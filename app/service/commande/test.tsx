@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { 
   View, 
   Animated, 
@@ -9,10 +9,15 @@ import { ScrollView } from 'react-native-gesture-handler';
 
 export default function ChangePlan() {
   const pan = useRef(new Animated.ValueXY()).current;
+  const [position, setPosition] = useState({ x: 0, y: 0 });
   
   const savePosition = (dx: number, dy: number) => {
-    pan.setValue({ x: dx, y: dy });
-    console.log('Position enregistrée:', dx, dy);
+    const newPosition = {
+      x: position.x + dx,
+      y: position.y + dy
+    };
+    setPosition(newPosition);
+    pan.setValue({ x: 0, y: 0 }); // Réinitialiser les valeurs d'animation
   };
 
   const panResponder = useRef(
@@ -38,8 +43,8 @@ export default function ChangePlan() {
           styles.square,
           {
             transform: [
-              { translateX: pan.x },
-              { translateY: pan.y },
+              { translateX: Animated.add(pan.x, new Animated.Value(position.x)) },
+              { translateY: Animated.add(pan.y, new Animated.Value(position.y)) },
             ]
           }
         ]}
