@@ -1,56 +1,11 @@
-import { Tabs } from 'expo-router';
-import { MaterialIcons } from '@expo/vector-icons';
+import { Stack } from "expo-router";
 
-export default function AppLayout() {
+export default function RootLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: 'gray',
-        tabBarStyle: {
-          backgroundColor: 'white',
-          borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
-        },
-        headerStyle: {
-          backgroundColor: '#2196F3',
-        },
-        headerTintColor: 'white',
-      }}
-      
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-            headerShown: false,
-            title: 'Caisse',
-            tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="point-of-sale" size={size} color={color} />
-          ),
-        }}
-      />
-      
-      <Tabs.Screen
-        name="mission"
-        options={{
-            headerShown: false,
-            title: 'Misison',
-            tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="inventory" size={size} color={color} />
-          ),
-        }}
-      />
-      
-      <Tabs.Screen
-        name="plan_de_salle"
-        options={{
-            headerShown: false,
-            title: 'Plan',
-            tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="analytics" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="change_plan" options={{ headerShown: false }} />
+        <Stack.Screen name="test" options={{ headerShown: false }} />
+    </Stack>
   );
 }
