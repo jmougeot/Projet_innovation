@@ -17,32 +17,36 @@ export default function AppLayout() {
         },
         headerTintColor: 'white',
       }}
+      
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Caisse',
-          tabBarIcon: ({ color, size }) => (
+            headerShown: false,
+            title: 'Caisse',
+            tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="point-of-sale" size={size} color={color} />
           ),
         }}
       />
       
       <Tabs.Screen
-        name="produits"
+        name="mission"
         options={{
-          title: 'Produits',
-          tabBarIcon: ({ color, size }) => (
+            headerShown: false,
+            title: 'Misison',
+            tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="inventory" size={size} color={color} />
           ),
         }}
       />
       
       <Tabs.Screen
-        name="rapports"
+        name="plan_de_salle"
         options={{
-          title: 'Rapports',
-          tabBarIcon: ({ color, size }) => (
+            headerShown: false,
+            title: 'Plan',
+            tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="analytics" size={size} color={color} />
           ),
         }}

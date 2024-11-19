@@ -1,6 +1,5 @@
-import { Text, View } from "react-native";
-import { Link } from "react-router-native";
-
+import { View } from "react-native";
+import { Link } from "expo-router";
 
 export default function Index() {
   return (
@@ -11,8 +10,7 @@ export default function Index() {
         alignItems: "center",
       }}
     >
-      <Link to="/service/pland_de_salle">Go to service</Link>
-
+      <Link href="/service/plan_de_salle">Go to service</Link>
     </View>
   );
 }
