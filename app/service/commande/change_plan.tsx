@@ -3,9 +3,9 @@ import {
   View, 
   Animated, 
   PanResponder,
-  StyleSheet 
+  StyleSheet,
+  Dimensions
 } from 'react-native';
-import { ScrollView } from 'react-native-gesture-handler';
 
 export default function ChangePlan() {
   const pan = useRef(new Animated.ValueXY()).current;
@@ -17,7 +17,7 @@ export default function ChangePlan() {
       y: position.y + dy
     };
     setPosition(newPosition);
-    pan.setValue({ x: 0, y: 0 }); // Réinitialiser les valeurs d'animation
+    pan.setValue({ x: 0, y: 0 });
   };
 
   const panResponder = useRef(
@@ -37,35 +37,42 @@ export default function ChangePlan() {
   ).current;
 
   return (
-    <ScrollView>
+    <View style={styles.container}>
       <Animated.View
         style={[
-          styles.square,
+          styles.draggable,
           {
             transform: [
               { translateX: Animated.add(pan.x, new Animated.Value(position.x)) },
-              { translateY: Animated.add(pan.y, new Animated.Value(position.y)) },
+              { translateY: Animated.add(pan.y, new Animated.Value(position.y)) }
             ]
           }
         ]}
         {...panResponder.panHandlers}
-        
       />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
-  square: {
+  draggable: {
     width: 100,
     height: 100,
     backgroundColor: '#2196F3',
     borderRadius: 8,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   }
 });

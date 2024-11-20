@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 interface Table {
   id: number;
@@ -11,6 +12,8 @@ interface Table {
 }
 
 export default function PlanDeSalle() {
+  const router = useRouter();
+
   const [tables, setTables] = useState<Table[]>([
     { id: 1, numero: "T1", places: 4, status: 'libre', position: { x: 10, y: 0 } },
     { id: 2, numero: "T2", places: 2, status: 'occupee', position: { x: 1, y: 0 } },
@@ -21,11 +24,11 @@ export default function PlanDeSalle() {
   ]);
 
   const handleTablePress = (tableId: number) => {
-    setTables(tables.map(table => 
-      table.id === tableId 
-        ? { ...table, status: getNextStatus(table.status) }
-        : table
-    ));
+    // Naviguer vers la page commande avec l'ID de la table
+    router.push({
+      pathname: "/service/commande/commande",
+      params: { tableId: tableId }
+    });
   };
 
   const getNextStatus = (currentStatus: Table['status']): Table['status'] => {
@@ -40,6 +43,7 @@ export default function PlanDeSalle() {
       case 'occupee': return '#f44336';
       case 'reservee': return '#FFC107';
     }
+
   };
 
   return (

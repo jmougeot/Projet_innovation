@@ -16,9 +16,7 @@ export default function AppLayout() {
           backgroundColor: '#2196F3',
         },
         headerTintColor: 'white',
-      }}
-      
-    >
+      }}>
       <Tabs.Screen
         name="index"
         options={{
@@ -28,7 +26,7 @@ export default function AppLayout() {
             <MaterialIcons name="point-of-sale" size={size} color={color} />
           ),
         }}
-      />
+/>
       
       <Tabs.Screen
         name="mission"
