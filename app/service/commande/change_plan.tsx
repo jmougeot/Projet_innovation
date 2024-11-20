@@ -48,8 +48,7 @@ export default function ChangePlan() {
             ]
           }
         ]}
-        {...panResponder.panHandlers}
-      />
+        {...panResponder.panHandlers}/>
     </View>
   );
 }

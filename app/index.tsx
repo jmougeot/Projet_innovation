@@ -1,6 +1,5 @@
 import { View } from "react-native";
 import { Link } from "expo-router";
-import { Header } from "react-native/Libraries/NewAppScreen";
 
 export default function Index() {
   return (
@@ -12,9 +11,9 @@ export default function Index() {
       }}
     >
       <Link href="/service/plan_de_salle">Go to service</Link>
-      <Link href="/service/commande/commande">Commander</Link>
       <Link href="/service/commande/change_plan">Modifier le plan</Link>
       <Link href="/service/commande/test">Test</Link>
+      <Link href="/cuisine/cuisine"> Cuisine </Link> 
     </View>
   );
 }
