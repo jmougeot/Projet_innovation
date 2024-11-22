@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { globalStyles } from '../../styles/globalStyles';
 import { PLAT, Plat } from './Plats';
@@ -13,6 +13,10 @@ export default function Commande() {
     const { tableId } = useLocalSearchParams();
     const [commandesParTable, setCommandesParTable] = useState<CommandeParTable[]>([]);
     const [platsSelectionnes, setPlatsSelectionnes] = useState<Plat[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const platsFilters = PLAT.filter(plat => 
+        plat.nom.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
     // Charger la commande existante pour la table
     useEffect(() => {
@@ -73,7 +77,7 @@ export default function Commande() {
 
     return (
         <View style={styles.container}>
-            <Text style={globalStyles.h1}>Commande - Table {tableId}</Text>
+            <Text style={globalStyles.h1}> Table {tableId}</Text>
             
             <View style={styles.section}>
                 <Text style={globalStyles.h2}>Plats sélectionnés</Text>
@@ -95,7 +99,7 @@ export default function Commande() {
                 </View>
             </View>
 
-            <View style={styles.section}>
+            <View style={styles.section2}>
                 <Text style={globalStyles.h2}>Liste des plats</Text>
                 <ScrollView style={styles.scrollView}>
                     {PLAT.map((plat, index) => (
@@ -114,7 +118,33 @@ export default function Commande() {
                         </Pressable>
                     ))}
                 </ScrollView>
-            </View>
+                <View style={styles.searchBar}>
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Rechercher un plat..."
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+                    </View>
+                    <ScrollView style={styles.scrollView}>
+                    {platsFilters.map((plat, index) => (
+                        <Pressable 
+                            key={plat.id} 
+                            style={styles.platItem}
+                            onPress={() => ajouterPlat(plat)}
+                        >
+                            <View style={styles.platInfo}>
+                                <Text style={styles.nomPlat}>{plat.nom}</Text>
+                                {plat.description && (
+                                    <Text style={styles.description}>{plat.description}</Text>
+                                )}
+                            </View>
+                            <Text style={styles.prixPlat}>{plat.prix.toFixed(2)} €</Text>
+                        </Pressable>
+                    ))}
+                    </ScrollView>
+                </View>
+            
         </View>
     );
 }
@@ -126,6 +156,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#f5f5f5',
     },
     section: {
+        flex: 0.6,
+        marginBottom: 20,
+    },
+    section2: {
         flex: 1,
         marginBottom: 20,
     },
@@ -177,4 +211,19 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'right',
     },
+    searchBar: {
+        backgroundColor: 'white',
+        borderRadius: 8,
+        marginBottom: 10,
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2,
+      },
+      searchInput: {
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        fontSize: 16,
+      },
 });
