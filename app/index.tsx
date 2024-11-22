@@ -26,6 +26,14 @@ export default function Index() {
             <Text style={styles.buttonText}>Cuisine</Text>
           </Pressable>
         </Link>
+
+        <Link href="/test_firebase" asChild>
+          <Pressable style={styles.button}>
+            <Text style={styles.buttonText}>Login</Text>
+          </Pressable>
+        </Link>
+
+        
       </View>
     </View>
   );
