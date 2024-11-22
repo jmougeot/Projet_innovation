@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { globalStyles } from '@/app/styles/globalStyles'; 
 
 interface Table {
   id: number;
@@ -49,7 +50,7 @@ export default function PlanDeSalle() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Plan de Salle</Text>
+        <Text style={globalStyles.h1}>Plan de Salle</Text>
         <View style={styles.legende}>
           <View style={styles.legendeItem}>
             <View style={[styles.legendeCarre, { backgroundColor: '#4CAF50' }]} />

@@ -32,7 +32,7 @@ export default function AppLayout() {
         name="mission"
         options={{
             headerShown: false,
-            title: 'Misison',
+            title: 'Mission',
             tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="inventory" size={size} color={color} />
           ),
