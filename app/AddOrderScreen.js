@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, Button, FlatList, TouchableOpacity } from "react-native-web";
-import { addOrder, getMenuItems } from "../firebase/firebaseDatabase";  // Import des fonctions Firebase
-import { auth } from "../firebase/firebaseConfig";  // Import de l'authentification Firebase
+import { addOrder, getMenuItems } from "./firebase/firebaseDatabase";  // Import des fonctions Firebase
+import { auth } from "./firebase/firebaseAuth";  // Import de l'authentification Firebase
 
 const AddOrderScreen = () => {
   const [menu, setMenu] = useState([]);
