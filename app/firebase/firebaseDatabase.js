@@ -2,6 +2,39 @@
 import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
+export async function ajout_plat(name, category, price) {
+  try {
+    const docRef = await addDoc(collection(db, "menu"), {
+      name: name,
+      category: category,
+      price: price
+    });
+    console.log("Plat ajouté avec succès :", docRef.id);
+  } catch (error) {
+    console.error("Erreur lors de l'ajout du plat :", error);
+  }
+}
+
+export async function get_plats() {
+  try {
+    const menuSnapshot = await getDocs(collection(db, "menu"));
+    const menuItems = [];
+    menuSnapshot.forEach((doc) => {
+      menuItems.push({ id: doc.id, ...doc.data() });
+    });
+    if (menuItems.length === 0) {
+      return [];
+    }
+    return menuItems;
+  } catch (error) {
+    console.error("Erreur lors de la récupération du menu :", error);
+    throw error; // Propager l'erreur au lieu de la silencer
+  }
+}
+
+
+
+
 // Ajouter une commande
 export async function addOrder(employeeId, items, totalPrice) {
   try {

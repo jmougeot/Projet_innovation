@@ -27,18 +27,17 @@ export default function Index() {
           </Pressable>
         </Link>
 
-        <Link href="./test_firebase" asChild>
+        <Link href="./connexion" asChild>
           <Pressable style={styles.button}>
             <Text style={styles.buttonText}>Login</Text>
           </Pressable>
         </Link>
 
-        <Link href="./AddOrderScreen" asChild>
+        <Link href="./manageur/menu/gestion_menu" asChild>
           <Pressable style={styles.button}>
-            <Text style={styles.buttonText}>Modifier le Plan</Text>
+            <Text style={styles.buttonText}> Gestion du menu</Text>
           </Pressable>
         </Link>
-
         
       </View>
     </View>
