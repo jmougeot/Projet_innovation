@@ -9,27 +9,33 @@ export default function Index() {
       </View>
 
       <View style={styles.buttonContainer}>
-        <Link href="/service/plan_de_salle" asChild>
+        <Link href="./service/plan_de_salle" asChild>
           <Pressable style={styles.button}>
             <Text style={styles.buttonText}>Plan de Salle</Text>
           </Pressable>
         </Link>
 
-        <Link href="/service/commande/change_plan" asChild>
+        <Link href="./service/commande/change_plan" asChild>
           <Pressable style={styles.button}>
             <Text style={styles.buttonText}>Modifier le Plan</Text>
           </Pressable>
         </Link>
 
-        <Link href="/cuisine/cuisine" asChild>
+        <Link href="./cuisine/cuisine" asChild>
           <Pressable style={styles.button}>
             <Text style={styles.buttonText}>Cuisine</Text>
           </Pressable>
         </Link>
 
-        <Link href="/test_firebase" asChild>
+        <Link href="./test_firebase" asChild>
           <Pressable style={styles.button}>
             <Text style={styles.buttonText}>Login</Text>
+          </Pressable>
+        </Link>
+
+        <Link href="./AddOrderScreen" asChild>
+          <Pressable style={styles.button}>
+            <Text style={styles.buttonText}>Modifier le Plan</Text>
           </Pressable>
         </Link>
 

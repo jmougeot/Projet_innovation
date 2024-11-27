@@ -70,6 +70,9 @@ export default function Commande() {
             setPlatsSelectionnes(platsMisesAJour);
         };
     }
+    const validerCommande = () => {
+        alert('Commande envoyée');
+    }
 
     const calculerTotal = () => {
         return platsSelectionnes.reduce((total, plat) => total + plat.prix * (plat.nombre || 0), 0).toFixed(2);
@@ -97,6 +100,9 @@ export default function Commande() {
                 <View style={styles.totalSection}>
                         <Text style={styles.totalText}>Total: {calculerTotal()} €</Text>
                 </View>
+                <Pressable onPress={validerCommande}>
+                    <Text>Envoyer la commande</Text>
+                </Pressable>
             </View>
 
             <View style={styles.section2}>
@@ -118,33 +124,32 @@ export default function Commande() {
                         </Pressable>
                     ))}
                 </ScrollView>
-                <View style={styles.searchBar}>
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder="Rechercher un plat..."
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                />
+ {/*            <View style={styles.searchBar}>
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Rechercher un plat..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}/>
+            </View>
+            <ScrollView style={styles.scrollView}>
+            {platsFilters.map((plat, index) => (
+                <Pressable 
+                    key={plat.id} 
+                    style={styles.platItem}
+                    onPress={() => ajouterPlat(plat)}
+                >
+                    <View style={styles.platInfo}>
+                        <Text style={styles.nomPlat}>{plat.nom}</Text>
+                        {plat.description && (
+                            <Text style={styles.description}>{plat.description}</Text>
+                        )}
                     </View>
-                    <ScrollView style={styles.scrollView}>
-                    {platsFilters.map((plat, index) => (
-                        <Pressable 
-                            key={plat.id} 
-                            style={styles.platItem}
-                            onPress={() => ajouterPlat(plat)}
-                        >
-                            <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.nom}</Text>
-                                {plat.description && (
-                                    <Text style={styles.description}>{plat.description}</Text>
-                                )}
-                            </View>
-                            <Text style={styles.prixPlat}>{plat.prix.toFixed(2)} €</Text>
-                        </Pressable>
-                    ))}
-                    </ScrollView>
-                </View>
-            
+                    <Text style={styles.prixPlat}>{plat.prix.toFixed(2)} €</Text>
+                </Pressable>
+            ))}
+            </ScrollView> */}
+            </View>
+    
         </View>
     );
 }
