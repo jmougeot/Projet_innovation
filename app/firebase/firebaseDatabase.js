@@ -33,8 +33,6 @@ export async function get_plats() {
 }
 
 
-
-
 // Ajouter une commande
 export async function addOrder(employeeId, items, totalPrice) {
   try {

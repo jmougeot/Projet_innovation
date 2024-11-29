@@ -57,7 +57,7 @@ const LoginScreen: React.FC = () => {
       <Button title="Se connecter" onPress={handleLogin} />
       {message && <Text>{message}</Text>}
 
-      <Link href="./SignUpScreen">
+      <Link href="./inscription">
         <Text>S'inscrire</Text>
       </Link>
     </View>

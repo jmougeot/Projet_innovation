@@ -33,7 +33,7 @@ export default function Index() {
           </Pressable>
         </Link>
 
-        <Link href="./manageur/menu/gestion_menu" asChild>
+        <Link href="./manageur/gestion_menu/gestion_menu" asChild>
           <Pressable style={styles.button}>
             <Text style={styles.buttonText}> Gestion du menu</Text>
           </Pressable>

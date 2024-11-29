@@ -1,13 +1,14 @@
 // src/screens/SignUpScreen.js
 import React, { useState } from "react";
-import { View, TextInput, Button, Text, Picker } from "react-native-web";
+import { View, TextInput, Button, Text } from "react-native";
 import { signUpUser } from "./firebase/firebaseAuth";
+import { Picker } from "@react-native-picker/picker";
 
 const SignUpScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState("employee"); // Par défaut : salarié
+  const [role, setRole] = useState("employee");
   const [message, setMessage] = useState("");
 
   const handleSignUp = async () => {
@@ -15,7 +16,11 @@ const SignUpScreen = () => {
       const user = await signUpUser(email, password, name, role);
       setMessage("Inscription réussie !");
     } catch (error) {
-      setMessage(`Erreur : ${error.message}`);
+      if (error instanceof Error) {
+        setMessage(`Erreur : ${error.message}`);
+      } else {
+        setMessage("Erreur inconnue");
+      }
     }
   };
 
