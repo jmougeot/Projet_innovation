@@ -6,7 +6,7 @@ import { setDoc, doc } from "firebase/firestore";
 const auth = getAuth(); // Instance d'authentification
 
 // Fonction d'inscription
-export async function signUpUser(email, password, name, role) {
+export async function signUpUser(email: string, password: string, name: string, role: string) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const userId = userCredential.user.uid;
@@ -22,18 +22,18 @@ export async function signUpUser(email, password, name, role) {
 
     return userCredential.user;
   } catch (error) {
-    console.error("Erreur lors de l'inscription :", error.message);
+    console.error("Erreur lors de l'inscription :", (error as Error).message);
     throw error;
   }
 }
 
 // Fonction de connexion
-export async function signInUser(email, password) {
+export async function signInUser(email: string, password: string) {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     return userCredential.user;
   } catch (error) {
-    console.error("Erreur lors de la connexion :", error.message);
+    console.error("Erreur lors de la connexion :", (error as Error).message);
     throw error;
   }
 }
