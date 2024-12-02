@@ -2,8 +2,8 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import React, { useState, useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { getDocs, collection } from 'firebase/firestore';
-import { db } from '../../firebase/firebaseConfig';
-import { getStock, addStock } from '../../firebase/firebaseStock';
+import { db } from '@/app/firebase/firebaseConfig';
+import {addStock } from '@/app/firebase/firebaseStock';
 
 interface StockItem {
     id: string;
