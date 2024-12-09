@@ -2,81 +2,88 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { globalStyles } from '../../styles/globalStyles';
-import { PLAT, Plat } from './Plats';
-
-interface CommandeParTable {
-    tableId: number;
-    plats: Plat[];
-}
+import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
+import { addCommande, CommandeData, PlatQuantite} from '@/app/firebase/firebaseCommande';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
-    const [commandesParTable, setCommandesParTable] = useState<CommandeParTable[]>([]);
-    const [platsSelectionnes, setPlatsSelectionnes] = useState<Plat[]>([]);
+    const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [searchQuery, setSearchQuery] = useState('');
-    const platsFilters = PLAT.filter(plat => 
-        plat.nom.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+    const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
+    const [listPlats, setListPlats] = useState<Plat[]>([]);
 
-    // Charger la commande existante pour la table
     useEffect(() => {
-        const commandeExistante = commandesParTable.find(cmd => cmd.tableId === Number(tableId));
-        if (commandeExistante) {
-            setPlatsSelectionnes(commandeExistante.plats);
-        } else {
-            setPlatsSelectionnes([]);
-        }
-    }, [tableId]);
+        const fetchPlats = async () => {
+            const platsData = await get_plats();
+            setListPlats(platsData);
+        };
+        fetchPlats();
+    }, []);
 
-    // Mettre à jour la commande pour la table
-    useEffect(() => {
-        if (tableId) {
-            setCommandesParTable(prev => {
-                const index = prev.findIndex(cmd => cmd.tableId === Number(tableId));
-                if (index >= 0) {
-                    const newCommandes = [...prev];
-                    newCommandes[index] = { tableId: Number(tableId), plats: platsSelectionnes };
-                    return newCommandes;
-                } else {
-                    return [...prev, { tableId: Number(tableId), plats: platsSelectionnes }];
-                }
-            });
-        }
-    }, [platsSelectionnes, tableId]);
 
     const ajouterPlat = (plat: Plat) => {
-        setPlatsSelectionnes((plats) => {
-            const index = plats.findIndex((p) => p.id === plat.id);
-            if (index >= 0) {
-                const platsMisesAJour = [...plats];
-                platsMisesAJour[index].nombre = (platsMisesAJour[index].nombre || 0) + 1;
-                return platsMisesAJour;
-            } else {
-                return [...plats, { ...plat, nombre: 1 }];
-            }        })
-    };
-
-    const supprimerPlat = (platToDelete:Plat) => {
-        const index =platsSelectionnes.findIndex((plat) => plat.id === platToDelete.id);
-        if (index==1){
-            setPlatsSelectionnes(platsSelectionnes.filter((plat) => plat !== platToDelete));
-        }
-        else{
-            const platsMisesAJour = [...platsSelectionnes];
-            platsMisesAJour[index].nombre = (platsMisesAJour[index].nombre || 0) - 1;
-            if (platsMisesAJour[index].nombre === 0) {
-                platsMisesAJour.splice(index, 1);
+        setPlats(prevPlats => {
+            const platIndex = prevPlats.findIndex(p => p.plat.id === plat.id);
+            if (platIndex >= 0) {
+                const updatedPlats = [...prevPlats];
+                updatedPlats[platIndex].quantite += 1;
+                return updatedPlats;
             }
-            setPlatsSelectionnes(platsMisesAJour);
-        };
+            return [...prevPlats, { plat, quantite: 1 }];
+        });
+        setCommandesParTable((prevCommande): CommandeData => {
+            if (!prevCommande || !prevCommande.plats || prevCommande.plats.length === 0) {
+                return {
+                    id: Date.now().toString(),
+                    employeeId: "default",
+                    plats: [{ plat, quantite: 1 }],
+                    totalPrice: plat.price,
+                    status: "pending",
+                    timestamp: new Date(),
+                    tableId: Number(tableId)
+                };
+            }
+            const commande = { ...prevCommande };
+            const platIndex = commande.plats.findIndex(p => p.plat.id === plat.id);
+
+            if (platIndex >= 0) {
+                const updatedCommande = { ...commande };
+                updatedCommande.plats[platIndex].quantite += 1;
+                updatedCommande.totalPrice = commande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
+                return updatedCommande;
+            }
+            
+            const updatedCommande = { ...commande };
+            updatedCommande.plats = [...commande.plats, { plat, quantite: 1 }];
+            updatedCommande.totalPrice = updatedCommande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
+            return updatedCommande;
+        })
     }
-    const validerCommande = () => {
+
+    const supprimerPlat = (plat: Plat) => {
+        setCommandesParTable(prevCommandes => {
+            if (!prevCommandes || !prevCommandes.plats) return prevCommandes;
+            
+            const commande = prevCommandes;
+            const platIndex = commande.plats.findIndex(p => p.plat.id === plat.id);
+            if (platIndex < 0) {
+                return prevCommandes;
+            }
+            const updatedCommande = { ...commande };
+            updatedCommande.plats = [...commande.plats];
+            updatedCommande.plats[platIndex].quantite -= 1;
+            if (updatedCommande.plats[platIndex].quantite === 0) {
+                updatedCommande.plats.splice(platIndex, 1);
+            }
+            updatedCommande.totalPrice = updatedCommande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
+            return updatedCommande;
+        });
+    }
+
+    const validerCommande = (commandesParTable: CommandeData) => {
+        addCommande(commandesParTable);
         alert('Commande envoyée');
     }
-
-    const calculerTotal = () => {
-        return platsSelectionnes.reduce((total, plat) => total + plat.prix * (plat.nombre || 0), 0).toFixed(2);
-    };
 
     return (
         <View style={styles.container}>
@@ -85,22 +92,22 @@ export default function Commande() {
             <View style={styles.section}>
                 <Text style={globalStyles.h2}>Plats sélectionnés</Text>
                 <ScrollView style={styles.scrollView}>
-                    {platsSelectionnes.map((plat, index) => (
+                    {plats.map((plat, index) => (
                         <Pressable key={index} 
                         style={styles.platItem}
-                        onPress={() => supprimerPlat(plat)} >
+                        onPress={() => supprimerPlat(plat.plat)} >
                         
                             <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.nom} x{plat.nombre}</Text>
+                                <Text style={styles.nomPlat}>{plat.plat.name} x{plat.quantite}</Text>
                             </View>
-                            <Text style={styles.prixPlat}>{plat.prix.toFixed(2)} €</Text>
+                            <Text style={styles.prixPlat}>{plat.plat.price} €</Text>
                         </Pressable>
                     ))}
                 </ScrollView>
                 <View style={styles.totalSection}>
-                        <Text style={styles.totalText}>Total: {calculerTotal()} €</Text>
+                        <Text style={styles.totalText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
                 </View>
-                <Pressable onPress={validerCommande}>
+                <Pressable onPress={() => commandesParTable && addCommande(commandesParTable)}>
                     <Text>Envoyer la commande</Text>
                 </Pressable>
             </View>
@@ -108,19 +115,18 @@ export default function Commande() {
             <View style={styles.section2}>
                 <Text style={globalStyles.h2}>Liste des plats</Text>
                 <ScrollView style={styles.scrollView}>
-                    {PLAT.map((plat, index) => (
+                    {listPlats.map((plat, index) => (
                         <Pressable 
                             key={plat.id} 
                             style={styles.platItem}
                             onPress={() => ajouterPlat(plat)}
                         >
                             <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.nom}</Text>
-                                {plat.description && (
-                                    <Text style={styles.description}>{plat.description}</Text>
-                                )}
-                            </View>
-                            <Text style={styles.prixPlat}>{plat.prix.toFixed(2)} €</Text>
+                                <Text style={styles.nomPlat}>{plat.name}</Text>
+                                <Text style={styles.description}>{plat.category}</Text>
+                            </View> 
+                            <Text style={styles.prixPlat}>{plat.price} €</Text>
+
                         </Pressable>
                     ))}
                 </ScrollView>

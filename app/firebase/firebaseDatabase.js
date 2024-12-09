@@ -2,6 +2,7 @@
 import { getFirestore, collection, addDoc, doc, getDoc, updateDoc, getDocs, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
+
 export async function ajout_plat(name, category, price) {
   try {
     const docRef = await addDoc(collection(db, "menu"), {
