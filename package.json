@@ -19,6 +19,8 @@
     "@react-native-picker/picker": "^2.10.0",
     "@react-navigation/bottom-tabs": "^7.0.5",
     "@react-navigation/native": "^7.0.3",
+    "antd": "^5.22.4",
+    "bootstrap": "^5.3.3",
     "expo": "~52.0.7",
     "expo-blur": "~14.0.1",
     "expo-constants": "~17.0.3",
