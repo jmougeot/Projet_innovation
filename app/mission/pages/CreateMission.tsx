@@ -3,13 +3,12 @@ import { db } from "../../firebase/firebaseConfig";
 import { addDoc, collection } from "firebase/firestore";
 import MissionForm from "../components/MissionForm"; // Importation du composant MissionForm
 import "bootstrap/dist/css/bootstrap.min.css";
-import "./CreateMission.css";
 
 // Définir le type des données de la mission que nous allons soumettre
 interface MissionData {
   title: string;
   description: string;
-  status: "à faire" | "en cours" | "fait"; // Liste des statuts possibles
+  status: string; // Liste des statuts possibles
 }
 
 const CreateMission: React.FC = () => {
