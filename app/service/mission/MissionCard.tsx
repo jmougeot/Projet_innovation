@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, Alert } from 'react-native';
 import ModifierEtat from './ModifierEtat'; // Importation du composant ModifierEtat
 import ProgressBar from './ProgressBar';
 
 // Définition des types pour les props du composant MissionCard
 interface MissionCardProps {
+  id: string;
   title: string;
   description: string;
-  state: string; // État actuel de la mission ("à faire", "en cours", "fait")
-  id: number; // Identifiant unique de la mission
-  onStateChange: (id: number, newState: string) => void; // Callback pour changer l'état de la mission
-  onDelete: (id: number) => void; // Callback pour supprimer la mission
+  status: string; // Changé de state à status
+  onStateChange: (id: string, newStatus: string) => Promise<void>; // Ajout du type Promise<void>
+  onDelete: (id: string) => Promise<void>; // Ajout du type Promise<void>
 }
 
 const MissionCard: React.FC<MissionCardProps> = ({ 
+  id, 
   title, 
   description, 
-  state, 
-  id, 
+  status, // Changé de state à status
   onStateChange, 
   onDelete 
 }) => {
@@ -30,8 +31,8 @@ const MissionCard: React.FC<MissionCardProps> = ({
     setShowDialog(false); // Fermer la modale sans faire de modification
   };
 
-  const handleSelectState = (newState: string) => {
-    onStateChange(id, newState); // Mettre à jour l'état de la mission via la fonction passée en props
+  const handleSelectState = (newStatus: string) => {
+    onStateChange(id, newStatus); // Mettre à jour l'état de la mission via la fonction passée en props
     setShowDialog(false); // Fermer la modale après avoir sélectionné l'état
   };
 
@@ -44,74 +45,70 @@ const MissionCard: React.FC<MissionCardProps> = ({
   };
 
   // Fonction pour transformer l'état en une valeur numérique pour ProgressBar
-  const transformStatus = (status: string): number | null => {
+  const transformStatus = (currentStatus: string): number => {
     const statusMapping: Record<string, number> = {
       "à faire": 0,
       "en cours": 1,
       "fait": 2,
     };
 
-    return statusMapping[status] !== undefined ? statusMapping[status] : null;
+    return statusMapping[currentStatus] !== undefined ? statusMapping[currentStatus] : 0;
   };
 
   return (
-    <div
+    <View
       style={{
-        width: '300px',
-        padding: '20px',
-        border: '1px solid #ccc',
-        borderRadius: '8px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+        width: 300,
+        padding: 20,
+        borderWidth: 1,
+        borderColor: '#ccc',
+        borderRadius: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
         backgroundColor: '#fff',
-        marginBottom: '20px',
+        marginBottom: 20,
       }}
     >
-      <h3 style={{ marginBottom: '10px' }}>{title}</h3>
-      <p style={{ marginBottom: '20px' }}>Déscription : {description}</p>
+      <Text style={{ fontSize: 18, fontWeight: 'bold', marginBottom: 10 }}>{title}</Text>
+      <Text style={{ marginBottom: 20 }}>Description : {description}</Text>
 
-      {/* Composant ProgressBar utilisé ici */}
-      <ProgressBar state={transformStatus(state)} />
+      <ProgressBar state={transformStatus(status)} />
 
-      {/* Bouton pour changer l'état de la mission */}
-      <button
-        onClick={handleStateChange}
+      <TouchableOpacity
+        onPress={handleStateChange}
         style={{
-          marginTop: '20px',
-          padding: '10px 20px',
+          marginTop: 20,
+          padding: 10,
           backgroundColor: '#3b82f6',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
+          borderRadius: 5,
+          alignItems: 'center',
         }}
       >
-        Modifier l'état
-      </button>
+        <Text style={{ color: 'white' }}>Modifier l'état</Text>
+      </TouchableOpacity>
 
-      {/* Bouton pour supprimer la mission */}
-      <button
-        onClick={handleDelete}
+      <TouchableOpacity
+        onPress={handleDelete}
         style={{
-          marginTop: '10px',
-          padding: '10px 20px',
+          marginTop: 10,
+          padding: 10,
           backgroundColor: 'red',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
+          borderRadius: 5,
+          alignItems: 'center',
         }}
       >
-        Supprimer la mission
-      </button>
+        <Text style={{ color: 'white' }}>Supprimer la mission</Text>
+      </TouchableOpacity>
 
-      {/* Modale de confirmation */}
       <ModifierEtat
         show={showDialog}
         onClose={handleCloseDialog}
         onSelectState={handleSelectState}
-        title={title} // Passer le titre de la mission à la modale
+        title={title}
       />
-    </div>
+    </View>
   );
 };
 

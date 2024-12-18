@@ -18,10 +18,10 @@ export default function AppLayout() {
         headerTintColor: 'white',
       }}>
       <Tabs.Screen
-        name="consigne"
+        name="AffichageMission"
         options={{
             headerShown: false,
-            title: 'Consigne',
+            title: 'Mission',
             tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="point-of-sale" size={size} color={color} />
           ),

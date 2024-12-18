@@ -38,12 +38,6 @@ export default function Index() {
             <Text style={styles.buttonText}> Gestion du menu</Text>
           </Pressable>
         </Link>
-
-        <Link href="./mission/pages/AffichageMission.tsx" asChild>
-          <Pressable style={styles.button}>
-            <Text style={styles.buttonText}> Mission</Text>
-          </Pressable>
-        </Link>
         
       </View>
     </View>

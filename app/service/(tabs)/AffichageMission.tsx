@@ -1,17 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { db } from '@/app/firebase/firebaseConfig';
 import { collection, getDocs, doc, updateDoc, deleteDoc, FirestoreError } from 'firebase/firestore';
-import MissionCard from '../components/MissionCard';
+import MissionCard from '../mission/MissionCard';
 
-// Définition du type pour une mission
 interface Mission {
   id: string;
   title: string;
   description: string;
-  status: string; // Statut de la mission (par exemple, 'à faire', 'en cours', 'fait')
+  status: string;
 }
 
-// Ajouter cette interface après l'interface Mission
 interface MissionCardProps {
   id: string;
   title: string;
@@ -78,21 +77,46 @@ const AffichageMission: React.FC = () => {
   };
 
   return (
-    <div className="p-5 min-h-screen overflow-y-auto">
-      <h1 className="text-2xl font-bold mb-4">Liste des Missions</h1>
-      {error && <div className="text-red-500 mb-4">{error}</div>}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {missions.map((mission) => (
-          <MissionCard
-            key={mission.id}
-            {...mission} // Spread des propriétés de base
-            onStateChange={handleStatusChange}
-            onDelete={handleDeleteMission}
-          />
-        ))}
-      </div>
-    </div>
+    <ScrollView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Liste des Missions</Text>
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        <View style={styles.gridContainer}>
+          {missions.map((mission) => (
+            <MissionCard
+              key={mission.id}
+              {...mission}
+              onStateChange={handleStatusChange}
+              onDelete={handleDeleteMission}
+            />
+          ))}
+        </View>
+      </View>
+    </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 16,
+  },
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+});
 
 export default AffichageMission;

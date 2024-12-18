@@ -29,7 +29,7 @@ export default function AppLayout() {
 />
       
       <Tabs.Screen
-        name="mission"
+        name="AffichageMission'"
         options={{
             headerShown: false,
             title: 'Mission',

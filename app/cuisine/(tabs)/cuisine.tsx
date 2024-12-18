@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native'
-import { PLAT, Plat } from '../../service/commande/Plats';
 import { globalStyles } from '../../styles/globalStyles';
 
 const Cuisine = () => {

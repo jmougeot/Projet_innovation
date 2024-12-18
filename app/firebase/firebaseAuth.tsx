@@ -6,7 +6,7 @@ import { setDoc, doc } from "firebase/firestore";
 const auth = getAuth(); // Instance d'authentification
 
 // Fonction d'inscription
-export async function signUpUser(email: string, password: string, name: string, role: string) {
+export default async function signUpUser(email: string, password: string, name: string, role: string) {
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const userId = userCredential.user.uid;
