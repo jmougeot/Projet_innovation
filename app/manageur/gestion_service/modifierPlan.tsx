@@ -1,11 +1,24 @@
-export default 
-function ModifierPlan() {
-    return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-            <h1 className="text-3xl font-bold mb-6">Modifier le Plan</h1>
-            <div className="bg-white p-8 rounded-lg shadow-md">
-                <p className="text-gray-600">Contenu de la page de modification du plan</p>
-            </div>
-        </div>
-    );
+import { FC, ReactElement } from 'react';
+
+interface TitleProps {
+    children: React.ReactNode;
 }
+
+const Title: FC<TitleProps> = ({ children }): ReactElement => (
+    <span className="text-xl font-bold">{children}</span>
+);
+
+const Content: FC<TitleProps> = ({ children }): ReactElement => (
+    <span className="text-base">{children}</span>
+);
+
+const ModifierPlan: FC = (): ReactElement => {
+    return (
+        <>
+            <Title>Modifier le Plan</Title>
+            <Content>Contenu de la page de modification du plan</Content>
+        </>
+    );
+};
+
+export default ModifierPlan;

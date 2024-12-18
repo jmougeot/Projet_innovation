@@ -20,20 +20,20 @@ export default function AppLayout() {
       <Tabs.Screen
         name="index"
         options={{
-            headerShown: false,
-            title: 'Caisse',
-            tabBarIcon: ({ color, size }) => (
+          headerShown: false,
+          title: 'Caisse',
+          tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="point-of-sale" size={size} color={color} />
           ),
         }}
-/>
+      />
       
       <Tabs.Screen
-        name="AffichageMission'"
+        name="AffichageMission"
         options={{
-            headerShown: false,
-            title: 'Mission',
-            tabBarIcon: ({ color, size }) => (
+          headerShown: false,
+          title: 'Mission',
+          tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="inventory" size={size} color={color} />
           ),
         }}
@@ -42,9 +42,9 @@ export default function AppLayout() {
       <Tabs.Screen
         name="plan_de_salle"
         options={{
-            headerShown: false,
-            title: 'Plan',
-            tabBarIcon: ({ color, size }) => (
+          headerShown: false,
+          title: 'Plan',
+          tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="analytics" size={size} color={color} />
           ),
         }}
