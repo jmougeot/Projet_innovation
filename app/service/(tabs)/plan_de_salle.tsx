@@ -25,9 +25,8 @@ export default function PlanDeSalle() {
   ]);
 
   const handleTablePress = (tableId: number) => {
-    // Naviguer vers la page commande avec l'ID de la table
     router.push({
-      pathname: "/service/commande/commande",
+      pathname: "/service/commande/commande_Table",
       params: { tableId: tableId }
     });
   };

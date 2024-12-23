@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import { globalStyles } from '../../styles/globalStyles';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
-import { addCommande, CommandeData, PlatQuantite} from '@/app/firebase/firebaseCommande';
+import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
+    const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
-    const [searchQuery, setSearchQuery] = useState('');
+    const [commandeExistante , setCommandeExistante] = useState<boolean>(false);
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
     const [listPlats, setListPlats] = useState<Plat[]>([]);
 
@@ -20,6 +21,26 @@ export default function Commande() {
         fetchPlats();
     }, []);
 
+    useEffect(() => {
+        const fetchCommande = async () => {
+          try {
+            const commande = await getCommandeByTableId(Number(tableId));
+            if (commande) {
+              setCommandesParTable(commande);
+              setPlats(commande.plats);
+              setCommandeExistante(true);
+              setIdcommande(commande.id);
+              console.log("Commande existante:",Idcommande);
+            }
+          } catch (error) {
+            console.error("Erreur lors du chargement de la commande:", error);
+          }
+        };
+        
+        if (tableId) {
+          fetchCommande();
+        }
+      }, [tableId]);
 
     const ajouterPlat = (plat: Plat) => {
         setPlats(prevPlats => {
@@ -29,16 +50,16 @@ export default function Commande() {
                 updatedPlats[platIndex].quantite += 1;
                 return updatedPlats;
             }
-            return [...prevPlats, { plat, quantite: 1 }];
+            return [...prevPlats, { plat, quantite: 1, status: "en attente", tableId: Number(tableId) }];
         });
         setCommandesParTable((prevCommande): CommandeData => {
             if (!prevCommande || !prevCommande.plats || prevCommande.plats.length === 0) {
                 return {
                     id: Date.now().toString(),
                     employeeId: "default",
-                    plats: [{ plat, quantite: 1 }],
+                    plats: [{ plat, quantite: 1, status: "en attente", tableId: Number(tableId) }],
                     totalPrice: plat.price,
-                    status: "pending",
+                    status: "en attente",
                     timestamp: new Date(),
                     tableId: Number(tableId)
                 };
@@ -54,7 +75,7 @@ export default function Commande() {
             }
             
             const updatedCommande = { ...commande };
-            updatedCommande.plats = [...commande.plats, { plat, quantite: 1 }];
+            updatedCommande.plats = [...commande.plats, { plat, quantite: 1, status: "en attente", tableId: Number(tableId) }];
             updatedCommande.totalPrice = updatedCommande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
             return updatedCommande;
         })
@@ -81,8 +102,14 @@ export default function Commande() {
     }
 
     const validerCommande = (commandesParTable: CommandeData) => {
-        addCommande(commandesParTable);
+        if (commandeExistante){
+            updateCommande(Idcommande, commandesParTable);
+        }
+        else{
+            addCommande(commandesParTable)
+        }
         alert('Commande envoyée');
+        router.replace("/service/(tabs)/plan_de_salle");
     }
 
     return (
@@ -107,9 +134,16 @@ export default function Commande() {
                 <View style={styles.totalSection}>
                         <Text style={styles.totalText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
                 </View>
-                <Pressable onPress={() => commandesParTable && addCommande(commandesParTable)}>
+                <Pressable onPress={() => commandesParTable && validerCommande(commandesParTable)}>
                     <Text>Envoyer la commande</Text>
                 </Pressable>
+                <Pressable onPress={() => router.replace({
+                    pathname: "/service/commande/encaissement",
+                    params: { tableId: tableId }
+                    })}>
+                    <Text>Encaissement</Text>
+                </Pressable>
+
             </View>
 
             <View style={styles.section2}>
@@ -126,36 +160,10 @@ export default function Commande() {
                                 <Text style={styles.description}>{plat.category}</Text>
                             </View> 
                             <Text style={styles.prixPlat}>{plat.price} €</Text>
-
                         </Pressable>
                     ))}
                 </ScrollView>
- {/*            <View style={styles.searchBar}>
-            <TextInput
-                style={styles.searchInput}
-                placeholder="Rechercher un plat..."
-                value={searchQuery}
-                onChangeText={setSearchQuery}/>
             </View>
-            <ScrollView style={styles.scrollView}>
-            {platsFilters.map((plat, index) => (
-                <Pressable 
-                    key={plat.id} 
-                    style={styles.platItem}
-                    onPress={() => ajouterPlat(plat)}
-                >
-                    <View style={styles.platInfo}>
-                        <Text style={styles.nomPlat}>{plat.nom}</Text>
-                        {plat.description && (
-                            <Text style={styles.description}>{plat.description}</Text>
-                        )}
-                    </View>
-                    <Text style={styles.prixPlat}>{plat.prix.toFixed(2)} €</Text>
-                </Pressable>
-            ))}
-            </ScrollView> */}
-            </View>
-    
         </View>
     );
 }

@@ -11,15 +11,6 @@ interface Mission {
   status: string;
 }
 
-interface MissionCardProps {
-  id: string;
-  title: string;
-  description: string;
-  status: string;
-  onStateChange: (id: string, status: string) => Promise<void>;
-  onDelete: (id: string) => Promise<void>;
-}
-
 const AffichageMission: React.FC = () => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [error, setError] = useState<string | null>(null);
