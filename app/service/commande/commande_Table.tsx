@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { globalStyles } from '../../styles/globalStyles';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 
 export default function Commande() {
@@ -114,53 +115,76 @@ export default function Commande() {
 
     return (
         <View style={styles.container}>
-            <Text style={globalStyles.h1}> Table {tableId}</Text>
-            
-            <View style={styles.section}>
-                <Text style={globalStyles.h2}>Plats sélectionnés</Text>
+            <View style={styles.headerSquare}>
+                <Text style={styles.headerSquareText}> Table {tableId}</Text>
+            </View>            
+            <View style={styles.sectionCommande}>
                 <ScrollView style={styles.scrollView}>
                     {plats.map((plat, index) => (
                         <Pressable key={index} 
-                        style={styles.platItem}
-                        onPress={() => supprimerPlat(plat.plat)} >
-                        
+                            style={styles.platItem}
+                            onPress={() => supprimerPlat(plat.plat)} >
                             <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.plat.name} x{plat.quantite}</Text>
+                                <Text style={styles.nomPlat}>{plat.plat.name}</Text>
                             </View>
-                            <Text style={styles.prixPlat}>{plat.plat.price} €</Text>
+                            <Text style={styles.prixPlat}>{plat.quantite} x {plat.plat.price} €</Text>
                         </Pressable>
-                    ))}
-                </ScrollView>
-                <View style={styles.totalSection}>
-                        <Text style={styles.totalText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
-                </View>
-                <Pressable onPress={() => commandesParTable && validerCommande(commandesParTable)}>
-                    <Text>Envoyer la commande</Text>
-                </Pressable>
-                <Pressable onPress={() => router.replace({
-                    pathname: "/service/commande/encaissement",
-                    params: { tableId: tableId }
-                    })}>
-                    <Text>Encaissement</Text>
-                </Pressable>
+                        ))}
 
+                </ScrollView>
+                <View style={styles.buttonContainer}>
+                    <Pressable
+                        style={styles.buttonEncaissement}
+                        onPress={() => commandesParTable && validerCommande(commandesParTable)}>
+                        <Text style={styles.buttonText}>Envoyer</Text>
+                    </Pressable>
+                    <Pressable 
+                        style={styles.buttonEnvoyer}
+                        onPress={() => router.replace({
+                        pathname: "/service/commande/encaissement",
+                        params: { tableId: tableId }
+                        })}>
+                        <Text style={styles.buttonText}>Encaissement</Text>
+                    </Pressable>
+                    <View style={styles.totalSection}>
+                            <Text style={styles.buttonText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
+                    </View>
+                </View>
             </View>
 
-            <View style={styles.section2}>
-                <Text style={globalStyles.h2}>Liste des plats</Text>
-                <ScrollView style={styles.scrollView}>
-                    {listPlats.map((plat, index) => (
-                        <Pressable 
-                            key={plat.id} 
-                            style={styles.platItem}
-                            onPress={() => ajouterPlat(plat)}
-                        >
-                            <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.name}</Text>
-                                <Text style={styles.description}>{plat.category}</Text>
-                            </View> 
-                            <Text style={styles.prixPlat}>{plat.price} €</Text>
-                        </Pressable>
+            <View style={styles.sectionPlat}>
+                <ScrollView style={styles.scrollView2}>
+                    {Object.entries(
+                        listPlats.reduce((acc, plat) => {
+                            acc[plat.category] = acc[plat.category] || [];
+                            acc[plat.category].push(plat);
+                            return acc;
+                        }, {} as Record<string, Plat[]>)
+                    ).map(([category, platsInCategory]) => (
+                        <View key={category} style={styles.category}>
+                            <View style={styles.categoryHeader}>
+                                <Text style={styles.categoryTitle}>{category}</Text>
+                                <View style={styles.categorySeparatorContainer}>
+                                    <LinearGradient
+                                        colors={['transparent', '#CAE1EF', 'transparent']}
+                                        start={{ x: 0, y: 0.5 }}
+                                        end={{ x: 1, y: 0.5 }}
+                                        style={styles.categorySeparator}
+                                    />
+                                </View>
+                            </View>
+                            <View style={styles.platsContainer}>
+                                {platsInCategory.map((plat, index) => (
+                                    <Pressable 
+                                        key={plat.id} 
+                                        style={[styles.platItem2, { width: '49%' }]}
+                                        onPress={() => ajouterPlat(plat)}
+                                    >
+                                 <Text style={styles.nomPlat}>{plat.name} {plat.price} €</Text>
+                                    </Pressable>
+                                ))}
+                            </View>
+                        </View>
                     ))}
                 </ScrollView>
             </View>
@@ -169,80 +193,175 @@ export default function Commande() {
 }
 
 const styles = StyleSheet.create({
+    // 1. Container principal et header
     container: {
         flex: 1,
         padding: 10,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#194A8D',
     },
-    section: {
-        flex: 0.6,
-        marginBottom: 20,
+    headerSquare: {
+        alignSelf: 'center',
+        backgroundColor: '#CAE1EF',
+        width: 150,
+        height: 35,
+        marginBottom: 10,
+        borderRadius: 80,
+        padding: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                marginTop: 45,
+            },
+            android: {
+                elevation: 5,
+            },
+        }),
     },
-    section2: {
-        flex: 1,
-        marginBottom: 20,
+    headerSquareText: {
+        color: '#083F8C',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+
+    // 2. Section commande (partie supérieure)
+    sectionCommande: {
+        flex: 0.30,
+        marginBottom: 10,
+        backgroundColor: '#F3EFEF',
+        borderRadius: 20,
+        overflow: 'hidden'
     },
     scrollView: {
-        backgroundColor: 'white',
-        borderRadius: 8,
+        backgroundColor: '#F3EFEF',
         padding: 10,
     },
     platItem: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        padding: 10,
+        padding: 5,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
     },
     platInfo: {
         flex: 1,
     },
-    platSelectionne: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
+    prixPlat: {
+        fontSize: 16,
+        fontWeight: '500',
+        color: '#2196F3',
     },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        padding: 5,
+        backgroundColor: '#F3EFEF',
+    },
+    buttonEncaissement: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#CAE1EF',
+        borderRadius: 25,
+        height: 30,
+        flex: 0.3,
+    },
+    buttonEnvoyer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#CAE1EF',
+        borderRadius: 25,
+        height: 30,
+        flex: 0.3,
+    },
+    totalSection: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#CAE1EF',
+        fontSize: 16,
+        borderRadius: 20,
+        height: 30,
+        flex: 0.3,
+    },
+    buttonText: {
+        color: '#083F8C',
+        fontSize: 13,
+        fontWeight: 'bold'
+    },
+
+    // 3. Section plats (partie inférieure)
+    sectionPlat: {
+        flex: 0.70,
+        marginBottom: 20,
+        backgroundColor: '#F3EFEF',
+        borderRadius: 20,
+        overflow: 'hidden'
+    },
+    scrollView2: {
+        backgroundColor: '#194A8D',
+        padding: 10,
+    },
+    category: {},
+    categoryHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: '100%',
+        marginVertical: 10,
+    },
+    categoryTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        fontStyle: 'italic',
+        color: 'white',
+        textAlign: 'right',
+        paddingRight: 15,
+        letterSpacing: 1,
+        fontFamily: 'Playfair',
+    },
+    categorySeparatorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+    },
+    categorySeparator: {
+        height: 4,
+        width: '100%',
+    },
+    platsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 7
+    },
+    platItem2: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 5,
+        backgroundColor: '#CAE1EF',
+        borderRadius: 30,
+        height: 40,
+    },
+
+    // 4. Éléments communs
     nomPlat: {
         fontSize: 16,
         fontWeight: '500',
+        color: '#194A8D',
     },
     description: {
         fontSize: 14,
         color: '#666',
         marginTop: 4,
     },
-    prixPlat: {
-        fontSize: 16,
-        fontWeight: '500',
-        color: '#2196F3',
+    platSelectionne: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        padding: 10,
+        borderBottomWidth: 1,
     },
-    totalSection: {
-        marginTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        paddingTop: 10,
-    },
-    totalText: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        textAlign: 'right',
-    },
-    searchBar: {
-        backgroundColor: 'white',
-        borderRadius: 8,
-        marginBottom: 10,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      searchInput: {
+    searchInput: {
         paddingHorizontal: 15,
         paddingVertical: 10,
         fontSize: 16,
-      },
+    },
 });
