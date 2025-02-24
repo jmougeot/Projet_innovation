@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-n
 import { useLocalSearchParams, router } from 'expo-router';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useFonts } from 'expo-font';
 
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 
@@ -10,9 +11,13 @@ export default function Commande() {
     const { tableId } = useLocalSearchParams();
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
-    const [commandeExistante , setCommandeExistante] = useState<boolean>(false);
+    const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
     const [listPlats, setListPlats] = useState<Plat[]>([]);
+
+    const [fontsLoaded] = useFonts({
+        'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
+    });
 
     useEffect(() => {
         const fetchPlats = async () => {
@@ -24,24 +29,27 @@ export default function Commande() {
 
     useEffect(() => {
         const fetchCommande = async () => {
-          try {
-            const commande = await getCommandeByTableId(Number(tableId));
-            if (commande) {
-              setCommandesParTable(commande);
-              setPlats(commande.plats);
-              setCommandeExistante(true);
-              setIdcommande(commande.id);
-              console.log("Commande existante:",Idcommande);
+            try {
+                const commande = await getCommandeByTableId(Number(tableId));
+                if (commande) {
+                    setCommandesParTable(commande);
+                    setPlats(commande.plats);
+                    setCommandeExistante(true);
+                    setIdcommande(commande.id);
+                }
+            } catch (error) {
+                console.error("Erreur lors du chargement de la commande:", error);
             }
-          } catch (error) {
-            console.error("Erreur lors du chargement de la commande:", error);
-          }
         };
         
         if (tableId) {
-          fetchCommande();
+            fetchCommande();
         }
-      }, [tableId]);
+    }, [tableId]);
+
+    if (!fontsLoaded) {
+        return null;
+    }
 
     const ajouterPlat = (plat: Plat) => {
         setPlats(prevPlats => {
@@ -175,12 +183,25 @@ export default function Commande() {
                             </View>
                             <View style={styles.platsContainer}>
                                 {platsInCategory.map((plat, index) => (
-                                    <Pressable 
+                                    <Pressable
                                         key={plat.id} 
-                                        style={[styles.platItem2, { width: '49%' }]}
+                                        style={{ width: '49%' }}
                                         onPress={() => ajouterPlat(plat)}
                                     >
-                                 <Text style={styles.nomPlat}>{plat.name} {plat.price} €</Text>
+                                        {plat.mission ? (
+                                            <LinearGradient
+                                                colors={['#F8EDCF', '#EFBC51']}
+                                                start={{ x: 0, y: 0 }}
+                                                end={{ x: 1, y: 1 }}
+                                                style={styles.platMission}
+                                            >
+                                                <Text style={[styles.nomPlat, { color: '#8B4513' }]}>{plat.name} {plat.price} €</Text>
+                                            </LinearGradient>
+                                        ) : (
+                                            <View style={styles.platItem2}>
+                                                <Text style={styles.nomPlat}>{plat.name} {plat.price} €</Text>
+                                            </View>
+                                        )}
                                     </Pressable>
                                 ))}
                             </View>
@@ -316,7 +337,7 @@ const styles = StyleSheet.create({
         textAlign: 'right',
         paddingRight: 15,
         letterSpacing: 1,
-        fontFamily: 'Playfair',
+        fontFamily: 'AlexBrush',
     },
     categorySeparatorContainer: {
         flex: 1,
@@ -340,6 +361,15 @@ const styles = StyleSheet.create({
         backgroundColor: '#CAE1EF',
         borderRadius: 30,
         height: 40,
+    },
+    platMission: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 5,
+        borderRadius: 30,
+        height: 40,
+        width: '100%',
     },
 
     // 4. Éléments communs
