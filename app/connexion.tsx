@@ -18,7 +18,7 @@ const LoginScreen: React.FC = () => {
   const router = useRouter();
 
   const [fontsLoaded] = useFonts({
-    'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
+    'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
   if (!fontsLoaded) {

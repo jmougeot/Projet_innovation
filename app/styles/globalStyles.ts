@@ -6,7 +6,7 @@ const fontSize = Math.min(windowWidth * 0.08, 40); // 10% de la largeur, max 40
 const STATUSBAR_HEIGHT = Platform.OS === 'ios' ? 44 : StatusBar.currentHeight || 0;
 
 
-export  const globalStyles = StyleSheet.create({
+const globalStyles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: STATUSBAR_HEIGHT,
@@ -38,3 +38,5 @@ export  const globalStyles = StyleSheet.create({
     marginBottom: 8,
   },
 });
+
+export default globalStyles;

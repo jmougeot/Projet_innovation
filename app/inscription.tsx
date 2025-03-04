@@ -16,7 +16,7 @@ const SignUpScreen = () => {
   const router = useRouter();
 
   const [fontsLoaded] = useFonts({
-    'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
+    'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
   if (!fontsLoaded) {
@@ -54,7 +54,7 @@ const SignUpScreen = () => {
       
       <ScrollView contentContainerStyle={styles.scrollViewContent}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>RestaurantApp</Text>
+          <Text style={styles.logoText}>Le Challenge</Text>
         </View>
         
         <View style={styles.formContainer}>
@@ -98,17 +98,20 @@ const SignUpScreen = () => {
           
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Rôle</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={role}
-                onValueChange={(itemValue) => setRole(itemValue)}
-                style={styles.picker}
-                dropdownIconColor="#194A8D"
-              >
-                <Picker.Item label="Salarié" value="employee" color="#083F8C" />
-                <Picker.Item label="Gérant" value="manager" color="#083F8C" />
-              </Picker>
-            </View>
+            <Pressable 
+              style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+              onPress={() => {
+                // Toggle role
+                const newRole = role === "employee" ? "manager" : "employee";
+                console.log("Changing role to:", newRole);
+                setRole(newRole);
+              }}
+            >
+              <Text style={{ color: '#194A8D' }}>
+                {role === "employee" ? "Salarié" : "Gérant"}
+              </Text>
+              <Text>▼</Text>
+            </Pressable>
           </View>
           
           {message ? <Text style={[styles.message, message.includes("réussie") ? styles.successMessage : styles.errorMessage]}>{message}</Text> : null}

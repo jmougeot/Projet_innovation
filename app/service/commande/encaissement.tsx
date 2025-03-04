@@ -1,152 +1,243 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { globalStyles } from '../../styles/globalStyles';
-import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
+import { MaterialIcons } from '@expo/vector-icons';
+import {Plat} from '@/app/firebase/firebaseMenu';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
 
-export default function Commande() {
+export default function Encaissement() {
     const { tableId } = useLocalSearchParams();
-    const [Idcommande, setIdcommande] = useState<string>("");
+    const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
-    const [PlatsSelectione, setPlatsSelectione] = useState<PlatQuantite[]>([]);
-    const [PlatEncaissé, setPlatEncaissé] = useState<PlatQuantite[]>([]);
-
+    const [platsSelectionnes, setPlatsSelectionnes] = useState<PlatQuantite[]>([]);
+    const [platsEncaisses, setPlatsEncaisses] = useState<PlatQuantite[]>([]);
+    const [totalSelectionnes, setTotalSelectionnes] = useState<number>(0);
+    const [totalEncaisses, setTotalEncaisses] = useState<number>(0);
+    const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque'>('carte');
 
     useEffect(() => {
         const fetchCommande = async () => {
-          try {
-            const commande = await getCommandeByTableId(Number(tableId));
-            if (commande) {
-              setCommandesParTable(commande);
-              setPlats(commande.plats);
-              setIdcommande(commande.id);
-              console.log("Commande existante:",Idcommande);
+            try {
+                const commande = await getCommandeByTableId(Number(tableId));
+                if (commande) {
+                    setCommandesParTable(commande);
+                    setPlats(commande.plats);
+                    setIdCommande(commande.id);
+                }
+            } catch (error) {
+                console.error("Erreur lors du chargement de la commande:", error);
             }
-          } catch (error) {
-            console.error("Erreur lors du chargement de la commande:", error);
-          }
         };
         
         if (tableId) {
-          fetchCommande();
+            fetchCommande();
         }
-      }, [tableId]);
+    }, [tableId]);
 
-    const EncaisserPlat = (plat: Plat) => {
+    // Update totals when platsSelectionnes changes
+    useEffect(() => {
+        const total = platsSelectionnes.reduce(
+            (sum, item) => sum + (item.plat.price * item.quantite), 
+            0
+        );
+        setTotalSelectionnes(total);
+    }, [platsSelectionnes]);
+
+    // Update totals when platsEncaisses changes
+    useEffect(() => {
+        const total = platsEncaisses.reduce(
+            (sum, item) => sum + (item.plat.price * item.quantite), 
+            0
+        );
+        setTotalEncaisses(total);
+    }, [platsEncaisses]);
+
+    const selectionnerPlat = (plat: PlatQuantite) => {
         // Retirer le plat des plats à encaisser
         setPlats(prevPlats => {
-            const updatedPlats = prevPlats.filter(p => p.plat.id !== plat.id);
-            return updatedPlats;
+            return prevPlats.filter(p => p.plat.id !== plat.plat.id);
         });
 
         // Ajouter le plat aux plats sélectionnés
-        setPlatsSelectione(prev => {
-            const existingPlat = prev.find(p => p.plat.id === plat.id);
+        setPlatsSelectionnes(prev => {
+            const existingPlat = prev.find(p => p.plat.id === plat.plat.id);
             if (existingPlat) {
                 return prev.map(p => 
-                    p.plat.id === plat.id 
-                    ? { ...p, quantite: p.quantite + 1 }
+                    p.plat.id === plat.plat.id 
+                    ? { ...p, quantite: p.quantite + plat.quantite }
                     : p
                 );
             }
-            return [...prev, { plat: plat, quantite: 1, status: 'new', tableId: Number(tableId) }];
+            return [...prev, { ...plat, status: 'en attente de paiement' }];
         });
     };
 
-    const Commande_Encaisse = () => {
-        CommandeEncaisse(Number(tableId));
-        console.log("Encaissement:");
-        router.replace('/service/(tabs)/plan_de_salle')
-    }
-
-
-
-    const validerEncaissement = (plat: Plat) => {
+    const encaisserPlat = (plat: PlatQuantite) => {
         // Retirer le plat des plats sélectionnés
-        setPlatsSelectione(prev => 
-            prev.filter(p => p.plat.id !== plat.id)
+        setPlatsSelectionnes(prev => 
+            prev.filter(p => p.plat.id !== plat.plat.id)
         );
 
         // Ajouter le plat aux plats encaissés
-        setPlatEncaissé(prev => {
-            const existingPlat = prev.find(p => p.plat.id === plat.id);
+        setPlatsEncaisses(prev => {
+            const existingPlat = prev.find(p => p.plat.id === plat.plat.id);
             if (existingPlat) {
                 return prev.map(p => 
-                    p.plat.id === plat.id 
-                    ? { ...p, quantite: p.quantite + 1 }
+                    p.plat.id === plat.plat.id 
+                    ? { ...p, quantite: p.quantite + plat.quantite }
                     : p
                 );
             }
-            return [...prev, { plat: plat, quantite: 1, status: 'new', tableId: Number(tableId) }];
+            return [...prev, { ...plat, status: 'encaissé' }];
         });
     };
 
+    const finaliserEncaissement = () => {
+        if (plats.length > 0) {
+            alert('Veuillez encaisser tous les plats avant de finaliser');
+            return;
+        }
+        
+        CommandeEncaisse(Number(tableId));
+        alert('Encaissement réussi !');
+        router.replace('/service/(tabs)/plan_de_salle');
+    };
+
+    const renderPaymentMethodButton = (
+        method: 'carte' | 'especes' | 'cheque', 
+        icon: keyof typeof MaterialIcons.glyphMap, 
+        label: string
+    ) => (
+        <Pressable
+            style={[
+                styles.paymentMethodButton,
+                paymentMethod === method ? styles.activePaymentMethod : {}
+            ]}
+            onPress={() => setPaymentMethod(method)}
+        >
+            <MaterialIcons name={icon} size={24} color={paymentMethod === method ? "#083F8C" : "#999"} />
+            <Text style={[
+                styles.paymentMethodText,
+                paymentMethod === method ? styles.activePaymentMethodText : {}
+            ]}>{label}</Text>
+        </Pressable>
+    );
+
     return (
         <View style={styles.container}>
-            <Text style={globalStyles.h1}>Table {tableId}</Text>
-            <View style={styles.section}>
-                <Text style={globalStyles.h2}>Plats à encaisser</Text>
-                <ScrollView style={styles.scrollView}>
-                    {plats.map((plat, index) => (
-                        <Pressable key={index} 
-                        style={styles.platItem}
-                        onPress={() => EncaisserPlat(plat.plat)} >
-                        
-                            <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.plat.name} x{plat.quantite}</Text>
+            <View style={styles.headerSquare}>
+                <Text style={styles.headerSquareText}>Encaissement Table {tableId}</Text>
+            </View>
+            
+            <View style={styles.paymentMethodsContainer}>
+                {renderPaymentMethodButton('carte', 'credit-card', 'Carte')}
+                {renderPaymentMethodButton('especes', 'attach-money', 'Espèces')}
+                {renderPaymentMethodButton('cheque', 'receipt', 'Chèque')}
+            </View>
+
+            <View style={styles.sectionsContainer}>
+                {/* Section 1: Plats à encaisser */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Plats à encaisser</Text>
+                    </View>
+                    <ScrollView style={styles.scrollView}>
+                        {plats.length > 0 ? (
+                            plats.map((plat, index) => (
+                                <Pressable 
+                                    key={index} 
+                                    style={styles.platItem}
+                                    onPress={() => selectionnerPlat(plat)}
+                                >
+                                    <View style={styles.platInfo}>
+                                        <Text style={styles.nomPlat}>{plat.plat.name}</Text>
+                                    </View>
+                                    <View style={styles.quantiteContainer}>
+                                        <Text style={styles.quantiteText}>× {plat.quantite}</Text>
+                                    </View>
+                                    <Text style={styles.prixPlat}>{plat.plat.price * plat.quantite} €</Text>
+                                </Pressable>
+                            ))
+                        ) : (
+                            <View style={styles.emptyStateContainer}>
+                                <MaterialIcons name="check-circle" size={32} color="#4CAF50" />
+                                <Text style={styles.emptyStateText}>Tous les plats sont sélectionnés</Text>
                             </View>
-                            <Text style={styles.prixPlat}>{plat.plat.price} €</Text>
-                        </Pressable>
-                    ))}
-                </ScrollView>
-                <View style={styles.totalSection}>
-                        <Text style={styles.totalText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
+                        )}
+                    </ScrollView>
+                    {commandesParTable && commandesParTable.totalPrice > 0 && (
+                        <View style={styles.totalSection}>
+                            <Text style={styles.totalText}>Total: {commandesParTable.totalPrice - totalSelectionnes - totalEncaisses} €</Text>
+                        </View>
+                    )}
+                </View>
+
+                {/* Section 2: Plats sélectionnés */}
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Plats sélectionnés pour paiement</Text>
+                    </View>
+                    <ScrollView style={styles.scrollView}>
+                        {platsSelectionnes.length > 0 ? (
+                            platsSelectionnes.map((plat, index) => (
+                                <Pressable 
+                                    key={index} 
+                                    style={styles.platItem}
+                                    onPress={() => encaisserPlat(plat)}
+                                >
+                                    <View style={styles.platInfo}>
+                                        <Text style={styles.nomPlat}>{plat.plat.name}</Text>
+                                    </View>
+                                    <View style={styles.quantiteContainer}>
+                                        <Text style={styles.quantiteText}>× {plat.quantite}</Text>
+                                    </View>
+                                    <Text style={styles.prixPlat}>{plat.plat.price * plat.quantite} €</Text>
+                                </Pressable>
+                            ))
+                        ) : (
+                            <View style={styles.emptyStateContainer}>
+                                <MaterialIcons name="shopping-cart" size={32} color="#999" />
+                                <Text style={styles.emptyStateText}>Aucun plat sélectionné</Text>
+                            </View>
+                        )}
+                    </ScrollView>
+                    {totalSelectionnes > 0 && (
+                        <View style={styles.totalSection}>
+                            <Text style={styles.totalText}>Sous-total: {totalSelectionnes} €</Text>
+                        </View>
+                    )}
                 </View>
             </View>
 
-            <View style={styles.section}>
-                <Text style={globalStyles.h2}>Plats selectionés </Text>
-                <ScrollView style={styles.scrollView}>
-                    {PlatsSelectione.map((plat, index) => (
-                        <Pressable key={index} 
-                        style={styles.platItem}
-                        onPress={() => validerEncaissement(plat.plat)} >
-                        
-                            <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.plat.name} x{plat.quantite}</Text>
-                            </View>
-                            <Text style={styles.prixPlat}>{plat.plat.price} €</Text>
-                        </Pressable>
-                    ))}
-                </ScrollView>
-                <View style={styles.totalSection}>
-                        <Text style={styles.totalText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
+            {/* Bottom section with payment actions */}
+            <View style={styles.bottomSection}>
+                <View style={styles.encaissementInfo}>
+                    <View style={styles.encaissementSummary}>
+                        <Text style={styles.encaissementLabel}>Encaissé: </Text>
+                        <Text style={styles.encaissementValue}>{totalEncaisses} €</Text>
+                    </View>
+                    <View style={styles.encaissementSummary}>
+                        <Text style={styles.encaissementLabel}>Restant: </Text>
+                        <Text style={styles.encaissementValue}>
+                            {commandesParTable ? (commandesParTable.totalPrice - totalEncaisses) : 0} €
+                        </Text>
+                    </View>
                 </View>
+                
+                <Pressable
+                    style={[
+                        styles.finaliserButton,
+                        plats.length > 0 ? styles.finaliserButtonDisabled : {}
+                    ]}
+                    onPress={finaliserEncaissement}
+                    disabled={plats.length > 0}
+                >
+                    <Text style={styles.finaliserButtonText}>
+                        {plats.length > 0 ? 'Encaissez tous les plats' : 'Finaliser l\'encaissement'}
+                    </Text>
+                </Pressable>
             </View>
-
-            <View style={styles.section}>
-                <Text style={globalStyles.h2}>Plats encaissés </Text>
-                <ScrollView style={styles.scrollView}>
-                    {PlatEncaissé.map((plat, index) => (
-                        <Pressable key={index} 
-                        style={styles.platItem}>
-                        
-                            <View style={styles.platInfo}>
-                                <Text style={styles.nomPlat}>{plat.plat.name} x{plat.quantite}</Text>
-                            </View>
-                            <Text style={styles.prixPlat}>{plat.plat.price} €</Text>
-                        </Pressable>
-                    ))}
-                </ScrollView>
-                <View style={styles.totalSection}>
-                        <Text style={styles.totalText}>Total: {commandesParTable?.totalPrice || 0} €</Text>
-                </View>
-            </View>
-            <Pressable onPress={() => Commande_Encaisse()}>
-                <Text>Valider la commande</Text>
-            </Pressable>
         </View>
     );
 }
@@ -155,19 +246,82 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         padding: 10,
-        backgroundColor: '#f5f5f5',
+        backgroundColor: '#194A8D',
+    },
+    headerSquare: {
+        alignSelf: 'center',
+        backgroundColor: '#CAE1EF',
+        width: 250,
+        height: 35,
+        marginBottom: 15,
+        borderRadius: 80,
+        padding: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        ...Platform.select({
+            ios: {
+                marginTop: 45,
+            },
+            android: {
+                elevation: 5,
+            },
+        }),
+    },
+    headerSquareText: {
+        color: '#083F8C',
+        fontWeight: 'bold',
+        fontSize: 18,
+    },
+    paymentMethodsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 15,
+    },
+    paymentMethodButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#CAE1EF',
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        borderRadius: 25,
+        flex: 0.3,
+    },
+    activePaymentMethod: {
+        backgroundColor: '#EFBC51',
+    },
+    paymentMethodText: {
+        marginLeft: 5,
+        color: '#999',
+        fontWeight: 'bold',
+    },
+    activePaymentMethodText: {
+        color: '#083F8C',
+    },
+    sectionsContainer: {
+        flex: 1,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
     },
     section: {
-        flex: 0.6,
-        marginBottom: 20,
+        flex: 0.48,
+        backgroundColor: '#F3EFEF',
+        borderRadius: 20,
+        overflow: 'hidden',
+        marginBottom: 10,
     },
-    section2: {
-        flex: 1,
-        marginBottom: 20,
+    sectionHeader: {
+        backgroundColor: '#CAE1EF',
+        padding: 10,
+        alignItems: 'center',
+    },
+    sectionTitle: {
+        color: '#083F8C',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
     scrollView: {
-        backgroundColor: 'white',
-        borderRadius: 8,
+        flex: 1,
         padding: 10,
     },
     platItem: {
@@ -177,55 +331,96 @@ const styles = StyleSheet.create({
         padding: 10,
         borderBottomWidth: 1,
         borderBottomColor: '#eee',
+        backgroundColor: 'white',
+        marginBottom: 5,
+        borderRadius: 8,
     },
     platInfo: {
         flex: 1,
     },
-    platSelectionne: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#eee',
-    },
+
     nomPlat: {
         fontSize: 16,
         fontWeight: '500',
+        color: '#083F8C',
     },
-    description: {
+    quantiteContainer: {
+        backgroundColor: '#EFBC51',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        marginRight: 8,
+    },
+    quantiteText: {
         fontSize: 14,
-        color: '#666',
-        marginTop: 4,
+        fontWeight: 'bold',
+        color: '#083F8C',
     },
     prixPlat: {
         fontSize: 16,
-        fontWeight: '500',
-        color: '#2196F3',
-    },
-    totalSection: {
-        marginTop: 10,
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        paddingTop: 10,
-    },
-    totalText: {
-        fontSize: 18,
         fontWeight: 'bold',
+        color: '#083F8C',
+        minWidth: 60,
         textAlign: 'right',
     },
-    searchBar: {
-        backgroundColor: 'white',
-        borderRadius: 8,
-        marginBottom: 10,
-        elevation: 2,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.2,
-        shadowRadius: 2,
-      },
-      searchInput: {
-        paddingHorizontal: 15,
-        paddingVertical: 10,
+    totalSection: {
+        backgroundColor: '#CAE1EF',
+        padding: 10,
+        borderBottomLeftRadius: 20,
+        borderBottomRightRadius: 20,
+    },
+    totalText: {
         fontSize: 16,
-      },
+        fontWeight: 'bold',
+        color: '#083F8C',
+        textAlign: 'right',
+    },
+    emptyStateContainer: {
+        padding: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyStateText: {
+        marginTop: 10,
+        color: '#999',
+        fontSize: 14,
+    },
+    bottomSection: {
+        backgroundColor: '#F3EFEF',
+        borderRadius: 20,
+        padding: 15,
+        marginTop: 10,
+    },
+    encaissementInfo: {
+        flexDirection: 'row',
+        justifyContent: 'space-around',
+        marginBottom: 10,
+    },
+    encaissementSummary: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    encaissementLabel: {
+        fontSize: 16,
+        color: '#083F8C',
+    },
+    encaissementValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#083F8C',
+    },
+    finaliserButton: {
+        backgroundColor: '#EFBC51',
+        padding: 15,
+        borderRadius: 25,
+        alignItems: 'center',
+    },
+    finaliserButtonDisabled: {
+        backgroundColor: '#CAE1EF',
+    },
+    finaliserButtonText: {
+        color: '#083F8C',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
 });

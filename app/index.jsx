@@ -11,7 +11,7 @@ export default function Index() {
       <View style={styles.buttonContainer}>
         <Link href="./service/plan_de_salle" asChild>
           <Pressable style={styles.button}>
-            <Text style={styles.buttonText}>Plan de Salle</Text>
+            <Text style={styles.buttonText}>Service</Text>
           </Pressable>
         </Link>
 
