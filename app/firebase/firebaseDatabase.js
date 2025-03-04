@@ -86,7 +86,6 @@ export async function calculateRevenue() {
   }
 }
 
-
 // Mettre à jour les points d’un salarié
 export async function updatePoints(employeeId, pointsToAdd) {
   try {

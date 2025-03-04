@@ -4,7 +4,6 @@ import { useLocalSearchParams, router } from 'expo-router';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 
 export default function Commande() {
@@ -91,20 +90,43 @@ export default function Commande() {
     }
 
     const supprimerPlat = (plat: Plat) => {
+        setPlats(prevPlats => {
+            const platIndex = prevPlats.findIndex(p => p.plat.id === plat.id);
+            if (platIndex < 0) return prevPlats;
+            
+            const updatedPlats = [...prevPlats];
+            
+            // Si la quantité est déjà à 1, supprimez le plat directement
+            if (updatedPlats[platIndex].quantite === 1) {
+                return updatedPlats.filter(p => p.plat.id !== plat.id);
+            }
+            
+            // Sinon, réduisez la quantité
+            updatedPlats[platIndex].quantite -= 1;
+            return updatedPlats;
+        });
+        
         setCommandesParTable(prevCommandes => {
             if (!prevCommandes || !prevCommandes.plats) return prevCommandes;
             
-            const commande = prevCommandes;
+            const commande = { ...prevCommandes };
             const platIndex = commande.plats.findIndex(p => p.plat.id === plat.id);
+            
             if (platIndex < 0) {
                 return prevCommandes;
             }
+            
             const updatedCommande = { ...commande };
             updatedCommande.plats = [...commande.plats];
-            updatedCommande.plats[platIndex].quantite -= 1;
-            if (updatedCommande.plats[platIndex].quantite === 0) {
-                updatedCommande.plats.splice(platIndex, 1);
+            
+            // Si la quantité est déjà à 1, supprimez le plat directement
+            if (updatedCommande.plats[platIndex].quantite === 1) {
+                updatedCommande.plats = updatedCommande.plats.filter(p => p.plat.id !== plat.id);
+            } else {
+                // Sinon, réduisez la quantité
+                updatedCommande.plats[platIndex].quantite -= 1;
             }
+            
             updatedCommande.totalPrice = updatedCommande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
             return updatedCommande;
         });

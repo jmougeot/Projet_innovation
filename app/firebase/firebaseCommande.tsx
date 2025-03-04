@@ -9,6 +9,7 @@ export interface PlatQuantite{
     quantite: number;
     status: string;
     tableId: number;
+    mission?: string; 
 }
 
 export interface CommandeData {

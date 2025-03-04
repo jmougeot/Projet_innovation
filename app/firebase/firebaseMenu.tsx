@@ -7,6 +7,7 @@ export interface Plat {
     category: string;
     price: number;
     description?: string;
+    mission?:boolean;
 }
 
 
