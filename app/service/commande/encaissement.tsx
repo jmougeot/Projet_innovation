@@ -101,7 +101,7 @@ export default function Encaissement() {
         
         CommandeEncaisse(Number(tableId));
         alert('Encaissement réussi !');
-        router.replace('/service/(tabs)/plan_de_salle');
+        router.replace('../(tabs)/plan_de_salle');
     };
 
     const renderPaymentMethodButton = (

@@ -26,7 +26,7 @@ export default function PlanDeSalle() {
 
   const handleTablePress = (tableId: number) => {
     router.push({
-      pathname: "/service/commande/commande_Table",
+      pathname: "../commande/commande_Table",
       params: { tableId: tableId }
     });
   };

@@ -140,7 +140,7 @@ export default function Commande() {
             addCommande(commandesParTable)
         }
         alert('Commande envoyée');
-        router.replace("/service/(tabs)/plan_de_salle");
+        router.replace("../(tabs)/plan_de_salle");
     }
 
     return (
@@ -171,7 +171,7 @@ export default function Commande() {
                     <Pressable 
                         style={styles.buttonEnvoyer}
                         onPress={() => router.replace({
-                        pathname: "/service/commande/encaissement",
+                        pathname: "./encaissement",
                         params: { tableId: tableId }
                         })}>
                         <Text style={styles.buttonText}>Encaissement</Text>
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
 
     // 2. Section commande (partie supérieure)
     sectionCommande: {
-        flex: 0.30,
+        flex: 0.5,  // Modifié de 0.30 à 0.5 pour occuper 50% de l'écran
         marginBottom: 10,
         backgroundColor: '#F3EFEF',
         borderRadius: 20,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
 
     // 3. Section plats (partie inférieure)
     sectionPlat: {
-        flex: 0.70,
+        flex: 0.5,  // Modifié de 0.70 à 0.5 pour occuper 50% de l'écran
         marginBottom: 20,
         backgroundColor: '#F3EFEF',
         borderRadius: 20,
