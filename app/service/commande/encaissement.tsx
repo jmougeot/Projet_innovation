@@ -4,6 +4,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import {Plat} from '@/app/firebase/firebaseMenu';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
+import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
+import { getAuth } from '@/app/firebase/firebaseConfig';
 
 export default function Encaissement() {
     const { tableId } = useLocalSearchParams();
@@ -15,6 +17,19 @@ export default function Encaissement() {
     const [totalSelectionnes, setTotalSelectionnes] = useState<number>(0);
     const [totalEncaisses, setTotalEncaisses] = useState<number>(0);
     const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque'>('carte');
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    useEffect(() => {
+        const auth = getAuth();
+        const user = auth.currentUser;
+        
+        if (user) {
+            setCurrentUserId(user.uid);
+            console.log("Utilisateur connecté:", user.uid);
+        } else {
+            console.log("Aucun utilisateur connecté");
+        }
+    }, []);
 
     useEffect(() => {
         const fetchCommande = async () => {
@@ -93,15 +108,33 @@ export default function Encaissement() {
         });
     };
 
-    const finaliserEncaissement = () => {
+    const finaliserEncaissement = async () => {
         if (plats.length > 0) {
             alert('Veuillez encaisser tous les plats avant de finaliser');
             return;
         }
         
-        CommandeEncaisse(Number(tableId));
-        alert('Encaissement réussi !');
-        router.replace('../(tabs)/plan_de_salle');
+        try {
+            if (!currentUserId) {
+                alert('Erreur: Utilisateur non connecté');
+                return;
+            }
+            
+            const montantTotal = commandesParTable ? commandesParTable.totalPrice : 0;
+            
+            if (montantTotal > 0) {
+                await distributeAmount(currentUserId, montantTotal);
+                console.log(`Montant de ${montantTotal}€ ajouté au CA de l'employé ${currentUserId} et du restaurant`);
+            }
+            
+            CommandeEncaisse(Number(tableId));
+            
+            alert('Encaissement réussi !');
+            router.replace('../(tabs)/plan_de_salle');
+        } catch (error) {
+            console.error("Erreur lors de l'encaissement:", error);
+            alert(`Erreur lors de l'encaissement: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+        }
     };
 
     const renderPaymentMethodButton = (

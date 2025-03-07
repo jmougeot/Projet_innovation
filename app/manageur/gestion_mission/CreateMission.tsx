@@ -1,12 +1,11 @@
 'use client';
 
 import React from "react";
-import { View } from 'react-native';
+import { View, Text } from 'react-native';
 import { db } from "../../firebase/firebaseConfig";
 import { addDoc, collection } from "firebase/firestore";
 import MissionForm from "@/app/service/mission/MissionForm";
 import "bootstrap/dist/css/bootstrap.min.css";
-import Text from "@/app/components/Text";
 
 interface MissionData {
   title: string;

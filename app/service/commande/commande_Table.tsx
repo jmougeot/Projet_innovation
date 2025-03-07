@@ -60,9 +60,11 @@ export default function Commande() {
             }
             return [...prevPlats, { plat, quantite: 1, status: "en attente", tableId: Number(tableId) }];
         });
-        setCommandesParTable((prevCommande): CommandeData => {
-            if (!prevCommande || !prevCommande.plats || prevCommande.plats.length === 0) {
-                return {
+        
+        setCommandesParTable((prevCommande) => {
+            // Si aucune commande n'existe, en créer une nouvelle
+            if (!prevCommande) {
+                const newCommande: CommandeData = {
                     id: Date.now().toString(),
                     employeeId: "default",
                     plats: [{ plat, quantite: 1, status: "en attente", tableId: Number(tableId) }],
@@ -71,7 +73,11 @@ export default function Commande() {
                     timestamp: new Date(),
                     tableId: Number(tableId)
                 };
+                setIdcommande(newCommande.id);
+                return newCommande;
             }
+            
+            // Si une commande existe
             const commande = { ...prevCommande };
             const platIndex = commande.plats.findIndex(p => p.plat.id === plat.id);
 
@@ -86,7 +92,7 @@ export default function Commande() {
             updatedCommande.plats = [...commande.plats, { plat, quantite: 1, status: "en attente", tableId: Number(tableId) }];
             updatedCommande.totalPrice = updatedCommande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
             return updatedCommande;
-        })
+        });
     }
 
     const supprimerPlat = (plat: Plat) => {
@@ -133,11 +139,16 @@ export default function Commande() {
     }
 
     const validerCommande = (commandesParTable: CommandeData) => {
-        if (commandeExistante){
-            updateCommande(Idcommande, commandesParTable);
+        if (!commandesParTable || !commandesParTable.plats || commandesParTable.plats.length === 0) {
+            alert('Veuillez ajouter des plats à la commande');
+            return;
         }
-        else{
-            addCommande(commandesParTable)
+        
+        if (commandeExistante) {
+            updateCommande(Idcommande, commandesParTable);
+        } else {
+            addCommande(commandesParTable);
+            setCommandeExistante(true);
         }
         alert('Commande envoyée');
         router.replace("../(tabs)/plan_de_salle");
@@ -164,7 +175,11 @@ export default function Commande() {
                 </ScrollView>
                 <View style={styles.buttonContainer}>
                     <Pressable
-                        style={styles.buttonEncaissement}
+                        style={[
+                            styles.buttonEncaissement,
+                            (!commandesParTable || !commandesParTable.plats || commandesParTable.plats.length === 0) ? 
+                            { opacity: 0.5 } : {}
+                        ]}
                         onPress={() => commandesParTable && validerCommande(commandesParTable)}>
                         <Text style={styles.buttonText}>Envoyer</Text>
                     </Pressable>

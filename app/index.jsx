@@ -60,6 +60,12 @@ export default function Index() {
               <Text style={styles.buttonText}>Gestion</Text>
             </Pressable>
           </Link>
+
+          <Link href="./Profil/avatar" asChild>
+            <Pressable style={styles.button}>
+              <Text style={styles.buttonText}>Profil</Text>
+            </Pressable>
+          </Link>
         </View>
       </View>
       

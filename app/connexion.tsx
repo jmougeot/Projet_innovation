@@ -37,7 +37,7 @@ const LoginScreen: React.FC = () => {
       const userData = userDoc.data() as UserData;
 
       if (userData?.role === "manager") {
-        router.push('./service/plan_de_salle');
+        router.push('./index');
       } else if (userData?.role === "employee") {
         router.push("./service/plan_de_salle");
       } else {
