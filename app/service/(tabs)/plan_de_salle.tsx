@@ -1,34 +1,61 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
 
-interface Table {
-  id: number;
-  numero: string;
-  places: number;
-  status: 'libre' | 'occupee' | 'reservee';
-  position: { x: number; y: number };
-}
+// Match table size with change_plan.tsx
+const TABLE_SIZE = 50;
 
 export default function PlanDeSalle() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'plan' | 'liste'>('plan');
+  const [tables, setTables] = useState<Table[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const [tables, setTables] = useState<Table[]>([
-    { id: 1, numero: "T1", places: 4, status: 'libre', position: { x: 10, y: 0 } },
-    { id: 2, numero: "T2", places: 2, status: 'occupee', position: { x: 1, y: 0 } },
-    { id: 3, numero: "T3", places: 6, status: 'reservee', position: { x: 2, y: 0 } },
-    { id: 4, numero: "T4", places: 4, status: 'libre', position: { x: 0, y: 1 } },
-    { id: 5, numero: "T5", places: 8, status: 'libre', position: { x: 1, y: 1 } },
-    { id: 6, numero: "T6", places: 2, status: 'occupee', position: { x: 2, y: 1 } },
-  ]);
+  // Load tables from Firebase
+  useEffect(() => {
+    const loadTables = async () => {
+      try {
+        setLoading(true);
+        // Initialize with default tables if none exist
+        await initializeDefaultTables();
+        const tablesData = await getTables();
+        setTables(tablesData);
+      } catch (error) {
+        console.error("Error loading tables:", error);
+        alert("Erreur lors du chargement des tables");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadTables();
+  }, []);
 
   const handleTablePress = (tableId: number) => {
     router.push({
       pathname: "../commande/commande_Table",
       params: { tableId: tableId }
     });
+  };
+
+  // Change table status on long press
+  const handleTableLongPress = async (tableId: number, currentStatus: Table['status']) => {
+    try {
+      const nextStatus = getNextStatus(currentStatus);
+      await updateTableStatus(tableId, nextStatus);
+      
+      // Update local state
+      setTables(prevTables => 
+        prevTables.map(table => 
+          table.id === tableId ? { ...table, status: nextStatus } : table
+        )
+      );
+    } catch (error) {
+      console.error("Error updating table status:", error);
+      alert("Erreur lors de la modification du statut");
+    }
   };
 
   const getNextStatus = (currentStatus: Table['status']): Table['status'] => {
@@ -62,32 +89,37 @@ export default function PlanDeSalle() {
   });
 
   const renderPlanView = () => (
-    <ScrollView horizontal={true} style={styles.scrollContainer}>
-      <ScrollView>
-        <View style={styles.planContainer}>
-          {tables.map((table) => (
-            <TouchableOpacity
-              key={table.id}
-              style={[
-                styles.table,
-                { 
-                  backgroundColor: getStatusColor(table.status),
-                  transform: [
-                    { translateX: table.position.x * 140 },
-                    { translateY: table.position.y * 140 }
-                  ]
-                }
-              ]}
-              onPress={() => handleTablePress(table.id)}
-            >
-              <Text style={styles.tableNumero}>{table.numero}</Text>
-              <MaterialIcons name="people" size={24} color="#194A8D" />
-              <Text style={styles.placesText}>{table.places} places</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-    </ScrollView>
+    <View 
+      style={{
+        width: '100%',
+        height: '100%',
+        backgroundColor: '#F3EFEF',
+      }}
+    >
+      <View style={styles.planContainer}>
+        {tables.map((table) => (
+          <TouchableOpacity
+            key={table.id}
+            style={[
+              styles.table,
+              { 
+                backgroundColor: getStatusColor(table.status),
+                // Use direct positioning to match change_plan.tsx
+                left: table.position.x,
+                top: table.position.y,
+              }
+            ]}
+            onPress={() => handleTablePress(table.id)}
+            onLongPress={() => handleTableLongPress(table.id, table.status)}
+            delayLongPress={500}
+          >
+            <Text style={styles.tableNumero}>{table.numero}</Text>
+            <MaterialIcons name="people" size={24} color="#194A8D" />
+            <Text style={styles.placesText}>{table.places} places</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
   );
 
   const renderListView = () => (
@@ -100,6 +132,8 @@ export default function PlanDeSalle() {
             { backgroundColor: getStatusColor(table.status) }
           ]}
           onPress={() => handleTablePress(table.id)}
+          onLongPress={() => handleTableLongPress(table.id, table.status)}
+          delayLongPress={500}
         >
           <View style={styles.tableListInfo}>
             <Text style={styles.tableListNumero}>{table.numero}</Text>
@@ -153,7 +187,18 @@ export default function PlanDeSalle() {
           </View>
         </View>
         
-        {viewMode === 'plan' ? renderPlanView() : renderListView()}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#194A8D" />
+            <Text style={styles.loadingText}>Chargement des tables...</Text>
+          </View>
+        ) : (
+          viewMode === 'plan' ? renderPlanView() : renderListView()
+        )}
+      </View>
+      
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>Appui long pour changer le statut</Text>
       </View>
     </View>
   );
@@ -247,14 +292,14 @@ const styles = StyleSheet.create({
   },
   planContainer: {
     position: 'relative',
-    width: 1000,
-    height: 800,
+    width: '100%',
+    height: '100%',
     padding: 20,
   },
   table: {
     position: 'absolute',
-    width: 120,
-    height: 120,
+    width: TABLE_SIZE,
+    height: TABLE_SIZE,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
@@ -266,14 +311,14 @@ const styles = StyleSheet.create({
   },
   tableNumero: {
     color: '#194A8D',
-    fontSize: 20,
+    fontSize: 16,  // Reduced font size to match smaller table
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   placesText: {
     color: '#194A8D',
-    fontSize: 14,
-    marginTop: 4,
+    fontSize: 12,  // Reduced font size
+    marginTop: 2,
   },
   listContainer: {
     flex: 1,
@@ -315,5 +360,25 @@ const styles = StyleSheet.create({
     color: '#194A8D',
     fontSize: 16,
     fontWeight: '500',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3EFEF',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#194A8D',
+    fontSize: 16,
+  },
+  footer: {
+    padding: 10,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#CAE1EF',
+    fontSize: 14,
+    fontStyle: 'italic',
   },
 });

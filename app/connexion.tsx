@@ -37,9 +37,9 @@ const LoginScreen: React.FC = () => {
       const userData = userDoc.data() as UserData;
 
       if (userData?.role === "manager") {
-        router.push('./index');
+        router.replace("/");  // Use absolute path instead of relative;
       } else if (userData?.role === "employee") {
-        router.push("./service/plan_de_salle");
+        router.replace("/");  // Use absolute path instead of relative;
       } else {
         setMessage("Rôle utilisateur non reconnu");
       }
