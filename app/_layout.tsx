@@ -7,7 +7,6 @@ export default function RootLayout() {
       <Stack.Screen name="service" options={{ headerShown: false }} />
       <Stack.Screen name="cuisine" options={{ headerShown: false }}/>
       <Stack.Screen name="manageur" options={{ headerShown: false }} />
-
     </Stack>
   );
 }

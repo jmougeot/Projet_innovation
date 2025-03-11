@@ -66,6 +66,13 @@ export default function Index() {
               <Text style={styles.buttonText}>Profil</Text>
             </Pressable>
           </Link>
+
+          <Link href="./mission" asChild>
+            <Pressable style={styles.button}>
+              <Text style={styles.buttonText}>Mission</Text>
+            </Pressable>
+          </Link>
+
         </View>
       </View>
       

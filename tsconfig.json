@@ -13,5 +13,5 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
-, "app/test_firebase.js", "app/LoginScreen.tsx", "app/LoginScreen.tsx", "app/firebase/firebaseConfig.js", "app/firebase/firebaseConfig.js", "app/index.jsx"  ]
+, "app/test_firebase.js", "app/LoginScreen.tsx", "app/LoginScreen.tsx", "app/firebase/firebaseConfig.js", "app/firebase/firebaseConfig.js", "app/index.jsx", "app/mission/NewMission"  ]
 }
