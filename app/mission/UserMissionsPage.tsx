@@ -6,7 +6,9 @@ import {
   FlatList, 
   TouchableOpacity, 
   ActivityIndicator, 
-  Alert 
+  Alert,
+  ScrollView,
+  Platform
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -16,6 +18,8 @@ import { getMission } from '../firebase/firebaseMission';
 import { MissionStackParamList } from './index';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useFonts } from 'expo-font';
 
 // Interface pour les missions de l'utilisateur avec données étendues
 interface UserMissionWithDetails {
@@ -35,10 +39,16 @@ const UserMissionsPage = () => {
   const [userMissions, setUserMissions] = useState<UserMissionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
+  const [completedMissions, setCompletedMissions] = useState<UserMissionWithDetails[]>([]);
   
   const navigation = useNavigation<StackNavigationProp<MissionStackParamList>>();
   const auth = getAuth();
   const currentUser = auth.currentUser;
+
+  const [fontsLoaded] = useFonts({
+    'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
+  });
 
   // Fonction pour charger les missions de l'utilisateur
   const loadUserMissions = async () => {
@@ -61,6 +71,13 @@ const UserMissionsPage = () => {
       );
       
       setUserMissions(missionsWithDetails);
+      
+      // Séparer les missions actives et complétées
+      const active = missionsWithDetails.filter(m => m.status === 'pending');
+      const completed = missionsWithDetails.filter(m => m.status === 'completed');
+      
+      setActiveMissions(active);
+      setCompletedMissions(completed);
     } catch (error) {
       console.error('Erreur lors de la récupération des missions:', error);
       Alert.alert('Erreur', 'Impossible de charger vos missions');
@@ -120,58 +137,67 @@ const UserMissionsPage = () => {
     );
   };
 
-  // Rendu d'une mission
-  const renderMissionItem = ({ item }: { item: UserMissionWithDetails }) => {
+  // Fonction pour déterminer la couleur de la barre de progression en fonction du pourcentage
+  const getProgressColor = (percentage: number) => {
+    if (percentage < 30) return '#F44336'; // Rouge pour progression faible
+    if (percentage < 70) return '#FFA726'; // Orange pour progression moyenne
+    return '#4CAF50'; // Vert pour bonne progression
+  };
+
+  // Rendu d'une mission active
+  const renderActiveMissionItem = (item: UserMissionWithDetails) => {
     if (!item.missionDetails) return null;
+    
+    const progressPercentage = item.progression || 0;
+    const progressColor = getProgressColor(progressPercentage);
     
     return (
       <TouchableOpacity 
         style={styles.missionCard}
         onPress={() => {
           // Navigation vers le détail de la mission (à implémenter plus tard)
-          // navigation.navigate('MissionDetail', { missionId: item.missionId });
         }}
       >
         <View style={styles.missionHeader}>
           <Text style={styles.missionTitle}>{item.missionDetails.titre || "Sans titre"}</Text>
-          {renderStatusIndicator(item.status)}
+          <View style={[styles.statusIndicator, { backgroundColor: '#FFA500' }]}>
+            <Text style={styles.statusText}>En cours</Text>
+          </View>
         </View>
         
         <Text style={styles.missionDescription} numberOfLines={2}>
           {item.missionDetails.description || "Pas de description disponible"}
         </Text>
         
-        {/* Date de début si disponible */}
-        {item.missionDetails.recurrence && item.missionDetails.recurrence.dateDebut && (
-          <View style={styles.dateContainer}>
-            <Ionicons name="calendar-outline" size={14} color="#666" />
-            <Text style={styles.dateText}>
-              {formatDate(item.missionDetails.recurrence.dateDebut)}
-            </Text>
-          </View>
-        )}
+        {/* Points de la mission */}
+        <View style={styles.pointsContainer}>
+          <Ionicons name="star" size={16} color="#FFD700" />
+          <Text style={styles.pointsText}>{item.missionDetails.points || 0} points</Text>
+        </View>
         
-        <View style={styles.missionFooter}>
-          <View style={styles.pointsContainer}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.pointsText}>{item.missionDetails.points || 0} points</Text>
-          </View>
-          
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>
-              Progression: {item.progression || 0}%
+        {/* Barre de progression */}
+        <View style={styles.progressContainer}>
+          <View style={styles.progressLabelContainer}>
+            <Text style={styles.progressText}>Progression</Text>
+            <Text style={[styles.progressPercentage, { color: progressColor }]}>
+              {progressPercentage}%
             </Text>
-            <View style={styles.progressBarContainer}>
-              <View 
-                style={[
-                  styles.progressBar, 
-                  { width: `${item.progression || 0}%` }
-                ]} 
-              />
-            </View>
+          </View>
+          <View style={styles.progressBarContainer}>
+            <View 
+              style={[
+                styles.progressBar, 
+                { width: `${progressPercentage}%`, backgroundColor: progressColor }
+              ]} 
+            />
+            {/* Marqueurs de jalons */}
+            <View style={[styles.milestone, { left: '25%' }]} />
+            <View style={[styles.milestone, { left: '50%' }]} />
+            <View style={[styles.milestone, { left: '75%' }]} />
           </View>
         </View>
         
+        {/* Tag mission collective */}
         {item.isPartOfCollective && (
           <View style={styles.collectiveTag}>
             <Ionicons name="people" size={14} color="#fff" />
@@ -182,10 +208,47 @@ const UserMissionsPage = () => {
     );
   };
 
-  if (loading) {
+  // Rendu d'une mission complétée (version simplifiée)
+  const renderCompletedMissionItem = (item: UserMissionWithDetails) => {
+    if (!item.missionDetails) return null;
+    
+    return (
+      <TouchableOpacity 
+        style={styles.completedMissionCard}
+        onPress={() => {
+          // Navigation vers le détail de la mission (à implémenter plus tard)
+        }}
+      >
+        <View style={styles.missionHeader}>
+          <Text style={styles.completedMissionTitle}>{item.missionDetails.titre || "Sans titre"}</Text>
+          <View style={[styles.statusIndicator, { backgroundColor: '#4CAF50' }]}>
+            <Text style={styles.statusText}>Terminée</Text>
+          </View>
+        </View>
+        
+        <View style={styles.completedMissionFooter}>
+          <View style={styles.pointsContainer}>
+            <Ionicons name="star" size={16} color="#FFD700" />
+            <Text style={styles.pointsText}>{item.missionDetails.points || 0} points</Text>
+          </View>
+          
+          {item.dateCompletion && (
+            <View style={styles.dateContainer}>
+              <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+              <Text style={styles.dateText}>
+                Complétée le {formatDate(item.dateCompletion)}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1890ff" />
+        <ActivityIndicator size="large" color="#CAE1EF" />
         <Text style={styles.loadingText}>Chargement de vos missions...</Text>
       </View>
     );
@@ -193,26 +256,70 @@ const UserMissionsPage = () => {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={userMissions}
-        renderItem={renderMissionItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        refreshing={refreshing}
-        onRefresh={handleRefresh}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="document-text-outline" size={60} color="#ccc" />
-            <Text style={styles.emptyText}>Vous n'avez pas encore de missions</Text>
-            <TouchableOpacity 
-              style={styles.emptyButton} 
-              onPress={() => navigation.navigate('CreateMission')}
-            >
-              <Text style={styles.emptyButtonText}>Créer une mission</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
+      {/* Header */}
+      <View style={styles.headerSquare}>
+        <Text style={styles.headerSquareText}>Mes Missions</Text>
+      </View>
+      
+      {/* Section missions actives */}
+      <View style={styles.sectionMissionsActives}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Missions en cours</Text>
+          <LinearGradient
+            colors={['transparent', '#CAE1EF', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.sectionSeparator}
+          />
+        </View>
+        
+        <ScrollView style={styles.scrollView}>
+          {activeMissions.length > 0 ? (
+            activeMissions.map((mission) => (
+              <View key={mission.id}>
+                {renderActiveMissionItem(mission)}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Aucune mission en cours</Text>
+              <TouchableOpacity 
+                style={styles.emptyButton} 
+                onPress={() => navigation.navigate('CreateMission')}
+              >
+                <Text style={styles.emptyButtonText}>Découvrir des missions</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </View>
+      
+      {/* Section missions complétées 
+      <View style={styles.sectionMissionsCompletees}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Missions complétées</Text>
+          <LinearGradient
+            colors={['transparent', '#CAE1EF', 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.sectionSeparator}
+          />
+        </View>
+        
+        <ScrollView style={styles.scrollView}>
+          {completedMissions.length > 0 ? (
+            completedMissions.map((mission) => (
+              <View key={mission.id}>
+                {renderCompletedMissionItem(mission)}
+              </View>
+            ))
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Aucune mission complétée</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>*/}
     </View>
   );
 };
@@ -220,10 +327,69 @@ const UserMissionsPage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    padding: 10,
+    backgroundColor: '#194A8D',
   },
-  listContainer: {
-    padding: 16,
+  headerSquare: {
+    alignSelf: 'center',
+    backgroundColor: '#CAE1EF',
+    width: 150,
+    height: 35,
+    marginBottom: 10,
+    borderRadius: 80,
+    padding: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        marginTop: 45,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
+  },
+  headerSquareText: {
+    color: '#083F8C',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  sectionMissionsActives: {
+    flex: 1,
+    marginBottom: 10,
+    backgroundColor: '#F3EFEF',
+    borderRadius: 20,
+    overflow: 'hidden'
+  },
+  sectionMissionsCompletees: {
+    flex: 0.4,
+    marginBottom: 10,
+    backgroundColor: '#F3EFEF',
+    borderRadius: 20,
+    overflow: 'hidden'
+  },
+  sectionHeader: {
+    padding: 10,
+    backgroundColor: '#194A8D',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    color: 'white',
+    textAlign: 'center',
+    paddingBottom: 5,
+    letterSpacing: 1,
+    fontFamily: 'AlexBrush',
+  },
+  sectionSeparator: {
+    height: 4,
+    width: '100%',
+    marginTop: 5,
+  },
+  scrollView: {
+    padding: 10,
+    backgroundColor: '#F3EFEF',
   },
   missionCard: {
     backgroundColor: '#fff',
@@ -235,6 +401,22 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFA500',
+  },
+  completedMissionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+    opacity: 0.85,
   },
   missionHeader: {
     flexDirection: 'row',
@@ -247,6 +429,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     marginRight: 8,
+    color: '#194A8D',
+  },
+  completedMissionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    flex: 1,
+    marginRight: 8,
+    color: '#194A8D',
   },
   statusIndicator: {
     paddingHorizontal: 10,
@@ -263,9 +453,6 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 12,
   },
-  missionFooter: {
-    marginTop: 8,
-  },
   pointsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -277,28 +464,47 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   progressContainer: {
-    marginTop: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: '#666',
+    marginTop: 10,
     marginBottom: 4,
   },
+  progressLabelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  progressPercentage: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   progressBarContainer: {
-    height: 6,
+    height: 10,
     backgroundColor: '#e0e0e0',
-    borderRadius: 3,
+    borderRadius: 5,
     overflow: 'hidden',
+    position: 'relative',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#1890ff',
+  },
+  milestone: {
+    position: 'absolute',
+    width: 1,
+    height: '60%',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    top: '20%',
+    zIndex: 2,
   },
   collectiveTag: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#1890ff',
+    backgroundColor: '#CAE1EF',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
@@ -306,25 +512,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   collectiveTagText: {
-    color: '#fff',
+    color: '#194A8D',
     fontSize: 10,
     marginLeft: 4,
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#194A8D',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: '#CAE1EF',
   },
   emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 20,
   },
   emptyText: {
     fontSize: 16,
@@ -333,10 +540,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   emptyButton: {
-    backgroundColor: '#1890ff',
+    backgroundColor: '#194A8D',
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 6,
+    borderRadius: 25,
   },
   emptyButtonText: {
     color: '#fff',
@@ -345,13 +552,16 @@ const styles = StyleSheet.create({
   dateContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
-    marginBottom: 8,
   },
   dateText: {
     fontSize: 13,
     color: '#666',
     marginLeft: 4,
+  },
+  completedMissionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });
 

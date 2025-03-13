@@ -1,9 +1,9 @@
 import React, { useState } from "react";
 import { View, TextInput, Text, StyleSheet, Pressable, Platform, Image } from "react-native";
 import { Link, useRouter } from "expo-router";
-import { signInUser } from "./firebase/firebaseAuth";
+import { signInUser } from "../firebase/firebaseAuth";
 import { getDoc, doc } from "firebase/firestore";
-import { db } from "./firebase/firebaseConfig";
+import { db } from "../firebase/firebaseConfig";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 
@@ -18,7 +18,7 @@ const LoginScreen: React.FC = () => {
   const router = useRouter();
 
   const [fontsLoaded] = useFonts({
-    'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
+    'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
   if (!fontsLoaded) {

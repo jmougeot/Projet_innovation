@@ -2,6 +2,8 @@ import { View, Text, StyleSheet, Image, Pressable, SafeAreaView, Platform } from
 import { Link } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from 'expo-font';
+import Reglage from './components/reglage';
+import Head from './components/Head';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -14,9 +16,17 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.headerSquare}>
-        <Text style={styles.headerSquareText}>Le Challenge</Text>
-      </View>
+      {/* Use the reusable Reglage component */}
+      <Reglage 
+        // Optional: pass custom menu items
+        // menuItems={customMenuItems}
+        // Optional: customize position
+        position={{ top: 5, right: 15 }}
+        // Optional: custom icon
+        // iconSource={require('../assets/images/custom-icon.png')}
+      />
+
+      <Head title="Le Challenge" />
 
       <View style={styles.contentContainer}>
         <View style={styles.welcomeSection}>
@@ -36,20 +46,14 @@ export default function Index() {
               <Text style={styles.buttonText}>Service</Text>
             </Pressable>
           </Link>
-
-          <Link href="./service/commande/change_plan" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Modifier le Plan</Text>
-            </Pressable>
-          </Link>
-
+          
           <Link href="./cuisine/cuisine" asChild>
             <Pressable style={styles.button}>
               <Text style={styles.buttonText}>Cuisine</Text>
             </Pressable>
           </Link>
 
-          <Link href="./connexion" asChild>
+          <Link href="./connexion/connexion" asChild>
             <Pressable style={styles.button}>
               <Text style={styles.buttonText}>Login</Text>
             </Pressable>
@@ -58,12 +62,6 @@ export default function Index() {
           <Link href="./manageur/home" asChild>
             <Pressable style={styles.button}>
               <Text style={styles.buttonText}>Gestion</Text>
-            </Pressable>
-          </Link>
-
-          <Link href="./Profil/avatar" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Profil</Text>
             </Pressable>
           </Link>
 
@@ -77,7 +75,7 @@ export default function Index() {
       </View>
       
       <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2023 Le Challenge</Text>
+        <Text style={styles.footerText}>© Le Challenge</Text>
       </View>
     </SafeAreaView>
   );
@@ -89,29 +87,57 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#194A8D',
   },
-  headerSquare: {
-    alignSelf: 'center',
-    backgroundColor: '#CAE1EF',
-    width: 200,
-    height: 35,
-    marginBottom: 20,
-    borderRadius: 80,
-    padding: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        marginTop: 45,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
+  // Logo styles
+  logoContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 15,
+    right: 15,
+    zIndex: 15,
   },
-  headerSquareText: {
-    color: '#083F8C',
-    fontWeight: 'bold',
-    fontSize: 20,
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#CAE1EF', // Temporary background if logo has transparency
+  },
+  // Dropdown menu styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  dropdown: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 90 : 60,
+    right: 15,
+    backgroundColor: 'transparent',
+  },
+  dropdownContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    minWidth: 180,
+    overflow: 'hidden',
+  },
+  menuItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EFEFEF',
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: '#194A8D',
+  },
+  logoutItem: {
+    borderBottomWidth: 0,
+    backgroundColor: '#FFF5F5',
+  },
+  logoutText: {
+    color: '#D32F2F',
   },
   contentContainer: {
     flex: 1,

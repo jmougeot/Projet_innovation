@@ -1,11 +1,12 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import CreateMissionPage from './CreateMissionPage';
 import UserMissionsPage from './UserMissionsPage';
 import AllMissionsPage from './AllMissionsPage';
 import { Ionicons } from '@expo/vector-icons';
+import Head from '@/app/components/Head';
 
 // Définir le type des paramètres de navigation
 export type MissionStackParamList = {
@@ -23,9 +24,8 @@ const MissionHome = () => {
   const navigation = useNavigation<NavigationProp<MissionStackParamList>>();
   
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Gestion des Missions</Text>
-      
+    <SafeAreaView style={styles.container}>
+      <Head title="Missions" />      
       <TouchableOpacity 
         style={styles.card}
         onPress={() => navigation.navigate('UserMissions')}
@@ -64,7 +64,7 @@ const MissionHome = () => {
           Créez une nouvelle mission pour vous ou votre équipe
         </Text>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -74,10 +74,7 @@ const MissionNavigator = () => {
     <Stack.Navigator 
       initialRouteName="MissionHome"
       screenOptions={{
-        headerShown: true,
-        headerStyle: {
-          backgroundColor: '#1890ff',
-        },
+        headerShown: false,
         headerTintColor: '#fff',
         headerTitleStyle: {
           fontWeight: 'bold',
@@ -113,12 +110,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
   },
   card: {
     backgroundColor: '#f9f9f9',

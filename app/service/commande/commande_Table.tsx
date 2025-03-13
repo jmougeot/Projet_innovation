@@ -5,6 +5,7 @@ import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
+import Reglage from '@/app/components/reglage';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
 
     // 2. Section commande (partie supérieure)
     sectionCommande: {
-        flex: 0.5,  // Modifié de 0.30 à 0.5 pour occuper 50% de l'écran
+        flex: 0.35,
         marginBottom: 10,
         backgroundColor: '#F3EFEF',
         borderRadius: 20,

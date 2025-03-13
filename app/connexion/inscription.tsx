@@ -1,7 +1,7 @@
 // src/screens/SignUpScreen.js
 import React, { useState } from "react";
 import { View, TextInput, Text, StyleSheet, Pressable, Platform, ScrollView } from "react-native";
-import { signUpUser } from "./firebase/firebaseAuth";
+import { signUpUser } from "../firebase/firebaseAuth";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { Link, useRouter } from "expo-router";
@@ -16,7 +16,7 @@ const SignUpScreen = () => {
   const router = useRouter();
 
   const [fontsLoaded] = useFonts({
-    'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
+    'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
   if (!fontsLoaded) {

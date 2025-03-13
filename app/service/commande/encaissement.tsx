@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import {Plat} from '@/app/firebase/firebaseMenu';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { getAuth } from '@/app/firebase/firebaseConfig';
+import Head from '@/app/components/Head';
 
 export default function Encaissement() {
     const { tableId } = useLocalSearchParams();
@@ -158,10 +159,8 @@ export default function Encaissement() {
     );
 
     return (
-        <View style={styles.container}>
-            <View style={styles.headerSquare}>
-                <Text style={styles.headerSquareText}>Encaissement Table {tableId}</Text>
-            </View>
+        <SafeAreaView style={styles.container}>
+            <Head title={'Encaissement Table'} />
             
             <View style={styles.paymentMethodsContainer}>
                 {renderPaymentMethodButton('carte', 'credit-card', 'Carte')}
@@ -271,7 +270,7 @@ export default function Encaissement() {
                     </Text>
                 </Pressable>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 
@@ -280,30 +279,6 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 10,
         backgroundColor: '#194A8D',
-    },
-    headerSquare: {
-        alignSelf: 'center',
-        backgroundColor: '#CAE1EF',
-        width: 250,
-        height: 35,
-        marginBottom: 15,
-        borderRadius: 80,
-        padding: 0,
-        justifyContent: 'center',
-        alignItems: 'center',
-        ...Platform.select({
-            ios: {
-                marginTop: 45,
-            },
-            android: {
-                elevation: 5,
-            },
-        }),
-    },
-    headerSquareText: {
-        color: '#083F8C',
-        fontWeight: 'bold',
-        fontSize: 18,
     },
     paymentMethodsContainer: {
         flexDirection: 'row',

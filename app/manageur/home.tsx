@@ -27,26 +27,6 @@ export default function ManagerHome() {
       </View>
 
       <ScrollView style={styles.scrollView}>
-        {/* Section d'accueil */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.categoryHeader}>
-            <Text style={styles.categoryTitle}>Bienvenue</Text>
-            <View style={styles.categorySeparatorContainer}>
-              <LinearGradient
-                colors={['transparent', '#CAE1EF', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.categorySeparator}
-              />
-            </View>
-          </View>
-          <View style={styles.welcomeBox}>
-            <Text style={styles.welcomeText}>
-              Bienvenue dans votre espace de gestion. Accédez à toutes les fonctionnalités
-              pour administrer votre restaurant.
-            </Text>
-          </View>
-        </View>
 
         {/* Navigation rapide */}
         <View style={styles.sectionContainer}>
@@ -104,7 +84,7 @@ export default function ManagerHome() {
           </View>
         </View>
 
-        {/* Statistiques */}
+        {/* Section d'accueil */}
         <View style={styles.sectionContainer}>
           <View style={styles.categoryHeader}>
             <Text style={styles.categoryTitle}>Performance</Text>
@@ -133,6 +113,51 @@ export default function ManagerHome() {
               <Text style={styles.statsValue}>4</Text>
               <Text style={styles.statsLabel}>En attente en cuisine</Text>
             </View>
+          </View>
+        </View>
+
+        {/* Statistiques */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Mission</Text>
+            <View style={styles.categorySeparatorContainer}>
+              <LinearGradient
+                colors={['transparent', '#CAE1EF', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.categorySeparator}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.statsContainer}>
+            <Pressable 
+                style= {styles.statsBox}
+                onPress={() => router.push('/cuisine/stock' as any)}
+              >
+                <View style={styles.iconContainer}>
+                  <Ionicons name="cube-outline" size={32} color="#194A8D" />
+                </View>
+                <Text style={styles.statsLabel}>Toutes les missions</Text>
+            </Pressable>
+            <Pressable 
+                style= {styles.statsBox}
+                onPress={() => router.push('/cuisine/stock' as any)}
+              >
+                <View style={styles.iconContainer}>
+                  <Ionicons name="cube-outline" size={32} color="#194A8D" />
+                </View>
+                <Text style={styles.statsLabel}>Ajouter une mission</Text>
+            </Pressable>
+            <Pressable 
+                style= {styles.statsBox}
+                onPress={() => router.push('/cuisine/stock' as any)}
+              >
+                <View style={styles.iconContainer}>
+                  <Ionicons name="cube-outline" size={32} color="#194A8D" />
+                </View>
+                <Text style={styles.statsLabel}>Mes mission</Text>
+            </Pressable>
           </View>
         </View>
 

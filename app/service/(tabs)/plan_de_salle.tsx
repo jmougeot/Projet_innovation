@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
+import Reglage from '@/app/components/reglage';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Head from '@/app/components/Head';
 
 // Match table size with change_plan.tsx
 const TABLE_SIZE = 50;
@@ -12,6 +15,29 @@ export default function PlanDeSalle() {
   const [viewMode, setViewMode] = useState<'plan' | 'liste'>('plan');
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const customMenuItems = [
+    {
+      label: 'Profil',
+      onPress: () => {}},
+    {
+      label: 'Paramètres',
+      onPress: () => {
+        // Open settings
+      }
+    },
+    {
+      label: 'Déconnexion',
+      onPress: () => {
+        // Logout logic
+      },
+      isLogout: true
+    },
+    {
+      label: 'Modifier le plan',
+      onPress: () => {router.push('../commande/change_plan')}
+    },
+  ];
 
   // Load tables from Firebase
   useEffect(() => {
@@ -161,11 +187,11 @@ export default function PlanDeSalle() {
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerSquare}>
-        <Text style={styles.headerSquareText}>Plan de Salle</Text>
-      </View>
-      
+    <SafeAreaView style={styles.container}>
+      <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems}/>
+
+      <Head title="Plan de Salle" />
+
       <View style={styles.toggleContainer}>
         {renderToggleButton('plan', 'Vue Plan')}
         {renderToggleButton('liste', 'Liste des Tables')}
@@ -196,11 +222,7 @@ export default function PlanDeSalle() {
           viewMode === 'plan' ? renderPlanView() : renderListView()
         )}
       </View>
-      
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Appui long pour changer le statut</Text>
-      </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -209,31 +231,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     backgroundColor: '#194A8D', // Matched with commande_Table.tsx
-  },
-  headerSquare: {
-    alignSelf: 'center',
-    backgroundColor: '#CAE1EF',
-    width: 200,
-    height: 35,
-    marginBottom: 15,
-    borderRadius: 80,
-    padding: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...Platform.select({
-      ios: {
-        marginTop: 45,
-      },
-      android: {
-        elevation: 5,
-      },
-    }),
-  },
-  headerSquareText: {
-    color: '#083F8C',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
+    },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -371,14 +369,5 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: '#194A8D',
     fontSize: 16,
-  },
-  footer: {
-    padding: 10,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: '#CAE1EF',
-    fontSize: 14,
-    fontStyle: 'italic',
   },
 });

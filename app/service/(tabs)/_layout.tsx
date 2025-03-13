@@ -21,7 +21,7 @@ export default function AppLayout() {
         name="index"
         options={{
           headerShown: false,
-          title: 'Caisse',
+          title: 'Cuisine',
           tabBarIcon: ({ color, size }) => (
             <MaterialIcons name="point-of-sale" size={size} color={color} />
           ),
