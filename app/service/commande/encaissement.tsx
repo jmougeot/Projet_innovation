@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import {Plat} from '@/app/firebase/firebaseMenu';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { getAuth } from '@/app/firebase/firebaseConfig';

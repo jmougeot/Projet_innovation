@@ -70,7 +70,6 @@ export default function Index() {
               <Text style={styles.buttonText}>Mission</Text>
             </Pressable>
           </Link>
-
         </View>
       </View>
       

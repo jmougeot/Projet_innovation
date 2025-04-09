@@ -1,6 +1,5 @@
-/**
- * Interface définissant la structure d'une mission
- */
+import {Plat}  from '@/app/firebase/firebaseMenu';
+
 export interface Mission {
   id: string;
   titre: string;
@@ -10,22 +9,9 @@ export interface Mission {
     frequence: 'daily' | 'weekly' | 'monthly';
     dateDebut: Date;
   };
+  plat?: Plat; // Plat associé à la mission (optionnel)
 }
 
-/**
- * Interface définissant la structure d'une mission collective
- */
-export interface CollectiveMission {
-  id: string;
-  missionId: string;
-  targetValue: number;
-  currentValue: number;
-  userIds: string[];
-}
-
-/**
- * Interface définissant un utilisateur (pour les mocks)
- */
 export interface User {
   id: string;
   name: string;
@@ -37,6 +23,7 @@ export interface MissionAssignment {
     status: Record<string, "pending" | "completed" | "failed">;
     progression: Record<string, number>;
     dateCompletion: Record<string, Date | null>;
+    plat: Plat;
   }
 
 export interface MissionGroup {

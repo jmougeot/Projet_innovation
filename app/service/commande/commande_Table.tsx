@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 import Reglage from '@/app/components/reglage';
+import { getMissionPlatsForUser } from '@/app/firebase/firebaseMission';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
@@ -14,10 +15,14 @@ export default function Commande() {
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
     const [listPlats, setListPlats] = useState<Plat[]>([]);
+    const [missionPlatsIds, setMissionPlatsIds] = useState<string[]>([]);
 
     const [fontsLoaded] = useFonts({
         'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
     });
+
+    // Simuler un userId - Dans une application réelle, vous récupéreriez l'utilisateur connecté
+    const currentUserId = "current_user_id"; // À remplacer par votre système d'authentification
 
     useEffect(() => {
         const fetchPlats = async () => {
@@ -26,6 +31,20 @@ export default function Commande() {
         };
         fetchPlats();
     }, []);
+
+    useEffect(() => {
+        const fetchMissionPlats = async () => {
+            try {
+                const platIds = await getMissionPlatsForUser(currentUserId);
+                console.log("Plats avec missions:", platIds); // Ajout de log pour déboguer
+                setMissionPlatsIds(platIds);
+            } catch (error) {
+                console.error("Erreur lors du chargement des plats avec mission:", error);
+            }
+        };
+        
+        fetchMissionPlats();
+    }, [currentUserId]);
 
     useEffect(() => {
         const fetchCommande = async () => {
@@ -46,6 +65,25 @@ export default function Commande() {
             fetchCommande();
         }
     }, [tableId]);
+
+    // Marquer les plats avec missions - Logique améliorée
+    useEffect(() => {
+        if (listPlats.length > 0) {
+            console.log("Liste des plats avant mise à jour:", listPlats.map(p => p.id));
+            console.log("Liste des IDs des plats avec mission:", missionPlatsIds);
+            
+            const updatedPlats = listPlats.map(plat => {
+                const hasMission = plat.id ? missionPlatsIds.includes(plat.id) : false;
+                console.log(`Plat ${plat.name} (${plat.id}) a une mission: ${hasMission}`);
+                return {
+                    ...plat,
+                    mission: hasMission
+                };
+            });
+            
+            setListPlats(updatedPlats);
+        }
+    }, [missionPlatsIds]); // Ne dépend que des missionPlatsIds pour éviter les boucles infinies
 
     if (!fontsLoaded) {
         return null;
@@ -226,7 +264,7 @@ export default function Commande() {
                                         style={{ width: '49%' }}
                                         onPress={() => ajouterPlat(plat)}
                                     >
-                                        {plat.mission ? (
+                                        {plat.mission === true ? (
                                             <LinearGradient
                                                 colors={['#F8EDCF', '#EFBC51']}
                                                 start={{ x: 0, y: 0 }}

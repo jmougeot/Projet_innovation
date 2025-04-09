@@ -17,6 +17,7 @@ import { MissionStackParamList } from './index';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
 
+
 const AllMissionsPage = () => {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [filteredMissions, setFilteredMissions] = useState<Mission[]>([]);
@@ -24,6 +25,8 @@ const AllMissionsPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
+
+  
   
   const navigation = useNavigation<StackNavigationProp<MissionStackParamList>>();
   const auth = getAuth();
@@ -186,9 +189,9 @@ const AllMissionsPage = () => {
   // Rendu des filtres de type
   const renderTypeFilters = () => {
     const types = [
-      { label: 'Quotidienne', value: 'quotidienne' },
-      { label: 'Hebdomadaire', value: 'hebdomadaire' },
-      { label: 'Mensuelle', value: 'mensuelle' }
+      { label: 'Quotidienne', value: 'daily' },
+      { label: 'Hebdomadaire', value: 'weekly' },
+      { label: 'Mensuelle', value: 'monthly' }
     ];
     
     return (

@@ -12,11 +12,15 @@ import {
 import { StackNavigationProp } from '@react-navigation/stack';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
+// Suppression de l'import du Picker original
+// import { Picker } from '@react-native-picker/picker';
+// Import du composant Picker personnalisé
+import Picker from '../components/Picker';
 import { createMission, assignMissionToUser, createCollectiveMission } from '../firebase/firebaseMission';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
 import { MissionStackParamList } from './index';
+import { get_plats, Plat } from '../firebase/firebaseMenu';
 
 // Types
 import type { Mission } from './Interface';
@@ -43,7 +47,8 @@ const CreateMissionPage = () => {
     dateDebut: new Date(),
     isCollective: false,
     targetValue: 1,
-    selectedUsers: [] as string[]
+    selectedUsers: [] as string[],
+    selectedPlat: null as Plat | null
   });
 
   // États pour le DatePicker
@@ -52,6 +57,9 @@ const CreateMissionPage = () => {
   // Liste des utilisateurs à assigner
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Liste des plats disponibles
+  const [plats, setPlats] = useState<Plat[]>([]);
   
   // Récupérer les utilisateurs depuis Firebase
   useEffect(() => {
@@ -72,6 +80,21 @@ const CreateMissionPage = () => {
     };
     
     fetchUsers();
+  }, []);
+  
+  // Récupérer les plats disponibles
+  useEffect(() => {
+    const fetchPlats = async () => {
+      try {
+        const platsList = await get_plats();
+        setPlats(platsList);
+      } catch (error) {
+        console.error('Erreur lors de la récupération des plats:', error);
+        Alert.alert('Erreur', 'Impossible de charger les plats');
+      }
+    };
+    
+    fetchPlats();
   }, []);
   
   // Gestion de la date
@@ -119,6 +142,11 @@ const CreateMissionPage = () => {
         }
       };
       
+      // Ajouter le plat si un plat est sélectionné
+      if (formData.selectedPlat) {
+        missionData.plat = formData.selectedPlat;
+      }
+      
       // Créer la mission
       const { id } = await createMission(missionData);
       
@@ -142,7 +170,8 @@ const CreateMissionPage = () => {
         dateDebut: new Date(),
         isCollective: false,
         targetValue: 1,
-        selectedUsers: []
+        selectedUsers: [],
+        selectedPlat: null
       });
       
       // Navigation corrigée
@@ -194,13 +223,18 @@ const CreateMissionPage = () => {
       <View style={styles.pickerContainer}>
         <Picker
           selectedValue={formData.frequence}
-          onValueChange={(itemValue) => setFormData({...formData, frequence: itemValue})}
-          style={styles.picker}
-        >
-          <Picker.Item label="Quotidienne" value="daily" />
-          <Picker.Item label="Hebdomadaire" value="weekly" />
-          <Picker.Item label="Mensuelle" value="monthly" />
-        </Picker>
+          onValueChange={(value) => 
+            setFormData({...formData, frequence: value as 'daily' | 'weekly' | 'monthly'})
+          }
+          items={[
+            { label: 'Quotidienne', value: 'daily' },
+            { label: 'Hebdomadaire', value: 'weekly' },
+            { label: 'Mensuelle', value: 'monthly' }
+          ]}
+          style={styles.pickerWrapper}
+          pickerStyle={styles.picker}
+          modalTitle="Choisissez une fréquence"
+        />
       </View>
       
       {/* Date de début */}
@@ -241,6 +275,43 @@ const CreateMissionPage = () => {
         keyboardType="numeric"
         placeholder="Valeur à atteindre pour la progression"
       />
+      
+      {/* Sélection du plat */}
+      <Text style={styles.label}>Plat associé (optionnel)</Text>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={formData.selectedPlat?.id || ""}
+          onValueChange={(value) => {
+            if (value === "") {
+              setFormData({...formData, selectedPlat: null});
+            } else {
+              const selectedPlat = plats.find(plat => plat.id === value);
+              if (selectedPlat) {
+                setFormData({...formData, selectedPlat});
+              }
+            }
+          }}
+          items={[
+            { label: 'Sélectionner un plat', value: '' },
+            ...plats.map(plat => ({
+              label: plat.name || "Plat sans nom",
+              value: plat.id || ""
+            }))
+          ]}
+          style={styles.pickerWrapper}
+          pickerStyle={styles.picker}
+          modalTitle="Choisissez un plat"
+        />
+      </View>
+      
+      {formData.selectedPlat && (
+        <View style={styles.selectedPlatInfo}>
+          <Text style={styles.selectedPlatTitle}>Plat sélectionné:</Text>
+          <Text style={styles.selectedPlatName}>{formData.selectedPlat.name}</Text>
+          <Text style={styles.selectedPlatCategory}>Catégorie: {formData.selectedPlat.category}</Text>
+          <Text style={styles.selectedPlatPrice}>Prix: {formData.selectedPlat.price}€</Text>
+        </View>
+      )}
       
       {/* Liste des utilisateurs */}
       <Text style={styles.label}>Sélectionner les utilisateurs*</Text>
@@ -312,9 +383,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#f9f9f9',
     marginBottom: 10,
+    overflow: 'hidden', // Évite le débordement du contenu
+  },
+  pickerWrapper: {
+    width: '100%',
   },
   picker: {
-    height: 50,
+    borderWidth: 0, // Supprimer la bordure par défaut car le conteneur a déjà une bordure
+    backgroundColor: 'transparent',
   },
   dateButton: {
     borderWidth: 1,
@@ -373,7 +449,32 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-  }
+  },
+  selectedPlatInfo: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1890ff',
+  },
+  selectedPlatTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  selectedPlatName: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedPlatCategory: {
+    fontSize: 14,
+    color: '#666',
+  },
+  selectedPlatPrice: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
 });
 
 export default CreateMissionPage;
