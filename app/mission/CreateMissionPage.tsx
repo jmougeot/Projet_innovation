@@ -35,7 +35,6 @@ interface User {
 type CreateMissionScreenNavigationProp = StackNavigationProp<MissionStackParamList, 'CreateMission'>;
 
 const CreateMissionPage = () => {
-  // Utiliser le hook useNavigation pour accéder à la navigation
   const navigation = useNavigation<CreateMissionScreenNavigationProp>();
 
   // État initial du formulaire
@@ -62,16 +61,19 @@ const CreateMissionPage = () => {
   const [plats, setPlats] = useState<Plat[]>([]);
   
   // Récupérer les utilisateurs depuis Firebase
-  useEffect(() => {
-    const fetchUsers = async () => {
+  useEffect(() => {const fetchUsers = async () => {
       try {
         const usersCollection = collection(db, 'users');
         const userSnapshot = await getDocs(usersCollection);
-        const usersList = userSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          name: doc.data().nom || doc.data().displayName || 'Utilisateur'
-        } as User));
+        const usersList = userSnapshot.docs.map(doc => {
+          const userData = doc.data();
+          return {
+            id: doc.id,
+            name: userData.name || 'Utilisateur sans nom',
+            email: userData.email || 'email inconnu'
+          };
+        });
+        console.log('Utilisateurs récupérés:', usersList);
         setUsers(usersList);
       } catch (error) {
         console.error('Erreur lors de la récupération des utilisateurs:', error);
@@ -147,17 +149,45 @@ const CreateMissionPage = () => {
         missionData.plat = formData.selectedPlat;
       }
       
+      console.log("Création de mission avec données:", JSON.stringify(missionData));
+      
       // Créer la mission
-      const { id } = await createMission(missionData);
+      const missionResult = await createMission(missionData);
+      const missionId = missionResult.id;
+      console.log(`Mission principale créée avec l'ID: ${missionId}`);
       
       // Si c'est une mission collective
       if (formData.isCollective) {
-        await createCollectiveMission(id, formData.selectedUsers, formData.targetValue);
+        console.log(`Création d'une mission collective pour ${formData.selectedUsers.length} utilisateurs`);
+        const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue);
+        console.log(`Mission collective créée avec l'ID: ${collectiveResult.id}`);
       } else {
-        // Assigner la mission à chaque utilisateur sélectionné
+        // Assigner la mission à chaque utilisateur sélectionné (missions individuelles)
+        console.log(`Création de ${formData.selectedUsers.length} missions individuelles`);
+        const assignmentResults = [];
+        
         for (const userId of formData.selectedUsers) {
-          await assignMissionToUser(id, userId);
+          try {
+            console.log(`Assignation de la mission ${missionId} à l'utilisateur ${userId}`);
+            const assignResult = await assignMissionToUser(missionId, userId);
+            console.log("Résultat de l'assignation:", JSON.stringify(assignResult));
+            
+            if (assignResult && assignResult.id) {
+              console.log(`✅ Mission individuelle assignée avec succès. ID: ${assignResult.id}`);
+              assignmentResults.push({
+                id: assignResult.id,
+                userId,
+                missionId
+              });
+            } else {
+              console.error(`❌ Pas d'ID retourné pour l'utilisateur ${userId}`);
+            }
+          } catch (assignError) {
+            console.error(`Erreur lors de l'assignation à l'utilisateur ${userId}:`, assignError);
+          }
         }
+        
+        console.log("Résumé des assignations:", JSON.stringify(assignmentResults));
       }
       
       Alert.alert('Succès', 'Mission créée avec succès');
@@ -174,11 +204,11 @@ const CreateMissionPage = () => {
         selectedPlat: null
       });
       
-      // Navigation corrigée
+      // Navigation
       navigation.goBack();
     } catch (error) {
       console.error('Erreur lors de la création de la mission:', error);
-      Alert.alert('Erreur', 'Impossible de créer la mission');
+      Alert.alert('Erreur', `Impossible de créer la mission: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
     } finally {
       setIsLoading(false);
     }

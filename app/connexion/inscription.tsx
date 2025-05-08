@@ -30,12 +30,11 @@ const SignUpScreen = () => {
         return;
       }
 
-      await signUpUser(email, password, name, role);
-      setMessage("Inscription réussie !");
-      // Redirect to login after successful signup
+      const user = await signUpUser(email, password, name, role);
+      setMessage(`Inscription réussie ! Votre profil a bien été enregistré ${role === "employee" ? "Salarié" : "Gérant"}.`);
       setTimeout(() => {
         router.push('./connexion');
-      }, 1500);
+      }, 2500);
     } catch (error) {
       if (error instanceof Error) {
         setMessage(`Erreur : ${error.message}`);
@@ -101,7 +100,6 @@ const SignUpScreen = () => {
             <Pressable 
               style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
               onPress={() => {
-                // Toggle role
                 const newRole = role === "employee" ? "manager" : "employee";
                 console.log("Changing role to:", newRole);
                 setRole(newRole);

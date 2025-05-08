@@ -7,6 +7,8 @@ import { useFonts } from 'expo-font';
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMission';
+import { PlatItem } from '@/app/components/Service/Plats';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
@@ -16,6 +18,17 @@ export default function Commande() {
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
     const [listPlats, setListPlats] = useState<Plat[]>([]);
     const [missionPlatsIds, setMissionPlatsIds] = useState<string[]>([]);
+
+    const customMenuItems = [
+        {
+            label: 'Accueil',
+            onPress: () => router.replace('/')
+        },
+        {
+            label: 'Connexion',
+            onPress: () => router.replace('/connexion/connexion')
+        }
+    ];
 
     const [fontsLoaded] = useFonts({
         'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
@@ -194,7 +207,9 @@ export default function Commande() {
     }
 
     return (
-        <View style={styles.container}>
+        <SafeAreaView style={styles.container}>
+            <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems} />
+            
             <View style={styles.headerSquare}>
                 <Text style={styles.headerSquareText}> Table {tableId}</Text>
             </View>            
@@ -258,34 +273,19 @@ export default function Commande() {
                                 </View>
                             </View>
                             <View style={styles.platsContainer}>
-                                {platsInCategory.map((plat, index) => (
-                                    <Pressable
-                                        key={plat.id} 
-                                        style={{ width: '49%' }}
-                                        onPress={() => ajouterPlat(plat)}
-                                    >
-                                        {plat.mission === true ? (
-                                            <LinearGradient
-                                                colors={['#F8EDCF', '#EFBC51']}
-                                                start={{ x: 0, y: 0 }}
-                                                end={{ x: 1, y: 1 }}
-                                                style={styles.platMission}
-                                            >
-                                                <Text style={[styles.nomPlat, { color: '#8B4513' }]}>{plat.name} {plat.price} €</Text>
-                                            </LinearGradient>
-                                        ) : (
-                                            <View style={styles.platItem2}>
-                                                <Text style={styles.nomPlat}>{plat.name} {plat.price} €</Text>
-                                            </View>
-                                        )}
-                                    </Pressable>
+                                {platsInCategory.map((plat) => (
+                                    <PlatItem 
+                                        key={plat.id}
+                                        plat={plat}
+                                        onPress={ajouterPlat}
+                                    />
                                 ))}
                             </View>
                         </View>
                     ))}
                 </ScrollView>
             </View>
-        </View>
+        </SafeAreaView>
     );
 }
 

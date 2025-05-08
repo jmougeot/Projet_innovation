@@ -57,6 +57,7 @@ export const createMission = async (mission: Omit<Mission, 'id'>) => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     });
+    await updateDoc(docRef, { id: docRef.id });
     return { id: docRef.id };
   } catch (error) {
     console.error("Erreur lors de la création de la mission:", error);
@@ -161,11 +162,15 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
     const querySnapshot = await getDocs(q);
     
     if (!querySnapshot.empty) {
-      return { success: true, message: "Cette mission est déjà assignée à cet utilisateur" };
+      return { 
+        success: true, 
+        message: "Cette mission est déjà assignée à cet utilisateur",
+        id: querySnapshot.docs[0].id
+      };
     }
     
     // Créer une nouvelle assignation
-    await addDoc(userMissionRef, {
+    const docRef = await addDoc(userMissionRef, {
       userId,
       missionId,
       status: "pending",
@@ -174,7 +179,12 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
       isPartOfCollective: false
     });
     
-    return { success: true };
+    console.log(`Mission individuelle créée avec l'ID: ${docRef.id}`);
+    
+    return { 
+      success: true,
+      id: docRef.id
+    };
   } catch (error) {
     console.error("Erreur lors de l'assignation de la mission:", error);
     throw error;
@@ -481,11 +491,9 @@ export const removeUserFromCollectiveMission = async (
 // Récupérer les plats associés à des missions pour un utilisateur
 export const getMissionPlatsForUser = async (userId: string): Promise<string[]> => {
   try {
-    console.log("Recherche des plats avec mission pour l'utilisateur:", userId);
     
     // Récupérer toutes les missions de l'utilisateur
     const userMissions = await getUserMissions(userId);
-    console.log("Missions de l'utilisateur:", userMissions.map(um => um.missionId));
     
     // Récupérer les détails de chaque mission
     const missionIds = userMissions.map(um => um.missionId);
@@ -500,15 +508,12 @@ export const getMissionPlatsForUser = async (userId: string): Promise<string[]> 
       // Essayer différentes façons que la mission pourrait stocker le plat ID
       if (mission) {
         if (mission.plat && mission.plat.id) {
-          console.log(`Mission ${missionId} associée au plat:`, mission.plat.id);
           missionPlats.push(mission.plat.id);
         } else {
-          console.log(`Mission ${missionId} n'a pas de plat associé`);
         }
       }
     }
     
-    console.log("Plats avec mission trouvés:", missionPlats);
     return missionPlats;
   } catch (error) {
     console.error("Erreur lors de la récupération des plats avec mission:", error);
