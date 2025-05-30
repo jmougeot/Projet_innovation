@@ -10,7 +10,7 @@ import {
   TextInput
 } from 'react-native';
 import { router } from 'expo-router';
-import { getAllMissions, assignMissionToUser } from '../firebase/firebaseMission';
+import { getAllMissions, assignMissionToUser, deleteMission } from '../firebase/firebaseMission';
 import { getAuth } from 'firebase/auth';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ const AllMissionsPage = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [showDeleteButtons, setShowDeleteButtons] = useState(false);
 
   
   
@@ -86,6 +87,54 @@ const AllMissionsPage = () => {
     loadAllMissions();
   };
   
+  // Supprimer une mission
+  const handleDeleteMission = async (missionId: string) => {
+    // Trouver les détails de la mission pour afficher son titre
+    const mission = missions.find(m => m.id === missionId);
+    const missionTitle = mission ? mission.titre : 'cette mission';
+    
+    Alert.alert(
+      '🗑️ Confirmer la suppression',
+      `Êtes-vous sûr de vouloir supprimer "${missionTitle}" ?\n\n⚠️ Cette action est irréversible et supprimera :\n• La mission principale\n• Toutes les assignations utilisateurs\n• Toutes les missions collectives associées\n• L'historique de progression\n\nCette action ne peut pas être annulée.`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel',
+        },
+        {
+          text: 'Supprimer définitivement',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('[MISSIONS] 🗑️ Début de suppression de la mission:', missionId);
+              await deleteMission(missionId);
+              console.log('[MISSIONS] ✅ Mission supprimée avec succès');
+              Alert.alert(
+                '✅ Succès', 
+                `La mission "${missionTitle}" a été supprimée avec succès.`,
+                [{ text: 'OK' }]
+              );
+              // Recharger la liste des missions
+              await loadAllMissions();
+            } catch (error) {
+              console.error('[MISSIONS] ❌ Erreur lors de la suppression de la mission:', error);
+              Alert.alert(
+                '❌ Erreur', 
+                'Impossible de supprimer la mission. Veuillez vérifier votre connexion et réessayer.',
+                [{ text: 'OK' }]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Basculer l'affichage des boutons de suppression
+  const toggleDeleteMode = () => {
+    setShowDeleteButtons(!showDeleteButtons);
+  };
+
   // S'inscrire à une mission
   const handleAssignMission = async (missionId: string) => {
     if (!currentUser) {
@@ -141,6 +190,15 @@ const AllMissionsPage = () => {
       <View style={styles.missionCard}>
         <View style={styles.missionHeader}>
           <Text style={styles.missionTitle}>{item.titre}</Text>
+          {/* Bouton de suppression uniquement en mode suppression */}
+          {showDeleteButtons && (
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={() => handleDeleteMission(item.id)}
+            >
+              <Ionicons name="trash-outline" size={20} color="#ff4d4f" />
+            </TouchableOpacity>
+          )}
         </View>
         
         <Text style={styles.missionDescription} numberOfLines={3}>
@@ -173,12 +231,24 @@ const AllMissionsPage = () => {
           </View>
         </View>
         
-        <TouchableOpacity 
-          style={styles.assignButton}
-          onPress={() => handleAssignMission(item.id)}
-        >
-          <Text style={styles.assignButtonText}>S'inscrire à cette mission</Text>
-        </TouchableOpacity>
+        <View style={styles.missionActions}>
+          <TouchableOpacity 
+            style={[styles.assignButton, !showDeleteButtons && styles.assignButtonFull]}
+            onPress={() => handleAssignMission(item.id)}
+          >
+            <Text style={styles.assignButtonText}>S'inscrire</Text>
+          </TouchableOpacity>
+          
+          {showDeleteButtons && (
+            <TouchableOpacity 
+              style={styles.deleteActionButton}
+              onPress={() => handleDeleteMission(item.id)}
+            >
+              <Ionicons name="trash-outline" size={16} color="#fff" />
+              <Text style={styles.deleteActionButtonText}>Supprimer</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     );
   };
@@ -228,6 +298,44 @@ const AllMissionsPage = () => {
   
   return (
     <View style={styles.container}>
+      {/* En-tête avec contrôles */}
+      <View style={styles.headerControls}>
+        <Text style={styles.headerTitle}>Toutes les missions</Text>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={[styles.controlButton, showDeleteButtons && styles.controlButtonActive]}
+            onPress={toggleDeleteMode}
+          >
+            <Ionicons 
+              name={showDeleteButtons ? "trash" : "trash-outline"} 
+              size={20} 
+              color={showDeleteButtons ? "#fff" : "#666"} 
+            />
+            <Text style={[styles.controlButtonText, showDeleteButtons && styles.controlButtonTextActive]}>
+              {showDeleteButtons ? "Désactiver" : "Gérer"}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.controlButton}
+            onPress={() => router.push('/mission/CreateMissionPage' as any)}
+          >
+            <Ionicons name="add-outline" size={20} color="#666" />
+            <Text style={styles.controlButtonText}>Créer</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Avertissement en mode suppression */}
+      {showDeleteButtons && (
+        <View style={styles.warningBanner}>
+          <Ionicons name="warning-outline" size={20} color="#ff4d4f" />
+          <Text style={styles.warningText}>
+            Mode suppression activé. Appuyez sur les boutons rouges pour supprimer des missions.
+          </Text>
+        </View>
+      )}
+
       {/* Barre de recherche */}
       <View style={styles.searchContainer}>
         <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
@@ -277,6 +385,67 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  headerControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  controlButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+    gap: 4,
+  },
+  controlButtonActive: {
+    backgroundColor: '#ff4d4f',
+    borderColor: '#ff4d4f',
+  },
+  controlButtonText: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  controlButtonTextActive: {
+    color: '#fff',
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff2f0',
+    borderColor: '#ffccc7',
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    borderRadius: 6,
+    gap: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#ff4d4f',
+    fontWeight: '500',
   },
   listContainer: {
     padding: 16,
@@ -353,6 +522,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 8,
   },
+  deleteButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 4,
+  },
   missionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -392,16 +566,40 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 4,
   },
+  missionActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    gap: 12,
+  },
   assignButton: {
+    flex: 1,
     backgroundColor: '#1890ff',
     paddingVertical: 12,
     borderRadius: 6,
     alignItems: 'center',
-    marginTop: 8,
+  },
+  assignButtonFull: {
+    flex: 2,
   },
   assignButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  deleteActionButton: {
+    flex: 1,
+    backgroundColor: '#ff4d4f',
+    paddingVertical: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  deleteActionButtonText: {
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
   loadingContainer: {

@@ -4,7 +4,8 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
-import { getAuth } from '@/app/firebase/firebaseConfig';
+import { getAuth } from 'firebase/auth';
+import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMission';
 import Head from '@/app/components/Head';
 
 function Encaissement() {
@@ -127,9 +128,33 @@ function Encaissement() {
                 console.log(`Montant de ${montantTotal}€ ajouté au CA de l'employé ${currentUserId} et du restaurant`);
             }
             
+            // Mettre à jour la progression des missions basée sur les plats encaissés
+            let missionMessage = '';
+            if (commandesParTable && commandesParTable.plats.length > 0) {
+                try {
+                    console.log(`Mise à jour des missions pour ${commandesParTable.plats.length} plats encaissés`);
+                    const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats);
+                    console.log(`Résultat mise à jour missions:`, missionUpdateResult);
+                    
+                    // Préparer un message informatif si des missions ont été mises à jour
+                    if (missionUpdateResult.updatedMissions > 0) {
+                        missionMessage = `\n🎯 ${missionUpdateResult.updatedMissions} mission(s) mise(s) à jour !`;
+                        console.log(`✅ ${missionUpdateResult.updatedMissions} mission(s) mise(s) à jour !`);
+                    } else if (missionUpdateResult.processedDishes > 0) {
+                        missionMessage = `\n📝 ${missionUpdateResult.processedDishes} plat(s) traité(s), aucune mission correspondante trouvée.`;
+                    }
+                } catch (missionError) {
+                    console.error("Erreur lors de la mise à jour des missions:", missionError);
+                    missionMessage = `\n⚠️ Erreur lors de la mise à jour des missions, mais l'encaissement a réussi.`;
+                    // Ne pas bloquer l'encaissement si les missions échouent
+                    console.warn("L'encaissement continue malgré l'erreur des missions");
+                }
+            }
+            
             CommandeEncaisse(Number(tableId));
             
-            alert('Encaissement réussi !');
+            // Afficher le message de succès avec les informations sur les missions
+            alert(`Encaissement réussi !${missionMessage}`);
             router.replace('../(tabs)/plan_de_salle');
         } catch (error) {
             console.error("Erreur lors de l'encaissement:", error);

@@ -117,24 +117,47 @@ export const updateMission = async (id: string, updates: Partial<Mission>) => {
 // Supprimer une mission
 export const deleteMission = async (id: string) => {
   try {
-    const missionRef = doc(db, 'missions', id);
-    await deleteDoc(missionRef);
-    
-    // Supprimer aussi toutes les assignations liées à cette mission
-    const userMissionsRef = collection(db, 'user_missions');
-    const q = query(userMissionsRef, where("missionId", "==", id));
-    const querySnapshot = await getDocs(q);
+    console.log(`[MISSIONS] Début suppression de la mission ${id}`);
     
     const batch = writeBatch(db);
-    querySnapshot.docs.forEach(doc => {
+    
+    // 1. Supprimer la mission principale
+    const missionRef = doc(db, 'missions', id);
+    batch.delete(missionRef);
+    console.log(`[MISSIONS] Mission principale ${id} marquée pour suppression`);
+    
+    // 2. Supprimer toutes les assignations individuelles liées à cette mission
+    const userMissionsRef = collection(db, 'user_missions');
+    const userMissionsQuery = query(userMissionsRef, where("missionId", "==", id));
+    const userMissionsSnapshot = await getDocs(userMissionsQuery);
+    
+    console.log(`[MISSIONS] ${userMissionsSnapshot.docs.length} assignations individuelles trouvées`);
+    userMissionsSnapshot.docs.forEach(doc => {
       batch.delete(doc.ref);
     });
     
+    // 3. Supprimer toutes les missions collectives liées à cette mission
+    const collectiveMissionsRef = collection(db, 'collective_missions');
+    const collectiveMissionsQuery = query(collectiveMissionsRef, where("missionId", "==", id));
+    const collectiveMissionsSnapshot = await getDocs(collectiveMissionsQuery);
+    
+    console.log(`[MISSIONS] ${collectiveMissionsSnapshot.docs.length} missions collectives trouvées`);
+    collectiveMissionsSnapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+    });
+    
+    // 4. Exécuter toutes les suppressions en une seule transaction
     await batch.commit();
     
-    return { success: true };
+    console.log(`[MISSIONS] ✅ Mission ${id} et toutes ses données liées supprimées avec succès`);
+    
+    return { 
+      success: true, 
+      deletedUserMissions: userMissionsSnapshot.docs.length,
+      deletedCollectiveMissions: collectiveMissionsSnapshot.docs.length 
+    };
   } catch (error) {
-    console.error("Erreur lors de la suppression de la mission:", error);
+    console.error(`[MISSIONS] ❌ Erreur lors de la suppression de la mission ${id}:`, error);
     throw error;
   }
 };
@@ -581,6 +604,212 @@ export const getMissionPlatsForUser = async (userId: string): Promise<string[]> 
   }
 };
 
+// Récupérer les missions avec plats associés pour un utilisateur (version optimisée)
+export const getUserMissionsWithPlats = async (userId: string) => {
+  try {
+    // Récupérer toutes les missions de l'utilisateur
+    const userMissions = await getUserMissions(userId);
+    console.log(`[MISSIONS] ${userMissions.length} missions trouvées pour l'utilisateur`);
+    
+    // Récupérer les détails de toutes les missions pour avoir accès aux plats associés
+    const missionsWithDetails = await Promise.all(
+      userMissions.map(async (userMission) => {
+        try {
+          const mission = await getMission(userMission.missionId);
+          return { userMission, mission };
+        } catch (error) {
+          console.warn(`[MISSIONS] Erreur lors de la récupération de la mission ${userMission.missionId}:`, error);
+          return { userMission, mission: null };
+        }
+      })
+    );
+    
+    // Filtrer les missions qui ont des plats associés
+    const missionsWithPlats = missionsWithDetails.filter(
+      ({ mission }) => mission && mission.plat && mission.plat.id
+    );
+    
+    console.log(`[MISSIONS] ${missionsWithPlats.length} missions trouvées avec des plats associés`);
+    missionsWithPlats.forEach(({ mission, userMission }) => {
+      console.log(`[MISSIONS] Mission "${mission?.titre}" associée au plat ID: ${mission?.plat?.id} (Status: ${userMission.status})`);
+    });
+    
+    return missionsWithPlats;
+  } catch (error) {
+    console.error("Erreur lors de la récupération des missions avec plats:", error);
+    return [];
+  }
+};
+
+// ---- FONCTION POUR CONNECTER ENCAISSEMENT ET MISSIONS ----
+
+// Mettre à jour la progression des missions basée sur les plats validés
+export const updateMissionsProgressFromDishes = async (
+  userId: string,
+  validatedDishes: { plat: { id?: string; name: string; price: number }; quantite: number }[]
+) => {
+  try {
+    console.log(`[MISSIONS] Début mise à jour pour utilisateur ${userId} avec ${validatedDishes.length} plats validés`);
+    
+    // Filtrer les plats qui ont un ID valide
+    const dishesWithId = validatedDishes.filter(dish => dish.plat.id);
+    console.log(`[MISSIONS] ${dishesWithId.length} plats avec ID valide trouvés:`, 
+      dishesWithId.map(d => `${d.plat.name} (ID: ${d.plat.id}, Qty: ${d.quantite})`));
+    
+    if (dishesWithId.length === 0) {
+      console.log("[MISSIONS] Aucun plat avec ID valide, arrêt de la mise à jour des missions");
+      return {
+        success: true,
+        updatedMissions: 0,
+        processedDishes: 0,
+        message: "Aucun plat avec ID valide à traiter"
+      };
+    }
+    
+    // Utiliser la fonction optimisée pour récupérer les missions avec plats
+    const missionsWithPlats = await getUserMissionsWithPlats(userId);
+    
+    // Pour chaque plat validé, vérifier s'il correspond à une mission
+    const progressUpdates: Promise<any>[] = [];
+    let updatedMissionsCount = 0;
+    
+    for (const validatedDish of dishesWithId) {
+      // Trouver les missions qui correspondent à ce plat
+      const matchingMissions = missionsWithPlats.filter(
+        ({ mission }) => mission?.plat?.id === validatedDish.plat.id
+      );
+      
+      console.log(`[MISSIONS] Plat "${validatedDish.plat.name}" (ID: ${validatedDish.plat.id}) correspond à ${matchingMissions.length} mission(s)`);
+      
+      // Mettre à jour la progression pour chaque mission correspondante
+      for (const { userMission, mission } of matchingMissions) {
+        if (mission && userMission.status !== "completed") {
+          // Calculer la nouvelle valeur actuelle
+          const currentValue = (userMission.currentValue || 0) + validatedDish.quantite;
+          
+          console.log(`[MISSIONS] Mission "${mission.titre}": progression de ${userMission.currentValue || 0} à ${currentValue}`);
+          
+          // Ajouter la mise à jour à la liste des promesses
+          progressUpdates.push(
+            updateUserMissionProgress(userMission.id, currentValue)
+              .then(() => {
+                console.log(`[MISSIONS] ✅ Mission "${mission.titre}" mise à jour avec succès`);
+                updatedMissionsCount++;
+              })
+              .catch((error) => {
+                console.error(`[MISSIONS] ❌ Erreur mise à jour mission "${mission.titre}":`, error);
+                throw error;
+              })
+          );
+        } else if (userMission.status === "completed") {
+          console.log(`[MISSIONS] Mission "${mission?.titre}" déjà complétée, pas de mise à jour`);
+        }
+      }
+    }
+    
+    // Exécuter toutes les mises à jour en parallèle
+    if (progressUpdates.length > 0) {
+      await Promise.all(progressUpdates);
+      console.log(`[MISSIONS] ✅ ${updatedMissionsCount} missions mises à jour avec succès`);
+    } else {
+      console.log("[MISSIONS] Aucune mission à mettre à jour");
+    }
+    
+    return {
+      success: true,
+      updatedMissions: updatedMissionsCount,
+      processedDishes: dishesWithId.length,
+      message: `${updatedMissionsCount} missions mises à jour pour ${dishesWithId.length} plats traités`
+    };
+    
+  } catch (error) {
+    console.error("[MISSIONS] ❌ Erreur lors de la mise à jour des missions depuis les plats:", error);
+    throw error;
+  }
+};
+
+// ---- ANALYTICS ET REPORTING ----
+
+// Obtenir des statistiques sur les missions et leur progression
+export const getMissionProgressAnalytics = async (userId: string) => {
+  try {
+    const userMissions = await getUserMissions(userId);
+    
+    // Statistiques générales
+    const totalMissions = userMissions.length;
+    const completedMissions = userMissions.filter(m => m.status === "completed").length;
+    const pendingMissions = userMissions.filter(m => m.status === "pending").length;
+    const failedMissions = userMissions.filter(m => m.status === "failed").length;
+    
+    // Progression moyenne
+    const totalProgress = userMissions.reduce((sum, mission) => sum + (mission.progression || 0), 0);
+    const averageProgress = totalMissions > 0 ? Math.round(totalProgress / totalMissions) : 0;
+    
+    // Missions avec plats associés
+    const missionsWithDetails = await Promise.all(
+      userMissions.map(async (userMission) => {
+        try {
+          const mission = await getMission(userMission.missionId);
+          return { userMission, mission };
+        } catch (error) {
+          return { userMission, mission: null };
+        }
+      })
+    );
+    
+    const missionsWithDishes = missionsWithDetails.filter(
+      ({ mission }) => mission && mission.plat && mission.plat.id
+    ).length;
+    
+    // Points totaux gagnés
+    const totalPointsEarned = missionsWithDetails
+      .filter(({ userMission }) => userMission.status === "completed")
+      .reduce((sum, { mission }) => sum + (mission?.points || 0), 0);
+    
+    return {
+      totalMissions,
+      completedMissions,
+      pendingMissions,
+      failedMissions,
+      averageProgress,
+      missionsWithDishes,
+      totalPointsEarned,
+      completionRate: totalMissions > 0 ? Math.round((completedMissions / totalMissions) * 100) : 0
+    };
+  } catch (error) {
+    console.error("Erreur lors du calcul des analytics des missions:", error);
+    throw error;
+  }
+};
+
+// Obtenir l'historique des mises à jour de progression d'une mission
+export const getMissionProgressHistory = async (userMissionId: string) => {
+  try {
+    // Cette fonction pourrait être étendue pour stocker un historique des changements
+    // Pour l'instant, on retourne les données actuelles
+    const userMissionRef = doc(db, 'user_missions', userMissionId);
+    const userMissionDoc = await getDoc(userMissionRef);
+    
+    if (!userMissionDoc.exists()) {
+      throw new Error("Mission utilisateur non trouvée");
+    }
+    
+    const userMission = userMissionDoc.data() as UserMission;
+    const mission = await getMission(userMission.missionId);
+    
+    return {
+      userMission,
+      mission,
+      currentProgress: userMission.progression || 0,
+      currentValue: userMission.currentValue || 0,
+      lastUpdated: userMission.dateAssigned || new Date()
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération de l'historique:", error);
+    throw error;
+  }
+};
+
 export default {
   createMission,
   getMission,
@@ -597,6 +826,10 @@ export default {
   getUserCollectiveMissions,
   addUserToCollectiveMission,
   removeUserFromCollectiveMission,
-  getMissionPlatsForUser
+  getMissionPlatsForUser,
+  getUserMissionsWithPlats,
+  updateMissionsProgressFromDishes,
+  getMissionProgressAnalytics,
+  getMissionProgressHistory
 };
 
