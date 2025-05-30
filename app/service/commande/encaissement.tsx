@@ -7,7 +7,7 @@ import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { getAuth } from '@/app/firebase/firebaseConfig';
 import Head from '@/app/components/Head';
 
-export default function Encaissement() {
+function Encaissement() {
     const { tableId } = useLocalSearchParams();
     const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
@@ -431,3 +431,5 @@ const styles = StyleSheet.create({
         fontSize: 16,
     },
 });
+
+export default Encaissement;

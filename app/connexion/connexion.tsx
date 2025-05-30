@@ -32,14 +32,14 @@ const LoginScreen: React.FC = () => {
         return;
       }
 
-      const user = await signInUser(email, password);
+      const user = await signInUser({ email, password });
       const userDoc = await getDoc(doc(db, "users", user.uid));
       const userData = userDoc.data() as UserData;
 
       if (userData?.role === "manager") {
-        router.replace("/");  // Use absolute path instead of relative;
+        router.replace("/" as any);  // Use absolute path instead of relative;
       } else if (userData?.role === "employee") {
-        router.replace("/");  // Use absolute path instead of relative;
+        router.replace("/" as any);  // Use absolute path instead of relative;
       } else {
         setMessage("Rôle utilisateur non reconnu");
       }

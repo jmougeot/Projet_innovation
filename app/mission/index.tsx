@@ -1,34 +1,18 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
-import CreateMissionPage from './CreateMissionPage';
-import UserMissionsPage from './UserMissionsPage';
-import AllMissionsPage from './AllMissionsPage';
+import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Head from '@/app/components/Head';
 
-// Définir le type des paramètres de navigation
-export type MissionStackParamList = {
-  MissionHome: undefined;
-  CreateMission: undefined;
-  UserMissions: undefined;
-  AllMissions: undefined;
-};
-
-// Définir le type de pile de navigation
-const Stack = createStackNavigator<MissionStackParamList>();
-
 // Page d'accueil des missions
 const MissionHome = () => {
-  const navigation = useNavigation<NavigationProp<MissionStackParamList>>();
   
   return (
     <SafeAreaView style={styles.container}>
       <Head title="Missions" />      
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => navigation.navigate('UserMissions')}
+        onPress={() => router.push('/mission/UserMissionsPage' as any )}
       >
         <View style={styles.cardHeader}>
           <Ionicons name="list" size={24} color="#1890ff" />
@@ -41,7 +25,7 @@ const MissionHome = () => {
       
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => navigation.navigate('AllMissions')}
+        onPress={() => router.push('/mission/AllMissionsPage' as any)}
       >
         <View style={styles.cardHeader}>
           <Ionicons name="search" size={24} color="#1890ff" />
@@ -54,7 +38,7 @@ const MissionHome = () => {
       
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => navigation.navigate('CreateMission')}
+        onPress={() => router.push('/mission/CreateMissionPage' as any)}
       >
         <View style={styles.cardHeader}>
           <Ionicons name="add-circle" size={24} color="#1890ff" />
@@ -64,63 +48,42 @@ const MissionHome = () => {
           Créez une nouvelle mission pour vous ou votre équipe
         </Text>
       </TouchableOpacity>
+      
+      <TouchableOpacity 
+        style={styles.card}
+        onPress={() => router.push('/mission/ProgressBarDemo' as any)}
+      >
+        <View style={styles.cardHeader}>
+          <Ionicons name="analytics" size={24} color="#1890ff" />
+          <Text style={styles.cardTitle}>Démo des barres de progression</Text>
+        </View>
+        <Text style={styles.cardDescription}>
+          Découvrez les nouvelles barres de progression avec valeurs absolues
+        </Text>
+      </TouchableOpacity>
     </SafeAreaView>
-  );
-};
-
-// Navigateur principal des missions
-const MissionNavigator = () => {
-  return (
-    <Stack.Navigator 
-      initialRouteName="MissionHome"
-      screenOptions={{
-        headerShown: false,
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
-      }}
-    >
-      <Stack.Screen 
-        name="MissionHome" 
-        component={MissionHome} 
-        options={{ title: 'Missions' }}
-      />
-      <Stack.Screen 
-        name="CreateMission" 
-        component={CreateMissionPage} 
-        options={{ title: 'Créer une mission' }}
-      />
-      <Stack.Screen 
-        name="UserMissions" 
-        component={UserMissionsPage} 
-        options={{ title: 'Mes missions' }}
-      />
-      <Stack.Screen 
-        name="AllMissions" 
-        component={AllMissionsPage} 
-        options={{ title: 'Toutes les missions' }}
-      />
-    </Stack.Navigator>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#194A8D',
+    padding: 16,
   },
   card: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 10,
+    backgroundColor: 'white',
+    borderRadius: 12,
     padding: 20,
-    marginBottom: 15,
-    elevation: 3,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -129,8 +92,9 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 10,
+    fontWeight: '600',
+    marginLeft: 12,
+    color: '#333',
   },
   cardDescription: {
     fontSize: 14,
@@ -138,4 +102,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default MissionNavigator;
+export default MissionHome;

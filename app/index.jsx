@@ -41,13 +41,13 @@ export default function Index() {
         </View>
         
         <View style={styles.buttonsSection}>
-          <Link href="./service/(tabs)/plan_de_salle" asChild>
+          <Link href="./service" asChild>
             <Pressable style={styles.button}>
               <Text style={styles.buttonText}>Service</Text>
             </Pressable>
           </Link>
           
-          <Link href="./cuisine/cuisine" asChild>
+          <Link href="./cuisine" asChild>
             <Pressable style={styles.button}>
               <Text style={styles.buttonText}>Cuisine</Text>
             </Pressable>

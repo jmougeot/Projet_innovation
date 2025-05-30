@@ -9,11 +9,9 @@ import {
   Alert,
   TextInput
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
+import { router } from 'expo-router';
 import { getAllMissions, assignMissionToUser } from '../firebase/firebaseMission';
 import { getAuth } from 'firebase/auth';
-import { MissionStackParamList } from './index';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -28,7 +26,6 @@ const AllMissionsPage = () => {
 
   
   
-  const navigation = useNavigation<StackNavigationProp<MissionStackParamList>>();
   const auth = getAuth();
   const currentUser = auth.currentUser;
   
@@ -101,7 +98,7 @@ const AllMissionsPage = () => {
       Alert.alert('Succès', 'Vous êtes maintenant inscrit à cette mission');
       
       // Rediriger vers la page des missions de l'utilisateur
-      navigation.navigate('UserMissions');
+      router.push('/mission/UserMissionsPage' as any);
     } catch (error) {
       console.error('Erreur lors de l\'inscription à la mission:', error);
       Alert.alert('Erreur', 'Impossible de vous inscrire à cette mission');
@@ -264,7 +261,7 @@ const AllMissionsPage = () => {
             {currentUser?.uid && missions.length === 0 && (
               <TouchableOpacity 
                 style={styles.emptyButton}
-                onPress={() => navigation.navigate('CreateMission')}
+                onPress={() => router.push('/mission/CreateMissionPage' as any)}
               >
                 <Text style={styles.emptyButtonText}>Créer une mission</Text>
               </TouchableOpacity>

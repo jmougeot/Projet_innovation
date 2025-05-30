@@ -9,8 +9,7 @@ import {
   Alert,
   Switch
 } from 'react-native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { useNavigation } from '@react-navigation/native';
+import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 // Suppression de l'import du Picker original
 // import { Picker } from '@react-native-picker/picker';
@@ -19,7 +18,6 @@ import Picker from '../components/Picker';
 import { createMission, assignMissionToUser, createCollectiveMission } from '../firebase/firebaseMission';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebaseConfig';
-import { MissionStackParamList } from './index';
 import { get_plats, Plat } from '../firebase/firebaseMenu';
 
 // Types
@@ -31,11 +29,7 @@ interface User {
   email: string;
 }
 
-// Type pour les props de navigation
-type CreateMissionScreenNavigationProp = StackNavigationProp<MissionStackParamList, 'CreateMission'>;
-
 const CreateMissionPage = () => {
-  const navigation = useNavigation<CreateMissionScreenNavigationProp>();
 
   // État initial du formulaire
   const [formData, setFormData] = useState({
@@ -141,7 +135,8 @@ const CreateMissionPage = () => {
         recurrence: {
           frequence: formData.frequence,
           dateDebut: formData.dateDebut
-        }
+        },
+        targetValue: formData.targetValue // Inclure la valeur cible dans toutes les missions
       };
       
       // Ajouter le plat si un plat est sélectionné
@@ -158,11 +153,8 @@ const CreateMissionPage = () => {
       
       // Si c'est une mission collective
       if (formData.isCollective) {
-        console.log(`Création d'une mission collective pour ${formData.selectedUsers.length} utilisateurs`);
         const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue);
-        console.log(`Mission collective créée avec l'ID: ${collectiveResult.id}`);
       } else {
-        // Assigner la mission à chaque utilisateur sélectionné (missions individuelles)
         console.log(`Création de ${formData.selectedUsers.length} missions individuelles`);
         const assignmentResults = [];
         
@@ -205,7 +197,7 @@ const CreateMissionPage = () => {
       });
       
       // Navigation
-      navigation.goBack();
+      router.back();
     } catch (error) {
       console.error('Erreur lors de la création de la mission:', error);
       Alert.alert('Erreur', `Impossible de créer la mission: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

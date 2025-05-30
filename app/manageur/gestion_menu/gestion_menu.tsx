@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, ActivityIndicator, Button, StyleSheet , TouchableOpacity, Modal, TextInput, Alert} from 'react-native';
-import { get_plats, MenuItem, ajout_plat} from '@/app/firebase/firebaseDatabase';
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
+import { Plat, get_plats, ajout_plat } from '@/app/firebase/firebaseMenu';
 
 
 export default function Menu() {
-  const [plats, setPlats] = useState<MenuItem[]>([]);
+  const [plats, setPlats] = useState<Plat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -41,18 +41,18 @@ export default function Menu() {
         return;
       }
 
-      await ajout_plat(
-        newPlat.name,
-        newPlat.category,
-        Number(newPlat.price)
-      );
+      await ajout_plat({
+        name: newPlat.name,
+        category: newPlat.category,
+        price: Number(newPlat.price)
+      });
 
       setModalVisible(false);
       setNewPlat({ name: '', category: '', price: '' });
 
       const querySnapshot = await getDocs(collection(db, "menu"));
       const items = querySnapshot.docs.map((doc) => {
-          const data = doc.data() as Omit<MenuItem, 'id'>;
+          const data = doc.data() as Omit<Plat, 'id'>;
           return {
               id: doc.id,
               ...data,
@@ -64,7 +64,7 @@ export default function Menu() {
     }
   };
 
-  const renderItem = ({ item }: { item: MenuItem }) => (
+  const renderItem = ({ item }: { item: Plat }) => (
     <View style={styles.platItem}>
       <Text style={styles.platName}>{item.name}</Text>
       <Text style={styles.platCategory}>{item.category}</Text>

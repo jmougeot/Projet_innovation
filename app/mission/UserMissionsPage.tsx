@@ -3,19 +3,15 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  FlatList, 
   TouchableOpacity, 
   ActivityIndicator, 
   Alert,
   ScrollView,
   Platform
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { getUserMissions } from '../firebase/firebaseMission';
+import { router } from 'expo-router';
+import { getUserMissions, getMission, updateUserMissionProgress } from '../firebase/firebaseMission';
 import { getAuth } from 'firebase/auth';
-import { getMission } from '../firebase/firebaseMission';
-import { MissionStackParamList } from './index';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +24,7 @@ interface UserMissionWithDetails {
   missionId: string;
   status: "pending" | "completed" | "failed";
   progression: number;
+  currentValue?: number; // Valeur actuelle pour les missions avec targetValue
   dateAssigned: any;
   dateCompletion?: any;
   isPartOfCollective?: boolean;
@@ -42,7 +39,6 @@ const UserMissionsPage = () => {
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
   const [completedMissions, setCompletedMissions] = useState<UserMissionWithDetails[]>([]);
   
-  const navigation = useNavigation<StackNavigationProp<MissionStackParamList>>();
   const auth = getAuth();
   const currentUser = auth.currentUser;
 
@@ -151,6 +147,15 @@ const UserMissionsPage = () => {
     const progressPercentage = item.progression || 0;
     const progressColor = getProgressColor(progressPercentage);
     
+    // Calculer les valeurs pour l'affichage
+    const targetValue = item.missionDetails.targetValue || 100;
+    const currentValue = item.currentValue !== undefined 
+      ? item.currentValue 
+      : Math.round((progressPercentage / 100) * targetValue);
+    
+    // Déterminer le format d'affichage
+    const showAbsoluteValues = item.missionDetails.targetValue !== undefined;
+    
     return (
       <TouchableOpacity 
         style={styles.missionCard}
@@ -180,7 +185,10 @@ const UserMissionsPage = () => {
           <View style={styles.progressLabelContainer}>
             <Text style={styles.progressText}>Progression</Text>
             <Text style={[styles.progressPercentage, { color: progressColor }]}>
-              {progressPercentage}%
+              {showAbsoluteValues 
+                ? `${currentValue}/${targetValue} (${progressPercentage}%)`
+                : `${progressPercentage}%`
+              }
             </Text>
           </View>
           <View style={styles.progressBarContainer}>
@@ -285,7 +293,7 @@ const UserMissionsPage = () => {
               <Text style={styles.emptyText}>Aucune mission en cours</Text>
               <TouchableOpacity 
                 style={styles.emptyButton} 
-                onPress={() => navigation.navigate('CreateMission')}
+                onPress={() => router.push('/mission/AllMissionsPage' as any )}
               >
                 <Text style={styles.emptyButtonText}>Découvrir des missions</Text>
               </TouchableOpacity>

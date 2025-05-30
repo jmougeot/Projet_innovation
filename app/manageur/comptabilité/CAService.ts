@@ -233,3 +233,15 @@ export const distributeAmount = async (employeeId: string, amount: number): Prom
     throw new Error("Impossible de distribuer le montant");
   }
 };
+
+// Ajouter un export par défaut pour Expo Router
+export default {
+  fetchFinancialData,
+  updateRestaurantCA,
+  updateUserCA,
+  saveAllChanges,
+  calculateTotalEmployeesCA,
+  filterAndSortEmployees,
+  addToCA,
+  distributeAmount
+};

@@ -129,3 +129,14 @@ export const initializeDefaultTables = async (): Promise<void> => {
     throw error;
   }
 };
+
+// Ajouter un export par défaut pour Expo Router
+export default {
+  getTables,
+  saveTable,
+  updateTables,
+  updateTablePosition,
+  updateTableStatus,
+  deleteTable,
+  initializeDefaultTables
+};

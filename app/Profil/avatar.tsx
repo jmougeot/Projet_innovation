@@ -19,22 +19,26 @@ import * as ImagePicker from 'expo-image-picker';
 import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header'; 
 import { 
-  getAuth, 
-  getFirestore, 
-  getStorage, 
+  auth,
+  db
+} from '@/app/firebase/firebaseConfig';
+import { 
+  getStorage,
   ref, 
   uploadBytes, 
-  getDownloadURL, 
+  getDownloadURL 
+} from 'firebase/storage';
+import { 
   doc, 
   getDoc,
   updateDoc,
-  setDoc,
-  signOut
-} from '@/app/firebase/firebaseConfig'; // Correction: suppression de initializeFirebase qui n'est pas exporté
+  setDoc
+} from 'firebase/firestore';
+import { 
+  signOut 
+} from 'firebase/auth';
 
-// Initialisation de Firebase
-const auth = getAuth();
-const db = getFirestore();
+// Firebase instances are already initialized in firebaseConfig
 const storage = getStorage();
 
 interface ProfileData {

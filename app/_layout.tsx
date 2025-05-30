@@ -9,6 +9,7 @@ export default function RootLayout() {
       <Stack.Screen name="manageur" options={{ headerShown: false }} />
       <Stack.Screen name="mission" options={{ headerShown: false }}/>
       <Stack.Screen name="connexion" options={{ headerShown: false }}/>
+      <Stack.Screen name="Profil" options={{ headerShown: false }}/>
     </Stack>
   );
 }

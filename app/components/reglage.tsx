@@ -35,7 +35,7 @@ export default function Reglage({
       label: 'Profil',
       onPress: () => {
         setMenuVisible(false);
-        router.push('/Profil/avatar');
+        router.push('/Profil/avatar' as any);
       }
     },
     {

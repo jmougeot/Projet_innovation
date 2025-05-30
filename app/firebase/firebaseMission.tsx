@@ -27,7 +27,8 @@ interface UserMission {
   userId: string;
   missionId: string;
   status: "pending" | "completed" | "failed";
-  progression: number;
+  progression: number; // Peut être un pourcentage ou une valeur absolue selon la mission
+  currentValue?: number; // Valeur actuelle pour les missions avec targetValue
   dateAssigned: Timestamp;
   dateCompletion?: Timestamp | ReturnType<typeof serverTimestamp>;
   isPartOfCollective?: boolean; // Indique si cette mission fait partie d'une mission collective
@@ -175,6 +176,7 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
       missionId,
       status: "pending",
       progression: 0,
+      currentValue: 0, // Initialiser la valeur actuelle à 0
       dateAssigned: serverTimestamp(),
       isPartOfCollective: false
     });
@@ -212,7 +214,8 @@ export const getUserMissions = async (userId: string): Promise<UserMission[]> =>
 export const updateUserMissionStatus = async (
   userMissionId: string, 
   status: "pending" | "completed" | "failed",
-  progression: number
+  progression: number,
+  currentValue?: number // Valeur absolue optionnelle
 ) => {
   try {
     const userMissionRef = doc(db, 'user_missions', userMissionId);
@@ -225,6 +228,7 @@ export const updateUserMissionStatus = async (
     const updateData: Partial<UserMission> = {
       status,
       progression,
+      ...(currentValue !== undefined ? { currentValue } : {}),
       ...(status === "completed" ? { dateCompletion: serverTimestamp() } : {})
     };
     
@@ -239,6 +243,59 @@ export const updateUserMissionStatus = async (
     return { success: true };
   } catch (error) {
     console.error("Erreur lors de la mise à jour du statut de la mission:", error);
+    throw error;
+  }
+};
+
+// Mettre à jour la progression d'une mission avec une valeur absolue
+export const updateUserMissionProgress = async (
+  userMissionId: string,
+  currentValue: number
+) => {
+  try {
+    const userMissionRef = doc(db, 'user_missions', userMissionId);
+    const userMissionDoc = await getDoc(userMissionRef);
+    
+    if (!userMissionDoc.exists()) {
+      throw new Error("Cette assignation de mission n'existe pas");
+    }
+    
+    const userMission = userMissionDoc.data() as UserMission;
+    
+    // Récupérer les détails de la mission pour obtenir targetValue
+    const mission = await getMission(userMission.missionId);
+    if (!mission) {
+      throw new Error("Mission non trouvée");
+    }
+    
+    const targetValue = mission.targetValue || 100;
+    const progressPercentage = Math.min(100, Math.round((currentValue / targetValue) * 100));
+    const isCompleted = currentValue >= targetValue;
+    
+    const updateData: Partial<UserMission> = {
+      currentValue,
+      progression: progressPercentage,
+      ...(isCompleted ? { 
+        status: "completed" as const,
+        dateCompletion: serverTimestamp() 
+      } : {})
+    };
+    
+    await updateDoc(userMissionRef, updateData);
+    
+    // Si cette mission fait partie d'une mission collective, mettre à jour la progression collective
+    if (userMission.isPartOfCollective && userMission.collectiveMissionId) {
+      await updateCollectiveMissionProgress(userMission.collectiveMissionId);
+    }
+    
+    return { 
+      success: true, 
+      currentValue, 
+      progressPercentage, 
+      isCompleted 
+    };
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de la progression:", error);
     throw error;
   }
 };
@@ -295,6 +352,7 @@ export const createCollectiveMission = async (
           missionId,
           status: "pending",
           progression: 0,
+          currentValue: 0, // Initialiser la valeur actuelle à 0
           dateAssigned: serverTimestamp(),
           isPartOfCollective: true,
           collectiveMissionId: newCollectiveRef.id
@@ -343,7 +401,8 @@ export const updateCollectiveMissionProgress = async (collectiveMissionId: strin
     let totalValue = 0;
     querySnapshot.docs.forEach(doc => {
       const userMission = doc.data() as UserMission;
-      totalValue += userMission.progression;
+      // Utiliser currentValue si disponible, sinon utiliser progression comme valeur absolue
+      totalValue += userMission.currentValue || userMission.progression;
     });
     
     // Mettre à jour la mission collective
@@ -432,6 +491,7 @@ export const addUserToCollectiveMission = async (
       missionId: collectiveMission.missionId,
       status: "pending",
       progression: 0,
+      currentValue: 0, // Initialiser la valeur actuelle à 0
       dateAssigned: serverTimestamp(),
       isPartOfCollective: true,
       collectiveMissionId
@@ -519,5 +579,24 @@ export const getMissionPlatsForUser = async (userId: string): Promise<string[]> 
     console.error("Erreur lors de la récupération des plats avec mission:", error);
     return [];
   }
+};
+
+export default {
+  createMission,
+  getMission,
+  getAllMissions,
+  updateMission,
+  deleteMission,
+  assignMissionToUser,
+  getUserMissions,
+  updateUserMissionStatus,
+  updateUserMissionProgress,
+  createCollectiveMission,
+  updateCollectiveMissionProgress,
+  getCollectiveMissions,
+  getUserCollectiveMissions,
+  addUserToCollectiveMission,
+  removeUserFromCollectiveMission,
+  getMissionPlatsForUser
 };
 

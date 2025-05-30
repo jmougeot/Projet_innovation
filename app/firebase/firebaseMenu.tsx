@@ -9,8 +9,6 @@ export interface Plat {
     description?: string;
     mission?:boolean;
 }
-
-
 export async function ajout_plat(plat: Plat) {
   try {
     const docRef = await addDoc(collection(db, "menu"), {
@@ -40,3 +38,8 @@ export async function get_plats() {
     throw error; 
   }
 }
+
+export default {
+  ajout_plat,
+  get_plats
+};

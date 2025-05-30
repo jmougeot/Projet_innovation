@@ -30,7 +30,7 @@ const SignUpScreen = () => {
         return;
       }
 
-      const user = await signUpUser(email, password, name, role);
+      const user = await signUpUser({ email, password, name, role });
       setMessage(`Inscription réussie ! Votre profil a bien été enregistré ${role === "employee" ? "Salarié" : "Gérant"}.`);
       setTimeout(() => {
         router.push('./connexion');

@@ -10,6 +10,7 @@ export interface Mission {
     dateDebut: Date;
   };
   plat?: Plat; // Plat associé à la mission (optionnel)
+  targetValue?: number; // Valeur cible pour la progression (optionnel)
 }
 
 export interface User {
@@ -35,3 +36,6 @@ export interface MissionGroup {
   dateCreation: Date;
   dateCompletion?: Date;
 }
+
+export default {
+};

@@ -302,10 +302,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)', // Remplace les propriétés shadow* dépréciées
     zIndex: 1,
   },
   tableNumber: {
@@ -335,10 +332,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 8,
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.2)', // Remplace les propriétés shadow* dépréciées
   },
   saveButtonText: {
     color: '#194A8D',
@@ -388,10 +382,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
+    boxShadow: '0px 2px 3px rgba(0, 0, 0, 0.3)', // Remplace les propriétés shadow* dépréciées
     zIndex: 10,
   },
 });
