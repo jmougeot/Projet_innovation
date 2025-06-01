@@ -10,3 +10,8 @@ export type {
 export type { MissionSearchProps } from './MissionSearch';
 export type { ConfirmDeleteModalProps } from './ConfirmDeleteModal';
 export type { MissionFormProps } from './MissionForm';
+
+// Default export to prevent Expo Router warnings
+export default function MissionComponentsIndex() {
+  return null;
+}

@@ -60,3 +60,5 @@ export const MissionFilters: React.FC<MissionFiltersProps> = ({
     </View>
   );
 };
+
+export default MissionFilters;

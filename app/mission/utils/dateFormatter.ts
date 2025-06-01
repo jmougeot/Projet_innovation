@@ -143,3 +143,12 @@ export const daysBetween = (date1: any, date2: any): number => {
     return 0;
   }
 };
+
+// Default export to prevent Expo Router warnings
+export default {
+  formatDate,
+  formatShortDate,
+  formatDateTime,
+  isValidDate,
+  daysBetween
+};

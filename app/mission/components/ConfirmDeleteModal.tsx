@@ -84,3 +84,5 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
     </Modal>
   );
 };
+
+export default ConfirmDeleteModal;

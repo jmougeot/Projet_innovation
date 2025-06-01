@@ -60,3 +60,5 @@ export const MissionSearch: React.FC<MissionSearchProps> = ({
     </View>
   );
 };
+
+export default MissionSearch;

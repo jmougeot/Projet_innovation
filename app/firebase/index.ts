@@ -97,3 +97,8 @@ export { default as firebaseStock } from './firebaseStock';
 export { default as firebaseTables } from './firebaseTables';
 export { default as firebaseUser } from './firebaseUser';
 export { default as firebaseAnalytics } from './firebaseAnalytics';
+
+// Default export to prevent Expo Router warnings
+export default function FirebaseIndex() {
+  return null;
+}

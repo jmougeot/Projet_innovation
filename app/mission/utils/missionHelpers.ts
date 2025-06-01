@@ -236,3 +236,17 @@ export const isMissionActiveToday = (mission: Mission): boolean => {
       return false;
   }
 };
+
+// Default export to prevent Expo Router warnings
+export default {
+  filterMissions,
+  sortMissions,
+  getRecurrenceColor,
+  getRecurrenceLabel,
+  calculateMissionStats,
+  groupMissionsByRecurrence,
+  validateMissionData,
+  generateMissionId,
+  getNextOccurrence,
+  isMissionActiveToday
+};
