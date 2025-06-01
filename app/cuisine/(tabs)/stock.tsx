@@ -56,13 +56,12 @@ export default function Stock() {
                 return;
             }
 
-            // Modify the call to match the current function signature
-            await addStock(
-                newItem.name,
-                Number(newItem.quantity),
-                Number(newItem.price)
-                // Remove the fourth parameter for now
-            );
+            // Call addStock with the correct object parameter
+            await addStock({
+                name: newItem.name,
+                quantity: Number(newItem.quantity),
+                price: Number(newItem.price)
+            });
 
             setModalVisible(false);
             setNewItem({ name: '', quantity: '', price: '', unit: '' });

@@ -10,9 +10,9 @@ import {
   Platform
 } from 'react-native';
 import { router } from 'expo-router';
-import { getUserMissions, getMission, updateUserMissionProgress } from '../firebase/firebaseMission';
-import { auth } from '../firebase/firebaseConfig';
-import { Mission } from './Interface';
+import { getUserMissions, getMission, updateUserMissionProgress } from '../../firebase/firebaseMission';
+import { auth } from '../../firebase/firebaseConfig';
+import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
@@ -42,7 +42,7 @@ const UserMissionsPage = () => {
   const currentUser = auth.currentUser;
 
   const [fontsLoaded] = useFonts({
-    'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
+    'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
   // Fonction pour charger les missions de l'utilisateur

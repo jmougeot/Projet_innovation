@@ -19,7 +19,7 @@ import {
 } from 'firebase/firestore';
 
 // Types importés des interfaces
-import type { Mission, MissionAssignment } from '../mission/Interface';
+import type { Mission, MissionAssignment } from '../mission/types';
 
 // Pour les user missions individuelles
 interface UserMission {

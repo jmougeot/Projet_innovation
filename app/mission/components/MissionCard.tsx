@@ -7,7 +7,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Mission } from '../Interface';
+import { Mission } from '../types';
 
 interface MissionCardProps {
   mission: Mission;

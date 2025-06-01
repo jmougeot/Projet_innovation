@@ -12,7 +12,7 @@ const MissionHome = () => {
       <Head title="Missions" />      
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => router.push('/mission/UserMissionsPage' as any )}
+        onPress={() => router.push('/mission/pages/UserMissionsPage' as any )}
       >
         <View style={styles.cardHeader}>
           <Ionicons name="list" size={24} color="#1890ff" />
@@ -25,7 +25,7 @@ const MissionHome = () => {
       
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => router.push('/mission/AllMissionsPage' as any)}
+        onPress={() => router.push('/mission/pages/AllMissionsPage' as any)}
       >
         <View style={styles.cardHeader}>
           <Ionicons name="search" size={24} color="#1890ff" />
@@ -38,7 +38,7 @@ const MissionHome = () => {
       
       <TouchableOpacity 
         style={styles.card}
-        onPress={() => router.push('/mission/CreateMissionPage' as any)}
+        onPress={() => router.push('/mission/pages/CreateMissionPage' as any)}
       >
         <View style={styles.cardHeader}>
           <Ionicons name="add-circle" size={24} color="#1890ff" />
@@ -46,19 +46,6 @@ const MissionHome = () => {
         </View>
         <Text style={styles.cardDescription}>
           Créez une nouvelle mission pour vous ou votre équipe
-        </Text>
-      </TouchableOpacity>
-      
-      <TouchableOpacity 
-        style={styles.card}
-        onPress={() => router.push('/mission/ProgressBarDemo' as any)}
-      >
-        <View style={styles.cardHeader}>
-          <Ionicons name="analytics" size={24} color="#1890ff" />
-          <Text style={styles.cardTitle}>Démo des barres de progression</Text>
-        </View>
-        <Text style={styles.cardDescription}>
-          Découvrez les nouvelles barres de progression avec valeurs absolues
         </Text>
       </TouchableOpacity>
     </SafeAreaView>

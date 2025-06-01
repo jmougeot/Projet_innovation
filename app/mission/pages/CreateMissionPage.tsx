@@ -14,14 +14,14 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 // Suppression de l'import du Picker original
 // import { Picker } from '@react-native-picker/picker';
 // Import du composant Picker personnalisé
-import Picker from '../components/Picker';
-import { createMission, assignMissionToUser, createCollectiveMission } from '../firebase/firebaseMission';
+import Picker from '../../components/Picker';
+import { createMission, assignMissionToUser, createCollectiveMission } from '../../firebase/firebaseMission';
 import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/firebaseConfig';
-import { get_plats, Plat } from '../firebase/firebaseMenu';
+import { db } from '../../firebase/firebaseConfig';
+import { get_plats, Plat } from '../../firebase/firebaseMenu';
 
 // Types
-import type { Mission } from './Interface';
+import type { Mission } from '../types';
 
 interface User {
   id: string;

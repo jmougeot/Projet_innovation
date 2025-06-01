@@ -6,16 +6,16 @@ import {
   FlatList,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
-  TextInput,
-  Modal
+  Alert
 } from 'react-native';
 import { router } from 'expo-router';
-import { getAllMissions, assignMissionToUser, deleteMission } from '../firebase/firebaseMission';
-import { auth } from '../firebase/firebaseConfig';
-import { Mission } from './Interface';
+import { getAllMissions, assignMissionToUser, deleteMission } from '../../firebase/firebaseMission';
+import { auth } from '../../firebase/firebaseConfig';
+import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
-import MissionCard from './components/MissionCard';
+import { MissionCard, MissionSearch, MissionFilters, ConfirmDeleteModal } from '../components';
+import { commonStyles } from '../styles';
+import { filterMissions, sortMissions } from '../utils';
 
 
 const AllMissionsPage = () => {
@@ -24,10 +24,10 @@ const AllMissionsPage = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [selectedRecurrence, setSelectedRecurrence] = useState('');
   const [showDeleteButtons, setShowDeleteButtons] = useState(false);
   const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null);
-  const [confirmDeleteMission, setConfirmDeleteMission] = useState<{ id: string, title: string } | null>(null);
+  const [confirmDeleteMission, setConfirmDeleteMission] = useState<Mission | null>(null);
 
   
   
@@ -38,7 +38,7 @@ const AllMissionsPage = () => {
     try {
       const allMissions = await getAllMissions();
       setMissions(allMissions);
-      applyFilters(allMissions, searchQuery, selectedType);
+      applyFilters(allMissions);
     } catch (error) {
       console.error('Erreur lors de la récupération des missions:', error);
       Alert.alert('Erreur', 'Impossible de charger les missions');
@@ -52,36 +52,35 @@ const AllMissionsPage = () => {
     loadAllMissions();
   }, []);
   
-  // Appliquer les filtres (recherche et type)
-  const applyFilters = (missionsToFilter: Mission[], query: string, type: string | null) => {
-    let filtered = missionsToFilter;
+  // Appliquer les filtres
+  const applyFilters = (missionsToFilter: Mission[] = missions) => {
+    const filtered = filterMissions(missionsToFilter, {
+      searchQuery,
+      recurrence: selectedRecurrence as 'daily' | 'weekly' | 'monthly' | undefined,
+    });
     
-    // Appliquer la recherche par texte
-    if (query) {
-      filtered = filtered.filter(mission => 
-        mission.titre.toLowerCase().includes(query.toLowerCase()) ||
-        mission.description.toLowerCase().includes(query.toLowerCase())
-      );
-    }
-    
-    // Appliquer le filtre par type
-    if (type) {
-      filtered = filtered.filter(mission => mission.recurrence.frequence === type);
-    }
-    
-    setFilteredMissions(filtered);
+    // Trier par titre par défaut
+    const sorted = sortMissions(filtered, 'titre', 'asc');
+    setFilteredMissions(sorted);
   };
+
+  // Effet pour appliquer les filtres quand ils changent
+  useEffect(() => {
+    applyFilters();
+  }, [searchQuery, selectedRecurrence, missions]);
   
-  // Gestionnaire de recherche
-  const handleSearch = (query: string) => {
+  // Gestionnaires de filtres
+  const handleSearchChange = (query: string) => {
     setSearchQuery(query);
-    applyFilters(missions, query, selectedType);
   };
-  
-  // Gestionnaire de filtre par type
-  const handleTypeFilter = (type: string | null) => {
-    setSelectedType(type === selectedType ? null : type);
-    applyFilters(missions, searchQuery, type === selectedType ? null : type);
+
+  const handleRecurrenceChange = (recurrence: string) => {
+    setSelectedRecurrence(recurrence);
+  };
+
+  const handleClearFilters = () => {
+    setSearchQuery('');
+    setSelectedRecurrence('');
   };
   
   // Rafraîchissement de la liste
@@ -90,36 +89,34 @@ const AllMissionsPage = () => {
     loadAllMissions();
   };
   
-    // Supprimer une mission - nouvelle version avec confirmation personnalisée
+  // Supprimer une mission - nouvelle version avec confirmation personnalisée
   const handleDeleteMission = async (missionId: string) => {
     console.log('[DEBUG] handleDeleteMission appelée avec ID:', missionId);
     
     // Trouver les détails de la mission pour afficher son titre
     const mission = missions.find(m => m.id === missionId);
-    const missionTitle = mission ? mission.titre : 'cette mission';
     
     console.log('[DEBUG] Mission trouvée:', mission);
-    console.log('[DEBUG] Titre de la mission:', missionTitle);
     
-    // Ouvrir la confirmation personnalisée
-    setConfirmDeleteMission({ id: missionId, title: missionTitle });
+    if (mission) {
+      // Ouvrir la confirmation personnalisée
+      setConfirmDeleteMission(mission);
+    }
   };
 
   // Confirmer la suppression
   const confirmDeletion = async () => {
     if (!confirmDeleteMission) return;
     
-    const { id: missionId, title: missionTitle } = confirmDeleteMission;
-    
-    console.log('[DEBUG] 🗑️ Suppression confirmée pour mission:', missionId);
+    console.log('[DEBUG] 🗑️ Suppression confirmée pour mission:', confirmDeleteMission.id);
     
     try {
       console.log('[DEBUG] 📋 Réglage de deletingMissionId...');
-      setDeletingMissionId(missionId);
-      console.log('[DEBUG] ✅ deletingMissionId réglé à:', missionId);
+      setDeletingMissionId(confirmDeleteMission.id);
+      console.log('[DEBUG] ✅ deletingMissionId réglé à:', confirmDeleteMission.id);
       
-      console.log('[DEBUG] 📞 Appel de deleteMission avec ID:', missionId);
-      const result = await deleteMission(missionId);
+      console.log('[DEBUG] 📞 Appel de deleteMission avec ID:', confirmDeleteMission.id);
+      const result = await deleteMission(confirmDeleteMission.id);
       console.log('[DEBUG] ✅ deleteMission terminé avec succès. Résultat:', result);
       
       console.log('[DEBUG] 📢 Mission supprimée avec succès !');
@@ -213,39 +210,6 @@ const AllMissionsPage = () => {
     );
   };
   
-  // Rendu des filtres de type
-  const renderTypeFilters = () => {
-    const types = [
-      { label: 'Quotidienne', value: 'daily' },
-      { label: 'Hebdomadaire', value: 'weekly' },
-      { label: 'Mensuelle', value: 'monthly' }
-    ];
-    
-    return (
-      <View style={styles.filterContainer}>
-        <Text style={styles.filterLabel}>Filtrer par type :</Text>
-        <View style={styles.filterButtons}>
-          {types.map(type => (
-            <TouchableOpacity
-              key={type.value}
-              style={[
-                styles.filterButton,
-                selectedType === type.value && styles.filterButtonSelected
-              ]}
-              onPress={() => handleTypeFilter(type.value)}
-            >
-              <Text style={[
-                styles.filterButtonText,
-                selectedType === type.value && styles.filterButtonTextSelected
-              ]}>
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    );
-  };
   
   if (loading) {
     return (
@@ -264,7 +228,7 @@ const AllMissionsPage = () => {
           <Text style={styles.headerTitle}>Toutes les missions</Text>
           <Text style={styles.missionCount}>
             {filteredMissions.length} mission{filteredMissions.length > 1 ? 's' : ''}
-            {searchQuery || selectedType ? ` (sur ${missions.length})` : ''}
+            {searchQuery || selectedRecurrence ? ` (sur ${missions.length})` : ''}
           </Text>
         </View>
         <View style={styles.headerButtons}>
@@ -305,19 +269,17 @@ const AllMissionsPage = () => {
         </View>
       )}
 
-      {/* Barre de recherche */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search-outline" size={20} color="#666" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Rechercher une mission..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-        />
-      </View>
+      {/* Composants de recherche et filtres */}
+      <MissionSearch
+        searchQuery={searchQuery}
+        onSearchChange={handleSearchChange}
+      />
       
-      {/* Filtres */}
-      {renderTypeFilters()}
+      <MissionFilters
+        selectedRecurrence={selectedRecurrence}
+        onRecurrenceChange={handleRecurrenceChange}
+        onClearFilters={handleClearFilters}
+      />
       
       {/* Liste des missions */}
       <FlatList
@@ -347,63 +309,14 @@ const AllMissionsPage = () => {
         }
       />
 
-      {/* Modal de confirmation de suppression */}
-      <Modal
+      {/* Modal de confirmation de suppression avec nouveau composant */}
+      <ConfirmDeleteModal
         visible={confirmDeleteMission !== null}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={cancelDeletion}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.confirmationModal}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="warning" size={30} color="#ff4d4f" />
-              <Text style={styles.modalTitle}>🗑️ Supprimer la mission</Text>
-            </View>
-            
-            <Text style={styles.modalMessage}>
-              Voulez-vous vraiment supprimer la mission "{confirmDeleteMission?.title}" ?
-            </Text>
-            
-            <Text style={styles.modalWarning}>
-              ⚠️ ATTENTION : Cette action est définitive et supprimera :
-            </Text>
-            
-            <View style={styles.warningList}>
-              <Text style={styles.warningItem}>• 📋 La mission principale</Text>
-              <Text style={styles.warningItem}>• 👥 Toutes les assignations utilisateurs</Text>
-              <Text style={styles.warningItem}>• 🎯 Toutes les missions collectives associées</Text>
-              <Text style={styles.warningItem}>• 📊 L'historique de progression</Text>
-              <Text style={styles.warningItem}>• 🏆 Les points associés</Text>
-            </View>
-            
-            <Text style={styles.modalFinalWarning}>
-              ❌ Cette action ne peut PAS être annulée !
-            </Text>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={cancelDeletion}
-              >
-                <Text style={styles.cancelButtonText}>❌ Annuler</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.deleteButton]}
-                onPress={confirmDeletion}
-                disabled={deletingMissionId === confirmDeleteMission?.id}
-              >
-                {deletingMissionId === confirmDeleteMission?.id ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.deleteButtonText}>🗑️ Supprimer</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        mission={confirmDeleteMission}
+        isDeleting={deletingMissionId === confirmDeleteMission?.id}
+        onConfirm={confirmDeletion}
+        onCancel={cancelDeletion}
+      />
     </View>
   );
 };
@@ -486,61 +399,6 @@ const styles = StyleSheet.create({
   listContainer: {
     padding: 16,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    margin: 16,
-    marginBottom: 0,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    padding: 8,
-  },
-  filterContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  filterButtons: {
-    flexDirection: 'row',
-  },
-  filterButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginRight: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
-  },
-  filterButtonSelected: {
-    backgroundColor: '#1890ff',
-    borderColor: '#1890ff',
-  },
-  filterButtonText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  filterButtonTextSelected: {
-    color: '#fff',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -573,102 +431,6 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  confirmationModal: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    maxWidth: 400,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 10,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 16,
-    lineHeight: 22,
-  },
-  modalWarning: {
-    fontSize: 14,
-    color: '#ff4d4f',
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  warningList: {
-    marginBottom: 16,
-    paddingLeft: 8,
-  },
-  warningItem: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  modalFinalWarning: {
-    fontSize: 14,
-    color: '#ff4d4f',
-    fontWeight: '700',
-    textAlign: 'center',
-    marginBottom: 20,
-    padding: 8,
-    backgroundColor: '#fff2f0',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#ffccc7',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 44,
-  },
-  cancelButton: {
-    backgroundColor: '#f5f5f5',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  deleteButton: {
-    backgroundColor: '#ff4d4f',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '600',
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
   },
 });
 
