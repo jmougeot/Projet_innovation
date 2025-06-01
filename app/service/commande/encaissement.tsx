@@ -4,7 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
-import { getAuth } from 'firebase/auth';
+import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMission';
 import Head from '@/app/components/Head';
 
@@ -21,7 +21,6 @@ function Encaissement() {
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     useEffect(() => {
-        const auth = getAuth();
         const user = auth.currentUser;
         
         if (user) {

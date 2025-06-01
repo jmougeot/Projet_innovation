@@ -122,7 +122,14 @@ const MissionDeletionTestPage = () => {
         <Text style={styles.statsText}>Missions trouvées: {missions.length}</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Missions disponibles pour test:</Text>
+      <View style={styles.instructionCard}>
+        <Ionicons name="information-circle" size={20} color="#1890ff" />
+        <Text style={styles.instructionText}>
+          💡 Appuyez sur une mission pour lancer le test de suppression
+        </Text>
+      </View>
+
+      <Text style={styles.sectionTitle}>🔍 Missions disponibles pour test - Appuyez pour tester la suppression:</Text>
 
       {missions.length === 0 ? (
         <View style={styles.emptyContainer}>
@@ -137,7 +144,13 @@ const MissionDeletionTestPage = () => {
         </View>
       ) : (
         missions.map((mission) => (
-          <View key={mission.id} style={styles.missionCard}>
+          <TouchableOpacity 
+            key={mission.id} 
+            style={styles.missionCard}
+            onPress={() => testDeleteMission(mission)}
+            disabled={deletingMissionId === mission.id}
+            activeOpacity={0.7}
+          >
             <View style={styles.missionHeader}>
               <Text style={styles.missionTitle}>{mission.titre}</Text>
               <View style={styles.missionMeta}>
@@ -169,7 +182,10 @@ const MissionDeletionTestPage = () => {
 
             <TouchableOpacity 
               style={[styles.deleteButton, deletingMissionId === mission.id && styles.deleteButtonLoading]}
-              onPress={() => testDeleteMission(mission)}
+              onPress={(event) => {
+                event.stopPropagation(); // Empêcher la propagation au parent
+                testDeleteMission(mission);
+              }}
               disabled={deletingMissionId === mission.id}
             >
               {deletingMissionId === mission.id ? (
@@ -181,7 +197,7 @@ const MissionDeletionTestPage = () => {
                 {deletingMissionId === mission.id ? 'Suppression...' : 'Tester suppression'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         ))
       )}
     </ScrollView>
@@ -256,6 +272,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  instructionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e6f7ff',
+    borderColor: '#91d5ff',
+    borderWidth: 1,
+    margin: 16,
+    marginTop: 0,
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  instructionText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1890ff',
+    fontWeight: '500',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -274,6 +308,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   missionHeader: {
     flexDirection: 'row',

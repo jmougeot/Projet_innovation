@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  TextInput
+  TextInput,
+  Modal
 } from 'react-native';
 import { router } from 'expo-router';
 import { getAllMissions, assignMissionToUser, deleteMission } from '../firebase/firebaseMission';
-import { getAuth } from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
+import MissionCard from './components/MissionCard';
 
 
 const AllMissionsPage = () => {
@@ -24,10 +26,11 @@ const AllMissionsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [showDeleteButtons, setShowDeleteButtons] = useState(false);
+  const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null);
+  const [confirmDeleteMission, setConfirmDeleteMission] = useState<{ id: string, title: string } | null>(null);
 
   
   
-  const auth = getAuth();
   const currentUser = auth.currentUser;
   
   // Charger toutes les missions
@@ -87,52 +90,70 @@ const AllMissionsPage = () => {
     loadAllMissions();
   };
   
-  // Supprimer une mission
+    // Supprimer une mission - nouvelle version avec confirmation personnalisée
   const handleDeleteMission = async (missionId: string) => {
+    console.log('[DEBUG] handleDeleteMission appelée avec ID:', missionId);
+    
     // Trouver les détails de la mission pour afficher son titre
     const mission = missions.find(m => m.id === missionId);
     const missionTitle = mission ? mission.titre : 'cette mission';
     
-    Alert.alert(
-      '🗑️ Confirmer la suppression',
-      `Êtes-vous sûr de vouloir supprimer "${missionTitle}" ?\n\n⚠️ Cette action est irréversible et supprimera :\n• La mission principale\n• Toutes les assignations utilisateurs\n• Toutes les missions collectives associées\n• L'historique de progression\n\nCette action ne peut pas être annulée.`,
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel',
-        },
-        {
-          text: 'Supprimer définitivement',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              console.log('[MISSIONS] 🗑️ Début de suppression de la mission:', missionId);
-              await deleteMission(missionId);
-              console.log('[MISSIONS] ✅ Mission supprimée avec succès');
-              Alert.alert(
-                '✅ Succès', 
-                `La mission "${missionTitle}" a été supprimée avec succès.`,
-                [{ text: 'OK' }]
-              );
-              // Recharger la liste des missions
-              await loadAllMissions();
-            } catch (error) {
-              console.error('[MISSIONS] ❌ Erreur lors de la suppression de la mission:', error);
-              Alert.alert(
-                '❌ Erreur', 
-                'Impossible de supprimer la mission. Veuillez vérifier votre connexion et réessayer.',
-                [{ text: 'OK' }]
-              );
-            }
-          },
-        },
-      ]
-    );
+    console.log('[DEBUG] Mission trouvée:', mission);
+    console.log('[DEBUG] Titre de la mission:', missionTitle);
+    
+    // Ouvrir la confirmation personnalisée
+    setConfirmDeleteMission({ id: missionId, title: missionTitle });
+  };
+
+  // Confirmer la suppression
+  const confirmDeletion = async () => {
+    if (!confirmDeleteMission) return;
+    
+    const { id: missionId, title: missionTitle } = confirmDeleteMission;
+    
+    console.log('[DEBUG] 🗑️ Suppression confirmée pour mission:', missionId);
+    
+    try {
+      console.log('[DEBUG] 📋 Réglage de deletingMissionId...');
+      setDeletingMissionId(missionId);
+      console.log('[DEBUG] ✅ deletingMissionId réglé à:', missionId);
+      
+      console.log('[DEBUG] 📞 Appel de deleteMission avec ID:', missionId);
+      const result = await deleteMission(missionId);
+      console.log('[DEBUG] ✅ deleteMission terminé avec succès. Résultat:', result);
+      
+      console.log('[DEBUG] 📢 Mission supprimée avec succès !');
+      
+      console.log('[DEBUG] 🔄 Rechargement des missions...');
+      await loadAllMissions();
+      console.log('[DEBUG] ✅ Missions rechargées avec succès');
+      
+      // Fermer la boîte de confirmation
+      setConfirmDeleteMission(null);
+      
+    } catch (error) {
+      console.error('[DEBUG] ❌ ERREUR lors de la suppression:', error);
+      console.error('[DEBUG] ❌ Type d\'erreur:', typeof error);
+      console.error('[DEBUG] ❌ Message d\'erreur:', error instanceof Error ? error.message : 'Message indisponible');
+      console.error('[DEBUG] ❌ Stack trace:', error instanceof Error ? error.stack : 'Stack indisponible');
+    } finally {
+      console.log('[DEBUG] 🧹 Nettoyage - réinitialisation deletingMissionId');
+      setDeletingMissionId(null);
+      console.log('[DEBUG] 🏁 Fin de la suppression');
+    }
+  };
+
+  // Annuler la suppression
+  const cancelDeletion = () => {
+    console.log('[DEBUG] ❌ Suppression annulée');
+    setConfirmDeleteMission(null);
   };
 
   // Basculer l'affichage des boutons de suppression
   const toggleDeleteMode = () => {
+    console.log('[DEBUG] toggleDeleteMode appelée. showDeleteButtons avant:', showDeleteButtons);
     setShowDeleteButtons(!showDeleteButtons);
+    console.log('[DEBUG] showDeleteButtons après:', !showDeleteButtons);
   };
 
   // S'inscrire à une mission
@@ -154,7 +175,7 @@ const AllMissionsPage = () => {
     }
   };
   
-  // Fonction utilitaire pour formater la date en toute sécurité
+  // Fonction utilitaire pour formater la date en toute sécurité (gardée pour compatibilité si nécessaire)
   const formatDate = (dateValue: any) => {
     if (!dateValue) return "Date non définie";
     
@@ -179,77 +200,16 @@ const AllMissionsPage = () => {
     }
   };
   
-  // Rendu d'un élément mission
+  // Rendu d'un élément mission avec le nouveau composant
   const renderMissionItem = ({ item }: { item: Mission }) => {
-    // Vérifier si l'objet mission est complet
-    if (!item || !item.titre) {
-      return null; // Ne pas rendre les missions incomplètes
-    }
-    
     return (
-      <View style={styles.missionCard}>
-        <View style={styles.missionHeader}>
-          <Text style={styles.missionTitle}>{item.titre}</Text>
-          {/* Bouton de suppression uniquement en mode suppression */}
-          {showDeleteButtons && (
-            <TouchableOpacity 
-              style={styles.deleteButton}
-              onPress={() => handleDeleteMission(item.id)}
-            >
-              <Ionicons name="trash-outline" size={20} color="#ff4d4f" />
-            </TouchableOpacity>
-          )}
-        </View>
-        
-        <Text style={styles.missionDescription} numberOfLines={3}>
-          {item.description || "Pas de description disponible"}
-        </Text>
-        
-        <View style={styles.missionDetails}>
-          <View style={styles.detailItem}>
-            <Ionicons name="calendar-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>
-              {item.recurrence && item.recurrence.dateDebut 
-                ? formatDate(item.recurrence.dateDebut)
-                : "Date non définie"}
-            </Text>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Ionicons name="repeat-outline" size={16} color="#666" />
-            <Text style={styles.detailText}>
-              {(item.recurrence && item.recurrence.frequence === 'daily') ? 'Tous les jours' : 
-               (item.recurrence && item.recurrence.frequence === 'weekly') ? 'Toutes les semaines' : 
-               (item.recurrence && item.recurrence.frequence === 'monthly') ? 'Tous les mois' : 
-               'Fréquence non définie'}
-            </Text>
-          </View>
-          
-          <View style={styles.detailItem}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.detailText}>{item.points || 0} points</Text>
-          </View>
-        </View>
-        
-        <View style={styles.missionActions}>
-          <TouchableOpacity 
-            style={[styles.assignButton, !showDeleteButtons && styles.assignButtonFull]}
-            onPress={() => handleAssignMission(item.id)}
-          >
-            <Text style={styles.assignButtonText}>S'inscrire</Text>
-          </TouchableOpacity>
-          
-          {showDeleteButtons && (
-            <TouchableOpacity 
-              style={styles.deleteActionButton}
-              onPress={() => handleDeleteMission(item.id)}
-            >
-              <Ionicons name="trash-outline" size={16} color="#fff" />
-              <Text style={styles.deleteActionButtonText}>Supprimer</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      <MissionCard
+        mission={item}
+        showDeleteButtons={showDeleteButtons}
+        deletingMissionId={deletingMissionId}
+        onAssignMission={handleAssignMission}
+        onDeleteMission={handleDeleteMission}
+      />
     );
   };
   
@@ -300,19 +260,28 @@ const AllMissionsPage = () => {
     <View style={styles.container}>
       {/* En-tête avec contrôles */}
       <View style={styles.headerControls}>
-        <Text style={styles.headerTitle}>Toutes les missions</Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>Toutes les missions</Text>
+          <Text style={styles.missionCount}>
+            {filteredMissions.length} mission{filteredMissions.length > 1 ? 's' : ''}
+            {searchQuery || selectedType ? ` (sur ${missions.length})` : ''}
+          </Text>
+        </View>
         <View style={styles.headerButtons}>
           <TouchableOpacity 
             style={[styles.controlButton, showDeleteButtons && styles.controlButtonActive]}
-            onPress={toggleDeleteMode}
+            onPress={() => {
+              console.log('[DEBUG] Bouton Modifier/Annuler cliqué');
+              toggleDeleteMode();
+            }}
           >
             <Ionicons 
-              name={showDeleteButtons ? "trash" : "trash-outline"} 
+              name={showDeleteButtons ? "trash" : "settings-outline"} 
               size={20} 
               color={showDeleteButtons ? "#fff" : "#666"} 
             />
             <Text style={[styles.controlButtonText, showDeleteButtons && styles.controlButtonTextActive]}>
-              {showDeleteButtons ? "Désactiver" : "Gérer"}
+              {showDeleteButtons ? "Annuler" : "Modifier"}
             </Text>
           </TouchableOpacity>
           
@@ -331,7 +300,7 @@ const AllMissionsPage = () => {
         <View style={styles.warningBanner}>
           <Ionicons name="warning-outline" size={20} color="#ff4d4f" />
           <Text style={styles.warningText}>
-            Mode suppression activé. Appuyez sur les boutons rouges pour supprimer des missions.
+            ⚠️ Mode modification activé - Vous pouvez maintenant supprimer des missions en cliquant sur les boutons rouges.
           </Text>
         </View>
       )}
@@ -377,6 +346,64 @@ const AllMissionsPage = () => {
           </View>
         }
       />
+
+      {/* Modal de confirmation de suppression */}
+      <Modal
+        visible={confirmDeleteMission !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelDeletion}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmationModal}>
+            <View style={styles.modalHeader}>
+              <Ionicons name="warning" size={30} color="#ff4d4f" />
+              <Text style={styles.modalTitle}>🗑️ Supprimer la mission</Text>
+            </View>
+            
+            <Text style={styles.modalMessage}>
+              Voulez-vous vraiment supprimer la mission "{confirmDeleteMission?.title}" ?
+            </Text>
+            
+            <Text style={styles.modalWarning}>
+              ⚠️ ATTENTION : Cette action est définitive et supprimera :
+            </Text>
+            
+            <View style={styles.warningList}>
+              <Text style={styles.warningItem}>• 📋 La mission principale</Text>
+              <Text style={styles.warningItem}>• 👥 Toutes les assignations utilisateurs</Text>
+              <Text style={styles.warningItem}>• 🎯 Toutes les missions collectives associées</Text>
+              <Text style={styles.warningItem}>• 📊 L'historique de progression</Text>
+              <Text style={styles.warningItem}>• 🏆 Les points associés</Text>
+            </View>
+            
+            <Text style={styles.modalFinalWarning}>
+              ❌ Cette action ne peut PAS être annulée !
+            </Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={cancelDeletion}
+              >
+                <Text style={styles.cancelButtonText}>❌ Annuler</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.deleteButton]}
+                onPress={confirmDeletion}
+                disabled={deletingMissionId === confirmDeleteMission?.id}
+              >
+                {deletingMissionId === confirmDeleteMission?.id ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.deleteButtonText}>🗑️ Supprimer</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -400,6 +427,15 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  missionCount: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   headerButtons: {
     flexDirection: 'row',
@@ -505,103 +541,6 @@ const styles = StyleSheet.create({
   filterButtonTextSelected: {
     color: '#fff',
   },
-  missionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  missionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  deleteButton: {
-    padding: 8,
-    marginLeft: 8,
-    borderRadius: 4,
-  },
-  missionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
-    marginRight: 8,
-  },
-  typeTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#e6f7ff',
-  },
-  typeText: {
-    fontSize: 12,
-    color: '#1890ff',
-    fontWeight: '500',
-  },
-  missionDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  missionDetails: {
-    marginVertical: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-    marginBottom: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
-  missionActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 12,
-    gap: 12,
-  },
-  assignButton: {
-    flex: 1,
-    backgroundColor: '#1890ff',
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  assignButtonFull: {
-    flex: 2,
-  },
-  assignButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  deleteActionButton: {
-    flex: 1,
-    backgroundColor: '#ff4d4f',
-    paddingVertical: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  deleteActionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -634,6 +573,102 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  confirmationModal: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    maxWidth: 400,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  modalWarning: {
+    fontSize: 14,
+    color: '#ff4d4f',
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  warningList: {
+    marginBottom: 16,
+    paddingLeft: 8,
+  },
+  warningItem: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  modalFinalWarning: {
+    fontSize: 14,
+    color: '#ff4d4f',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 20,
+    padding: 8,
+    backgroundColor: '#fff2f0',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ffccc7',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  deleteButton: {
+    backgroundColor: '#ff4d4f',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '600',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 

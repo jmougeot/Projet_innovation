@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getUserMissions, getMission, updateUserMissionProgress } from '../firebase/firebaseMission';
-import { getAuth } from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
 import { Mission } from './Interface';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,7 +39,6 @@ const UserMissionsPage = () => {
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
   const [completedMissions, setCompletedMissions] = useState<UserMissionWithDetails[]>([]);
   
-  const auth = getAuth();
   const currentUser = auth.currentUser;
 
   const [fontsLoaded] = useFonts({
