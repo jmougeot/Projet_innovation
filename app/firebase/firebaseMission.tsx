@@ -18,8 +18,45 @@ import {
   Timestamp
 } from 'firebase/firestore';
 
+// Import function to update user points and level
+import { updatePointsAndLevel } from './firebaseUser';
+
 // Types importés des interfaces
 import type { Mission, MissionAssignment } from '../mission/types';
+
+// Cache local pour les missions - Durée courte car les missions changent modérément
+let missionsCache: Mission[] | null = null;
+let individualMissionCache: { [missionId: string]: Mission } = {};
+let userMissionsCache: { [userId: string]: UserMission[] } = {};
+let collectiveMissionsCache: CollectiveMission[] | null = null;
+let lastMissionsCacheUpdate = 0;
+const MISSIONS_CACHE_DURATION = 60000; // 1 minute - Les missions changent modérément
+
+// Fonctions utilitaires de cache pour les missions
+export const clearMissionsCache = () => {
+  missionsCache = null;
+  individualMissionCache = {};
+  userMissionsCache = {};
+  collectiveMissionsCache = null;
+  lastMissionsCacheUpdate = 0;
+  console.log('🗑️ Cache des missions vidé');
+};
+
+export const getMissionsCacheInfo = () => {
+  const now = Date.now();
+  const timeLeft = missionsCache ? Math.max(0, MISSIONS_CACHE_DURATION - (now - lastMissionsCacheUpdate)) : 0;
+  return {
+    isActive: missionsCache !== null,
+    allMissionsCount: missionsCache?.length || 0,
+    individualMissionsCount: Object.keys(individualMissionCache).length,
+    userMissionsCount: Object.keys(userMissionsCache).length,
+    collectiveMissionsCount: collectiveMissionsCache?.length || 0,
+    timeLeftMs: timeLeft,
+    timeLeftFormatted: `${Math.ceil(timeLeft / 1000)}s`,
+    durationMs: MISSIONS_CACHE_DURATION,
+    durationFormatted: `${MISSIONS_CACHE_DURATION / 60000}min`
+  };
+};
 
 // Pour les user missions individuelles
 interface UserMission {
@@ -59,9 +96,14 @@ export const createMission = async (mission: Omit<Mission, 'id'>) => {
       updatedAt: serverTimestamp()
     });
     await updateDoc(docRef, { id: docRef.id });
+
+    // Invalider le cache après création
+    missionsCache = null;
+    console.log('🔄 Cache des missions invalidé après création');
+
     return { id: docRef.id };
   } catch (error) {
-    console.error("Erreur lors de la création de la mission:", error);
+    console.error("❌ Erreur lors de la création de la mission:", error);
     throw error;
   }
 };
@@ -69,16 +111,40 @@ export const createMission = async (mission: Omit<Mission, 'id'>) => {
 // Récupérer une mission par ID
 export const getMission = async (id: string): Promise<Mission | null> => {
   try {
+    const now = Date.now();
+    
+    // Vérifier le cache d'abord
+    if (individualMissionCache[id] && (now - lastMissionsCacheUpdate) < MISSIONS_CACHE_DURATION) {
+      console.log(`📦 Mission ${id} récupérée depuis le cache`);
+      return individualMissionCache[id];
+    }
+
     const missionRef = doc(db, 'missions', id);
     const missionDoc = await getDoc(missionRef);
     
     if (missionDoc.exists()) {
-      return { id: missionDoc.id, ...missionDoc.data() } as Mission;
+      const mission = { id: missionDoc.id, ...missionDoc.data() } as Mission;
+      
+      // Mettre en cache
+      individualMissionCache[id] = mission;
+      if (Object.keys(individualMissionCache).length === 1) {
+        lastMissionsCacheUpdate = now;
+      }
+      console.log(`💾 Mission ${id} mise en cache`);
+      
+      return mission;
     } else {
       return null;
     }
   } catch (error) {
-    console.error("Erreur lors de la récupération de la mission:", error);
+    console.error("❌ Erreur lors de la récupération de la mission:", error);
+    
+    // En cas d'erreur, retourner le cache si disponible
+    if (individualMissionCache[id]) {
+      console.log(`🔄 Utilisation du cache de secours pour la mission ${id}`);
+      return individualMissionCache[id];
+    }
+    
     throw error;
   }
 };
@@ -86,15 +152,42 @@ export const getMission = async (id: string): Promise<Mission | null> => {
 // Récupérer toutes les missions
 export const getAllMissions = async (): Promise<Mission[]> => {
   try {
+    const now = Date.now();
+    
+    // Vérifier le cache d'abord
+    if (missionsCache && (now - lastMissionsCacheUpdate) < MISSIONS_CACHE_DURATION) {
+      console.log(`📦 Liste des missions récupérée depuis le cache (${missionsCache.length} missions)`);
+      return missionsCache;
+    }
+
     const missionsRef = collection(db, 'missions');
     const querySnapshot = await getDocs(missionsRef);
     
-    return querySnapshot.docs.map(doc => ({ 
+    const missions = querySnapshot.docs.map(doc => ({ 
       id: doc.id, 
       ...doc.data() 
     } as Mission));
+
+    // Mettre en cache
+    missionsCache = missions;
+    lastMissionsCacheUpdate = now;
+    
+    // Mettre à jour le cache individuel aussi
+    missions.forEach(mission => {
+      individualMissionCache[mission.id] = mission;
+    });
+    
+    console.log(`💾 Liste des missions mise en cache (${missions.length} missions)`);
+    return missions;
   } catch (error) {
-    console.error("Erreur lors de la récupération des missions:", error);
+    console.error("❌ Erreur lors de la récupération des missions:", error);
+    
+    // En cas d'erreur, retourner le cache si disponible
+    if (missionsCache) {
+      console.log(`🔄 Utilisation du cache de secours pour les missions (${missionsCache.length} missions)`);
+      return missionsCache;
+    }
+    
     throw error;
   }
 };
@@ -107,9 +200,17 @@ export const updateMission = async (id: string, updates: Partial<Mission>) => {
       ...updates,
       updatedAt: serverTimestamp()
     });
+
+    // Invalider le cache après mise à jour
+    missionsCache = null;
+    if (individualMissionCache[id]) {
+      delete individualMissionCache[id];
+    }
+    console.log(`🔄 Cache des missions invalidé après mise à jour de ${id}`);
+
     return { success: true };
   } catch (error) {
-    console.error("Erreur lors de la mise à jour de la mission:", error);
+    console.error("❌ Erreur lors de la mise à jour de la mission:", error);
     throw error;
   }
 };
@@ -150,6 +251,16 @@ export const deleteMission = async (id: string) => {
     await batch.commit();
     
     console.log(`[MISSIONS] ✅ Mission ${id} et toutes ses données liées supprimées avec succès`);
+    
+    // Invalider le cache après suppression
+    missionsCache = null;
+    if (individualMissionCache[id]) {
+      delete individualMissionCache[id];
+    }
+    // Invalider le cache des missions utilisateurs car les assignations ont été supprimées
+    userMissionsCache = {};
+    collectiveMissionsCache = null;
+    console.log('🔄 Cache complet des missions invalidé après suppression');
     
     return { 
       success: true, 
@@ -194,7 +305,7 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
     }
     
     // Créer une nouvelle assignation
-    const docRef = await addDoc(userMissionRef, {
+    const docRef =    await addDoc(userMissionRef, {
       userId,
       missionId,
       status: "pending",
@@ -203,6 +314,12 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
       dateAssigned: serverTimestamp(),
       isPartOfCollective: false
     });
+    
+    // Invalider le cache des missions utilisateur après assignation
+    if (userMissionsCache[userId]) {
+      delete userMissionsCache[userId];
+    }
+    console.log(`🔄 Cache des missions utilisateur ${userId} invalidé après assignation`);
     
     console.log(`Mission individuelle créée avec l'ID: ${docRef.id}`);
     
@@ -219,16 +336,40 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
 // Récupérer les missions d'un utilisateur
 export const getUserMissions = async (userId: string): Promise<UserMission[]> => {
   try {
+    const now = Date.now();
+    
+    // Vérifier le cache d'abord
+    if (userMissionsCache[userId] && (now - lastMissionsCacheUpdate) < MISSIONS_CACHE_DURATION) {
+      console.log(`📦 Missions utilisateur ${userId} récupérées depuis le cache (${userMissionsCache[userId].length} missions)`);
+      return userMissionsCache[userId];
+    }
+    
     const userMissionsRef = collection(db, 'user_missions');
     const q = query(userMissionsRef, where("userId", "==", userId));
     const querySnapshot = await getDocs(q);
     
-    return querySnapshot.docs.map(doc => ({ 
+    const userMissions = querySnapshot.docs.map(doc => ({ 
       id: doc.id, 
       ...doc.data() 
     } as UserMission));
+
+    // Mettre en cache
+    userMissionsCache[userId] = userMissions;
+    if (Object.keys(userMissionsCache).length === 1) {
+      lastMissionsCacheUpdate = now;
+    }
+    console.log(`💾 Missions utilisateur ${userId} mises en cache (${userMissions.length} missions)`);
+
+    return userMissions;
   } catch (error) {
-    console.error("Erreur lors de la récupération des missions de l'utilisateur:", error);
+    console.error("❌ Erreur lors de la récupération des missions de l'utilisateur:", error);
+    
+    // En cas d'erreur, retourner le cache si disponible
+    if (userMissionsCache[userId]) {
+      console.log(`🔄 Utilisation du cache de secours pour les missions utilisateur ${userId} (${userMissionsCache[userId].length} missions)`);
+      return userMissionsCache[userId];
+    }
+    
     throw error;
   }
 };
@@ -257,8 +398,14 @@ export const updateUserMissionStatus = async (
     
     await updateDoc(userMissionRef, updateData);
     
-    // Si cette mission fait partie d'une mission collective, mettre à jour la progression collective
+    // Invalider le cache des missions utilisateur après mise à jour du statut
     const userMission = userMissionDoc.data() as UserMission;
+    if (userMissionsCache[userMission.userId]) {
+      delete userMissionsCache[userMission.userId];
+    }
+    console.log(`🔄 Cache des missions utilisateur ${userMission.userId} invalidé après mise à jour du statut`);
+    
+    // Si cette mission fait partie d'une mission collective, mettre à jour la progression collective
     if (userMission.isPartOfCollective && userMission.collectiveMissionId) {
       await updateCollectiveMissionProgress(userMission.collectiveMissionId);
     }
@@ -285,6 +432,9 @@ export const updateUserMissionProgress = async (
     
     const userMission = userMissionDoc.data() as UserMission;
     
+    // Vérifier si la mission était déjà complétée
+    const wasAlreadyCompleted = userMission.status === "completed";
+    
     // Récupérer les détails de la mission pour obtenir targetValue
     const mission = await getMission(userMission.missionId);
     if (!mission) {
@@ -306,6 +456,23 @@ export const updateUserMissionProgress = async (
     
     await updateDoc(userMissionRef, updateData);
     
+    // Invalider le cache des missions utilisateur après mise à jour de la progression
+    if (userMissionsCache[userMission.userId]) {
+      delete userMissionsCache[userMission.userId];
+    }
+    console.log(`🔄 Cache des missions utilisateur ${userMission.userId} invalidé après mise à jour de progression`);
+    
+    // Si la mission vient d'être complétée (pas déjà complétée avant), attribuer des points
+    if (isCompleted && !wasAlreadyCompleted && mission.points) {
+      try {
+        await updatePointsAndLevel(userMission.userId, mission.points);
+        console.log(`[POINTS] ✅ ${mission.points} points attribués à l'utilisateur ${userMission.userId} pour la mission "${mission.titre}"`);
+      } catch (pointsError) {
+        console.error(`[POINTS] ❌ Erreur lors de l'attribution des points:`, pointsError);
+        // Ne pas faire échouer la mission si l'attribution des points échoue
+      }
+    }
+    
     // Si cette mission fait partie d'une mission collective, mettre à jour la progression collective
     if (userMission.isPartOfCollective && userMission.collectiveMissionId) {
       await updateCollectiveMissionProgress(userMission.collectiveMissionId);
@@ -315,7 +482,8 @@ export const updateUserMissionProgress = async (
       success: true, 
       currentValue, 
       progressPercentage, 
-      isCompleted 
+      isCompleted,
+      pointsAwarded: (isCompleted && !wasAlreadyCompleted && mission.points) ? mission.points : 0
     };
   } catch (error) {
     console.error("Erreur lors de la mise à jour de la progression:", error);
@@ -392,6 +560,16 @@ export const createCollectiveMission = async (
     
     await batch.commit();
     
+    // Invalider le cache après création de la mission collective
+    collectiveMissionsCache = null;
+    // Invalider le cache des missions utilisateur pour tous les utilisateurs impliqués
+    for (const userId of userIds) {
+      if (userMissionsCache[userId]) {
+        delete userMissionsCache[userId];
+      }
+    }
+    console.log(`🔄 Cache des missions collectives et utilisateurs invalidé après création de mission collective`);
+    
     return { id: newCollectiveRef.id, success: true };
   } catch (error) {
     console.error("Erreur lors de la création de la mission collective:", error);
@@ -437,6 +615,10 @@ export const updateCollectiveMissionProgress = async (collectiveMissionId: strin
       ...(isCompleted && !collectiveMission.isCompleted ? { dateCompleted: serverTimestamp() } : {})
     });
     
+    // Invalider le cache des missions collectives après mise à jour
+    collectiveMissionsCache = null;
+    console.log(`🔄 Cache des missions collectives invalidé après mise à jour de progression`);
+    
     return { success: true, currentValue: totalValue, isCompleted };
   } catch (error) {
     console.error("Erreur lors de la mise à jour de la progression de la mission collective:", error);
@@ -447,15 +629,37 @@ export const updateCollectiveMissionProgress = async (collectiveMissionId: strin
 // Récupérer les missions collectives
 export const getCollectiveMissions = async (): Promise<CollectiveMission[]> => {
   try {
+    const now = Date.now();
+    
+    // Vérifier le cache d'abord
+    if (collectiveMissionsCache && (now - lastMissionsCacheUpdate) < MISSIONS_CACHE_DURATION) {
+      console.log(`📦 Missions collectives récupérées depuis le cache (${collectiveMissionsCache.length} missions)`);
+      return collectiveMissionsCache;
+    }
+    
     const collectiveMissionsRef = collection(db, 'collective_missions');
     const querySnapshot = await getDocs(collectiveMissionsRef);
     
-    return querySnapshot.docs.map(doc => ({ 
+    const missions = querySnapshot.docs.map(doc => ({ 
       id: doc.id, 
       ...doc.data() 
     } as CollectiveMission));
+    
+    // Mettre en cache les résultats
+    collectiveMissionsCache = missions;
+    lastMissionsCacheUpdate = now;
+    console.log(`💾 Missions collectives mises en cache (${missions.length} missions)`);
+    
+    return missions;
   } catch (error) {
-    console.error("Erreur lors de la récupération des missions collectives:", error);
+    console.error("❌ Erreur lors de la récupération des missions collectives:", error);
+    
+    // En cas d'erreur, retourner le cache si disponible
+    if (collectiveMissionsCache) {
+      console.log(`🔄 Utilisation du cache de secours pour les missions collectives (${collectiveMissionsCache.length} missions)`);
+      return collectiveMissionsCache;
+    }
+    
     throw error;
   }
 };
@@ -522,6 +726,13 @@ export const addUserToCollectiveMission = async (
     
     await batch.commit();
     
+    // Invalider le cache après ajout d'utilisateur à la mission collective
+    collectiveMissionsCache = null;
+    if (userMissionsCache[userId]) {
+      delete userMissionsCache[userId];
+    }
+    console.log(`🔄 Cache des missions collectives et utilisateur ${userId} invalidé après ajout`);
+    
     return { success: true };
   } catch (error) {
     console.error("Erreur lors de l'ajout de l'utilisateur à la mission collective:", error);
@@ -563,6 +774,13 @@ export const removeUserFromCollectiveMission = async (
     
     // Mettre à jour la progression après avoir retiré l'utilisateur
     await updateCollectiveMissionProgress(collectiveMissionId);
+    
+    // Invalider le cache après retrait d'utilisateur de la mission collective
+    collectiveMissionsCache = null;
+    if (userMissionsCache[userId]) {
+      delete userMissionsCache[userId];
+    }
+    console.log(`🔄 Cache des missions collectives et utilisateur ${userId} invalidé après retrait`);
     
     return { success: true };
   } catch (error) {
@@ -672,6 +890,8 @@ export const updateMissionsProgressFromDishes = async (
     // Pour chaque plat validé, vérifier s'il correspond à une mission
     const progressUpdates: Promise<any>[] = [];
     let updatedMissionsCount = 0;
+    let totalPointsAwarded = 0;
+    let completedMissions: string[] = [];
     
     for (const validatedDish of dishesWithId) {
       // Trouver les missions qui correspondent à ce plat
@@ -692,9 +912,18 @@ export const updateMissionsProgressFromDishes = async (
           // Ajouter la mise à jour à la liste des promesses
           progressUpdates.push(
             updateUserMissionProgress(userMission.id, currentValue)
-              .then(() => {
+              .then((result) => {
                 console.log(`[MISSIONS] ✅ Mission "${mission.titre}" mise à jour avec succès`);
                 updatedMissionsCount++;
+                
+                // Si des points ont été attribués
+                if (result.pointsAwarded > 0) {
+                  totalPointsAwarded += result.pointsAwarded;
+                  completedMissions.push(mission.titre);
+                  console.log(`[MISSIONS] 🎉 Mission "${mission.titre}" complétée! ${result.pointsAwarded} points attribués`);
+                }
+                
+                return result;
               })
               .catch((error) => {
                 console.error(`[MISSIONS] ❌ Erreur mise à jour mission "${mission.titre}":`, error);
@@ -711,6 +940,10 @@ export const updateMissionsProgressFromDishes = async (
     if (progressUpdates.length > 0) {
       await Promise.all(progressUpdates);
       console.log(`[MISSIONS] ✅ ${updatedMissionsCount} missions mises à jour avec succès`);
+      
+      if (totalPointsAwarded > 0) {
+        console.log(`[MISSIONS] 🎉 Total: ${totalPointsAwarded} points attribués pour ${completedMissions.length} mission(s) complétée(s)`);
+      }
     } else {
       console.log("[MISSIONS] Aucune mission à mettre à jour");
     }
@@ -718,8 +951,11 @@ export const updateMissionsProgressFromDishes = async (
     return {
       success: true,
       updatedMissions: updatedMissionsCount,
+      completedMissions: completedMissions.length,
+      totalPointsAwarded,
+      completedMissionTitles: completedMissions,
       processedDishes: dishesWithId.length,
-      message: `${updatedMissionsCount} missions mises à jour pour ${dishesWithId.length} plats traités`
+      message: `${updatedMissionsCount} missions mises à jour, ${completedMissions.length} complétées, ${totalPointsAwarded} points attribués pour ${dishesWithId.length} plats traités`
     };
     
   } catch (error) {
@@ -830,6 +1066,9 @@ export default {
   getUserMissionsWithPlats,
   updateMissionsProgressFromDishes,
   getMissionProgressAnalytics,
-  getMissionProgressHistory
+  getMissionProgressHistory,
+  // Cache utilities
+  clearMissionsCache,
+  getMissionsCacheInfo
 };
 

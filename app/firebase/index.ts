@@ -89,6 +89,18 @@ export type { RevenueData, AnalyticsFilter } from './firebaseAnalytics';
 // Mission management (re-export from existing module)
 export * from './firebaseMission';
 
+// Real-time cache system
+export { 
+  realtimeMenuCache, 
+  realtimeStockCache,
+  realtimeOrdersCache,
+  realtimeTablesCache,
+  useRealtimeMenu,
+  useRealtimeStock,
+  useRealtimeOrders,
+  useRealtimeTables
+} from './firebaseRealtimeCache';
+
 // Default exports for backward compatibility
 export { default as firebaseAuth } from './firebaseAuth';
 export { default as firebaseMenu } from './firebaseMenu';

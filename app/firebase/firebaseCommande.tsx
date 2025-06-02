@@ -36,6 +36,31 @@ export interface CreateOrderData {
   tableId: number;
 }
 
+// Cache local pour les commandes - Durée courte car elles changent très fréquemment
+let commandesCache: CommandeData[] | null = null;
+let lastCommandesCacheUpdate = 0;
+const COMMANDES_CACHE_DURATION = 30000; // 30 secondes - Les commandes changent très souvent
+
+// Fonctions utilitaires de cache pour les commandes
+export const clearCommandesCache = () => {
+  commandesCache = null;
+  lastCommandesCacheUpdate = 0;
+  console.log('🗑️ Cache des commandes vidé');
+};
+
+export const getCommandesCacheInfo = () => {
+  const now = Date.now();
+  const timeLeft = commandesCache ? Math.max(0, COMMANDES_CACHE_DURATION - (now - lastCommandesCacheUpdate)) : 0;
+  return {
+    isActive: !!commandesCache,
+    itemsCount: commandesCache?.length || 0,
+    timeLeftMs: timeLeft,
+    timeLeftFormatted: `${Math.ceil(timeLeft / 1000)}s`,
+    durationMs: COMMANDES_CACHE_DURATION,
+    durationFormatted: `${COMMANDES_CACHE_DURATION / 1000}s`
+  };
+};
+
 // 1. Modification de addCommande
 export const addCommande = async (commandeData: Partial<CommandeData>): Promise<string> => {
     try {
@@ -51,10 +76,13 @@ export const addCommande = async (commandeData: Partial<CommandeData>): Promise<
 
         const commandeRef = doc(collection(db, "commandes"), commandeData.id);
         await setDoc(commandeRef, commandeToAdd);
-        console.log("Commande ajoutée avec succès, ID:", commandeRef.id);
+        
+        // Invalider le cache après ajout
+        clearCommandesCache();
+        console.log("✅ Commande ajoutée avec succès, ID:", commandeRef.id);
         return commandeRef.id; // Retourner l'ID Firestore
     } catch (error) {
-        console.error("Erreur lors de l'ajout de la commande:", error);
+        console.error("❌ Erreur lors de l'ajout de la commande:", error);
         throw error;
     }
 };
@@ -118,26 +146,59 @@ export async function updateCommande(documentId: string, newData: Partial<Comman
       timestamp: new Date().toISOString()
     });
 
-    console.log("Document mis à jour avec succès:", documentId);
+    // Invalider le cache après modification
+    clearCommandesCache();
+    console.log("✅ Document mis à jour avec succès:", documentId);
   } catch (error) {
-    console.error("Erreur lors de la mise à jour:", error);
+    console.error("❌ Erreur lors de la mise à jour:", error);
     throw error;
   }
 }
 
-export async function getCommandesByStatus(status: string): Promise<CommandeData[]> {
+export async function getCommandesByStatus(status: string, useCache = true): Promise<CommandeData[]> {
     try {
+        const now = Date.now();
+        const cacheKey = `commandes_${status}`;
+        
+        // Pour les commandes, on utilise un cache très court car elles changent souvent
+        if (useCache && commandesCache && (now - lastCommandesCacheUpdate) < COMMANDES_CACHE_DURATION) {
+            const cachedCommandes = commandesCache.filter(cmd => cmd.status === status);
+            console.log(`📱 Commandes (${status}) chargées depuis le cache local`);
+            return cachedCommandes;
+        }
+
+        console.log(`🔄 Chargement des commandes (${status}) depuis Firebase...`);
         const commandesRef = collection(db, "commandes");
         const q = query(
             commandesRef,
-            where("status", "==", status),        );
+            where("status", "==", status),        
+        );
         const querySnapshot = await getDocs(q);
         const commandes: CommandeData[] = [];
         querySnapshot.forEach((doc) => {
             commandes.push({ id: doc.id, ...(doc.data() as Omit<CommandeData, 'id'>) });
         });
+        
+        // Mettre à jour le cache (simple pour les commandes par statut)
+        if (!commandesCache) commandesCache = [];
+        // Remplacer les commandes du même statut dans le cache
+        commandesCache = commandesCache.filter(cmd => cmd.status !== status).concat(commandes);
+        lastCommandesCacheUpdate = now;
+        
+        console.log(`✅ ${commandes.length} commandes (${status}) chargées et mises en cache`);
         return commandes;
     } catch (error) {
+        console.error(`❌ Erreur lors de la récupération des commandes (${status}):`, error);
+        
+        // En cas d'erreur, retourner le cache si disponible
+        if (commandesCache) {
+            const cachedCommandes = commandesCache.filter(cmd => cmd.status === status);
+            if (cachedCommandes.length > 0) {
+                console.log(`🔄 Utilisation du cache de secours pour les commandes (${status})`);
+                return cachedCommandes;
+            }
+        }
+        
         throw error;
     }
 }

@@ -17,7 +17,7 @@ export default function ServiceHome() {
           <MaterialIcons name="restaurant" size={32} color="#1890ff" />
           <Text style={styles.cardTitle}>Plan de salle</Text>
           <Text style={styles.cardDescription}>
-            Gérer les tables et les commandes
+            Visualiser et gérer les tables du restaurant
           </Text>
         </TouchableOpacity>
         
@@ -28,7 +28,7 @@ export default function ServiceHome() {
           <MaterialIcons name="point-of-sale" size={32} color="#1890ff" />
           <Text style={styles.cardTitle}>Cuisine Service</Text>
           <Text style={styles.cardDescription}>
-            Suivre les commandes en cuisine
+            Suivre et coordonner les commandes en cuisine
           </Text>
         </TouchableOpacity>
         
@@ -39,7 +39,18 @@ export default function ServiceHome() {
           <MaterialIcons name="assignment" size={32} color="#1890ff" />
           <Text style={styles.cardTitle}>Missions Service</Text>
           <Text style={styles.cardDescription}>
-            Consulter vos missions du service
+            Consulter et gérer vos missions du service
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => router.push('/service/commande/change_plan' as any)}
+        >
+          <MaterialIcons name="dashboard" size={32} color="#52c41a" />
+          <Text style={styles.cardTitle}>Gestion des Tables</Text>
+          <Text style={styles.cardDescription}>
+            Organiser le plan de salle - Système simplifié
           </Text>
         </TouchableOpacity>
       </View>

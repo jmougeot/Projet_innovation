@@ -8,7 +8,9 @@ import {
   deleteDoc, 
   query,
   orderBy,
-  getDoc
+  getDoc,
+  enableNetwork,
+  disableNetwork
 } from 'firebase/firestore';
 
 export interface Table {
@@ -21,16 +23,65 @@ export interface Table {
 
 const TABLES_COLLECTION = 'tables';
 
-// Get all tables
-export const getTables = async (): Promise<Table[]> => {
+// Cache local pour optimiser les performances
+let tablesCache: Table[] | null = null;
+let lastCacheUpdate = 0;
+const CACHE_DURATION = 300000; // 5 minutes (300 secondes) - Optimisé pour réduire les requêtes Firebase tout en gardant les données à jour
+
+// Get all tables avec cache optimisé
+export const getTables = async (useCache = true): Promise<Table[]> => {
   try {
+    const now = Date.now();
+    
+    // Utiliser le cache si disponible et récent
+    if (useCache && tablesCache && (now - lastCacheUpdate) < CACHE_DURATION) {
+      console.log('📱 Tables chargées depuis le cache local');
+      return tablesCache;
+    }
+
+    console.log('🔄 Chargement des tables depuis Firebase...');
     const tableQuery = query(collection(db, TABLES_COLLECTION), orderBy('id'));
     const snapshot = await getDocs(tableQuery);
-    return snapshot.docs.map(doc => doc.data() as Table);
+    const tables = snapshot.docs.map(doc => doc.data() as Table);
+    
+    // Mettre à jour le cache
+    tablesCache = tables;
+    lastCacheUpdate = now;
+    
+    console.log(`✅ ${tables.length} tables chargées et mises en cache`);
+    return tables;
   } catch (error) {
-    console.error("Error getting tables:", error);
+    console.error("❌ Erreur lors du chargement des tables:", error);
+    
+    // En cas d'erreur, retourner le cache si disponible
+    if (tablesCache) {
+      console.log('🔄 Utilisation du cache de secours');
+      return tablesCache;
+    }
+    
     throw error;
   }
+};
+
+// Vider le cache manuellement
+export const clearTablesCache = () => {
+  tablesCache = null;
+  lastCacheUpdate = 0;
+  console.log('🗑️ Cache des tables vidé');
+};
+
+// Obtenir les informations du cache
+export const getCacheInfo = () => {
+  const now = Date.now();
+  const timeLeft = tablesCache ? Math.max(0, CACHE_DURATION - (now - lastCacheUpdate)) : 0;
+  return {
+    isActive: !!tablesCache,
+    itemsCount: tablesCache?.length || 0,
+    timeLeftMs: timeLeft,
+    timeLeftFormatted: `${Math.ceil(timeLeft / 1000)}s`,
+    durationMs: CACHE_DURATION,
+    durationFormatted: `${CACHE_DURATION / 60000}min`
+  };
 };
 
 // Add or update a table
@@ -38,8 +89,12 @@ export const saveTable = async (table: Table): Promise<void> => {
   try {
     const tableRef = doc(db, TABLES_COLLECTION, table.id.toString());
     await setDoc(tableRef, table);
+    
+    // Invalider le cache après modification
+    clearTablesCache();
+    console.log(`✅ Table ${table.numero} sauvegardée`);
   } catch (error) {
-    console.error("Error saving table:", error);
+    console.error("❌ Erreur lors de la sauvegarde:", error);
     throw error;
   }
 };
@@ -47,6 +102,8 @@ export const saveTable = async (table: Table): Promise<void> => {
 // Update multiple tables (for batch position updates)
 export const updateTables = async (tables: Table[]): Promise<void> => {
   try {
+    console.log(`🔄 Mise à jour de ${tables.length} tables...`);
+    
     // Using Promise.all to perform multiple updates in parallel
     await Promise.all(tables.map(async table => {
       const tableRef = doc(db, TABLES_COLLECTION, table.id.toString());
@@ -68,8 +125,12 @@ export const updateTables = async (tables: Table[]): Promise<void> => {
         await setDoc(tableRef, table);
       }
     }));
+    
+    // Invalider le cache après les modifications
+    clearTablesCache();
+    console.log(`✅ ${tables.length} tables mises à jour avec succès`);
   } catch (error) {
-    console.error("Error updating tables:", error);
+    console.error("❌ Erreur lors de la mise à jour des tables:", error);
     throw error;
   }
 };
@@ -79,8 +140,12 @@ export const updateTablePosition = async (tableId: number, position: { x: number
   try {
     const tableRef = doc(db, TABLES_COLLECTION, tableId.toString());
     await updateDoc(tableRef, { position });
+    
+    // Invalider le cache après modification
+    clearTablesCache();
+    console.log(`✅ Position de la table ${tableId} mise à jour`);
   } catch (error) {
-    console.error("Error updating table position:", error);
+    console.error("❌ Erreur lors de la mise à jour de la position:", error);
     throw error;
   }
 };
@@ -90,8 +155,12 @@ export const updateTableStatus = async (tableId: number, status: Table['status']
   try {
     const tableRef = doc(db, TABLES_COLLECTION, tableId.toString());
     await updateDoc(tableRef, { status });
+    
+    // Invalider le cache après modification
+    clearTablesCache();
+    console.log(`✅ Statut de la table ${tableId} mis à jour: ${status}`);
   } catch (error) {
-    console.error("Error updating table status:", error);
+    console.error("❌ Erreur lors de la mise à jour du statut:", error);
     throw error;
   }
 };

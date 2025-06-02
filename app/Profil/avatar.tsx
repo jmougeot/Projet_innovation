@@ -54,6 +54,8 @@ interface ProfileData {
   objectifMensuel: number;
   performanceScore: number;
   imageUrl: string;
+  points: number;
+  level: number;
 }
 
 interface InfoFieldProps {
@@ -81,7 +83,9 @@ const ProfileAvatar = () => {
     chiffreAffaire: 0,
     objectifMensuel: 0,
     performanceScore: 0,
-    imageUrl: ''
+    imageUrl: '',
+    points: 0,
+    level: 1
   });
 
   // Charger les données du profil
@@ -112,7 +116,9 @@ const ProfileAvatar = () => {
             chiffreAffaire: userData.chiffreAffaire || 0,
             objectifMensuel: userData.objectifMensuel || 0,
             performanceScore: userData.performanceScore || 0,
-            imageUrl: userData.imageUrl || ''
+            imageUrl: userData.imageUrl || '',
+            points: userData.points || 0,
+            level: userData.level || 1
           });
         } else {
           // Créer un document utilisateur par défaut s'il n'existe pas
@@ -127,7 +133,9 @@ const ProfileAvatar = () => {
             chiffreAffaire: 0,
             objectifMensuel: 5000,
             performanceScore: 0,
-            imageUrl: ''
+            imageUrl: '',
+            points: 0,
+            level: 1
           };
           
           await setDoc(doc(db, 'users', currentUser.uid), defaultUserData); // Correction: updateDoc -> setDoc pour le document initial
@@ -324,6 +332,46 @@ const ProfileAvatar = () => {
               onChangeText={(text) => setProfileData({...profileData, telephone: text})}
               keyboardType="phone-pad"
             />
+          </View>
+        </View>
+        
+        {/* Section Points et Niveau */}
+        <View style={styles.infoSection}>
+          <View style={styles.sectionHeader}>
+            <FontAwesome5 name="trophy" size={22} color="#FFFFFF" />
+            <Text style={styles.sectionTitle}>Points et Niveau</Text>
+          </View>
+          
+          <View style={styles.infoContent}>
+            <View style={styles.pointsLevelContainer}>
+              <View style={styles.pointsCard}>
+                <FontAwesome5 name="coins" size={24} color="#FFD700" />
+                <Text style={styles.pointsValue}>{profileData.points}</Text>
+                <Text style={styles.pointsLabel}>Points</Text>
+              </View>
+              
+              <View style={styles.levelCard}>
+                <FontAwesome5 name="star" size={24} color="#FF6B35" />
+                <Text style={styles.levelValue}>Niveau {profileData.level}</Text>
+                <Text style={styles.levelLabel}>Niveau actuel</Text>
+              </View>
+            </View>
+            
+            {/* Progression vers le niveau suivant */}
+            <View style={styles.levelProgressContainer}>
+              <Text style={styles.levelProgressLabel}>Progression vers le niveau {profileData.level + 1}</Text>
+              <View style={styles.levelProgressBar}>
+                <View 
+                  style={[
+                    styles.levelProgressFill, 
+                    { width: `${((profileData.points % 100) / 100) * 100}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.levelProgressText}>
+                {profileData.points % 100}/100 points
+              </Text>
+            </View>
           </View>
         </View>
         
@@ -716,6 +764,81 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
+  },
+  // Styles pour la section Points et Niveau
+  pointsLevelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  pointsCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF15',
+    borderRadius: 15,
+    padding: 16,
+    alignItems: 'center',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  levelCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF15',
+    borderRadius: 15,
+    padding: 16,
+    alignItems: 'center',
+    marginLeft: 8,
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+  },
+  pointsValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    marginVertical: 8,
+  },
+  pointsLabel: {
+    fontSize: 14,
+    color: '#FFFFFF90',
+    textAlign: 'center',
+  },
+  levelValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FF6B35',
+    marginVertical: 8,
+  },
+  levelLabel: {
+    fontSize: 14,
+    color: '#FFFFFF90',
+    textAlign: 'center',
+  },
+  levelProgressContainer: {
+    marginTop: 4,
+  },
+  levelProgressLabel: {
+    fontSize: 14,
+    color: '#FFFFFF90',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  levelProgressBar: {
+    height: 8,
+    backgroundColor: '#FFFFFF30',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  levelProgressFill: {
+    height: '100%',
+    backgroundColor: '#FF6B35',
+    borderRadius: 4,
+  },
+  levelProgressText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
 
