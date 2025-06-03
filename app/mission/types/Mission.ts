@@ -3,7 +3,7 @@ import {Plat}  from '@/app/firebase/firebaseMenu';
 export interface Mission {
   id: string;
   titre: string;
-  description: string;
+  description?: string;
   points: number;
   recurrence: {
     frequence: 'daily' | 'weekly' | 'monthly';
@@ -11,6 +11,7 @@ export interface Mission {
   };
   plat?: Plat; // Plat associé à la mission (optionnel)
   targetValue?: number; // Valeur cible pour la progression (optionnel)
+  UserId : User["id"][]; // Liste des utilisateurs assignés à la mission
 }
 
 export interface User {
@@ -26,16 +27,5 @@ export interface MissionAssignment {
     dateCompletion: Record<string, Date | null>;
     plat: Plat;
   }
-
-export interface MissionGroup {
-  id: string;
-  missionId: string;
-  userIds: string[]; // Liste des utilisateurs participants
-  progressionCollective: number; // Progression combinée
-  status: "pending" | "completed" | "failed";
-  dateCreation: Date;
-  dateCompletion?: Date;
-}
-
 export default {
 };

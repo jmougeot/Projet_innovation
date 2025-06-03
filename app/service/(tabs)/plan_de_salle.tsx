@@ -59,10 +59,10 @@ export default function PlanDeSalle() {
     loadTables();
   }, []);
 
-  const handleTablePress = (tableId: number) => {
+  const handleTablePress = (tableId: number, tablenumber : string) => {
     router.push({
       pathname: "../commande/commande_Table",
-      params: { tableId: tableId }
+      params: { tableId: tableId , tablenumber: tablenumber }
     });
   };
 
@@ -135,7 +135,7 @@ export default function PlanDeSalle() {
                 top: table.position.y,
               }
             ]}
-            onPress={() => handleTablePress(table.id)}
+            onPress={() => handleTablePress(table.id, table.numero)}  
             onLongPress={() => handleTableLongPress(table.id, table.status)}
             delayLongPress={500}
           >
@@ -157,7 +157,7 @@ export default function PlanDeSalle() {
             styles.tableListItem,
             { backgroundColor: getStatusColor(table.status) }
           ]}
-          onPress={() => handleTablePress(table.id)}
+          onPress={() => handleTablePress(table.id, table.numero)}
           onLongPress={() => handleTableLongPress(table.id, table.status)}
           delayLongPress={500}
         >

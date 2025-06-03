@@ -374,6 +374,7 @@ export const getUserMissions = async (userId: string): Promise<UserMission[]> =>
   }
 };
 
+
 // Mettre à jour le statut d'une mission pour un utilisateur
 export const updateUserMissionStatus = async (
   userMissionId: string, 
@@ -789,35 +790,39 @@ export const removeUserFromCollectiveMission = async (
   }
 };
 
-// Récupérer les plats associés à des missions pour un utilisateur
 export const getMissionPlatsForUser = async (userId: string): Promise<string[]> => {
   try {
+    console.log(`[MISSIONS] Début récupération optimisée des plats pour l'utilisateur ${userId}`);
     
-    // Récupérer toutes les missions de l'utilisateur
-    const userMissions = await getUserMissions(userId);
+    // Récupérer toutes les missions depuis le cache ou Firebase
+    const allMissions = await getAllMissions();
+    console.log(`[MISSIONS] ${allMissions.length} missions totales récupérées`);
     
-    // Récupérer les détails de chaque mission
-    const missionIds = userMissions.map(um => um.missionId);
-    const missionPlats: string[] = [];
+    // Filtrer les missions où l'utilisateur est assigné (userId dans le tableau UserId)
+    const userAssignedMissions = allMissions.filter(mission => 
+      mission.UserId && mission.UserId.includes(userId)
+    );
+    console.log(`[MISSIONS] ${userAssignedMissions.length} missions assignées à l'utilisateur trouvées`);
     
-    // Pour chaque mission, vérifier si elle est associée à un plat
-    for (const missionId of missionIds) {
-      console.log("Recherche des détails pour la mission:", missionId);
-      const mission = await getMission(missionId);
-      console.log("Détails de la mission:", mission);
-      
-      // Essayer différentes façons que la mission pourrait stocker le plat ID
-      if (mission) {
-        if (mission.plat && mission.plat.id) {
-          missionPlats.push(mission.plat.id);
-        } else {
-        }
+    // Extraire les IDs des plats associés à ces missions
+    const platIds: string[] = [];
+    
+    userAssignedMissions.forEach(mission => {
+      if (mission.plat && mission.plat.id) {
+        platIds.push(mission.plat.id);
+        console.log(`[MISSIONS] Plat ID "${mission.plat.id}" ajouté depuis la mission "${mission.titre}"`);
       }
-    }
+    });
     
-    return missionPlats;
+    // Supprimer les doublons si un même plat est associé à plusieurs missions
+    const uniquePlatIds = [...new Set(platIds)];
+    console.log(`[MISSIONS] ✅ ${uniquePlatIds.length} plats uniques trouvés pour l'utilisateur ${userId}`);
+    
+    return uniquePlatIds;
   } catch (error) {
-    console.error("Erreur lors de la récupération des plats avec mission:", error);
+    console.error(`[MISSIONS] ❌ Erreur lors de la récupération optimisée des plats pour l'utilisateur ${userId}:`, error);
+    
+    // En cas d'erreur, retourner un tableau vide
     return [];
   }
 };

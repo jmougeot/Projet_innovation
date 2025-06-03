@@ -2,23 +2,27 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
+import { auth } from '@/app/firebase/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMission';
-import { PlatItem } from '@/app/components/Service/Plats';
+import { PlatItem } from '@/app/service/component/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
+    const { tablenumber} = useLocalSearchParams();
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
     const [listPlats, setListPlats] = useState<Plat[]>([]);
     const [missionPlatsIds, setMissionPlatsIds] = useState<string[]>([]);
-
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    
+// Définition des éléments du menu personnalisé
     const customMenuItems = [
         {
             label: 'Accueil',
@@ -30,13 +34,22 @@ export default function Commande() {
         }
     ];
 
+// Chargement des polices personnalisées
     const [fontsLoaded] = useFonts({
         'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
     });
 
-    // Simuler un userId - Dans une application réelle, vous récupéreriez l'utilisateur connecté
-    const currentUserId = "current_user_id"; // À remplacer par votre système d'authentification
+// Vérification de la connexion de l'utilisateur
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (user) {
+            setCurrentUserId(user.uid);
+        } else {
+            console.error("Aucun utilisateur connecté");
+        }
+    }, []);
 
+// Chargement des plats depuis Firebase
     useEffect(() => {
         const fetchPlats = async () => {
             const platsData = await get_plats();
@@ -45,8 +58,10 @@ export default function Commande() {
         fetchPlats();
     }, []);
 
+// Chargement des plats avec missions pour l'utilisateur actuel
     useEffect(() => {
         const fetchMissionPlats = async () => {
+            if (!currentUserId) return; // Ensure currentUserId is not null
             try {
                 const platIds = await getMissionPlatsForUser(currentUserId);
                 console.log("Plats avec missions:", platIds); // Ajout de log pour déboguer
@@ -59,6 +74,7 @@ export default function Commande() {
         fetchMissionPlats();
     }, [currentUserId]);
 
+// Chargement de la commande existante pour la table
     useEffect(() => {
         const fetchCommande = async () => {
             try {
@@ -102,6 +118,7 @@ export default function Commande() {
         return null;
     }
 
+// Fonction pour ajouter un plat à la commande
     const ajouterPlat = (plat: Plat) => {
         setPlats(prevPlats => {
             const platIndex = prevPlats.findIndex(p => p.plat.id === plat.id);
@@ -147,6 +164,7 @@ export default function Commande() {
         });
     }
 
+// Fonction pour supprimer un plat de la commande
     const supprimerPlat = (plat: Plat) => {
         setPlats(prevPlats => {
             const platIndex = prevPlats.findIndex(p => p.plat.id === plat.id);
@@ -190,6 +208,7 @@ export default function Commande() {
         });
     }
 
+// Fonction pour valider la commande
     const validerCommande = (commandesParTable: CommandeData) => {
         if (!commandesParTable || !commandesParTable.plats || commandesParTable.plats.length === 0) {
             alert('Veuillez ajouter des plats à la commande');
@@ -206,12 +225,13 @@ export default function Commande() {
         router.replace("../(tabs)/plan_de_salle");
     }
 
+// Affichage du composant principal
     return (
         <SafeAreaView style={styles.container}>
             <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems} />
             
             <View style={styles.headerSquare}>
-                <Text style={styles.headerSquareText}> Table {tableId}</Text>
+                <Text style={styles.headerSquareText}> Table {tablenumber}</Text>
             </View>            
             <View style={styles.sectionCommande}>
                 <ScrollView style={styles.scrollView}>
@@ -288,7 +308,7 @@ export default function Commande() {
         </SafeAreaView>
     );
 }
-
+// Styles pour le composant Commande
 const styles = StyleSheet.create({
     // 1. Container principal et header
     container: {

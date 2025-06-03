@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, TextInput, Text, StyleSheet, Pressable, Platform } from "react-native";
+import { View, TextInput, Text, StyleSheet, Pressable, Platform, Image } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { signInUser } from "../firebase/firebaseAuth";
 import { getDoc, doc } from "firebase/firestore";
@@ -107,7 +107,7 @@ const LoginScreen: React.FC = () => {
         <View style={styles.registerContainer}>
           <Text style={styles.registerText}>Pas encore de compte? </Text>
           <Link href="./inscription">
-            <Text style={styles.registerLink}>S&apos;inscrire</Text>
+            <Text style={styles.registerLink}>S'inscrire</Text>
           </Link>
         </View>
       </View>

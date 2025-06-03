@@ -119,7 +119,7 @@ const CreateMissionPage = () => {
   
   // Soumettre le formulaire
   const handleSubmit = async () => {
-    if (!formData.titre || !formData.description || formData.selectedUsers.length === 0) {
+    if (!formData.titre || formData.selectedUsers.length === 0) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
       return;
     }
@@ -136,7 +136,8 @@ const CreateMissionPage = () => {
           frequence: formData.frequence,
           dateDebut: formData.dateDebut
         },
-        targetValue: formData.targetValue // Inclure la valeur cible dans toutes les missions
+        targetValue: formData.targetValue, // Inclure la valeur cible dans toutes les missions
+        UserId : formData.selectedUsers // Liste des utilisateurs assignés
       };
       
       // Ajouter le plat si un plat est sélectionné

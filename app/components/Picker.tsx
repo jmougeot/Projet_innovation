@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Modal, FlatList, StyleSheet, Dimensions } from 'react-native';
 
 interface PickerProps<T> {
   selectedValue: T;
   onValueChange: (value: T, index: number) => void;
-  items: {
+  items: Array<{
     label: string;
     value: T;
-  }[];
+  }>;
   placeholder?: string;
   style?: any;
   labelStyle?: any;

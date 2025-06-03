@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { getAuth } from 'firebase/auth';
-import { updateMissionsProgressFromDishes, getUserMissions, getMission } from '../firebase/firebaseMission';
+import { updateMissionsProgressFromDishes } from '../firebase/firebaseMission';
+import { getUserMissions, getMission } from '../firebase/firebaseMission';
 import { Ionicons } from '@expo/vector-icons';
 
 const MissionProgressTester = () => {
