@@ -9,7 +9,7 @@ import {
   Alert
 } from 'react-native';
 import { router } from 'expo-router';
-import { getAllMissions, assignMissionToUser, deleteMission } from '../../firebase/firebaseMission';
+import { getAllMissions, assignMissionToUser, deleteMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';

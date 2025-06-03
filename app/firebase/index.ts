@@ -87,7 +87,7 @@ export {
 export type { RevenueData, AnalyticsFilter } from './firebaseAnalytics';
 
 // Mission management (re-export from existing module)
-export * from './firebaseMission';
+export * from './firebaseMissionOptimized';
 
 // Real-time cache system
 export { 

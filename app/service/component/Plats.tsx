@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, View, Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Plat } from '@/app/firebase/firebaseMenu';
-import { getMissionPlatsForUser } from '@/app/firebase/firebaseMission';
+import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
 import { getAuth } from 'firebase/auth';
 import Reglage from '@/app/components/reglage';
 import { router } from 'expo-router';

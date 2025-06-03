@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
-import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMission';
+import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
 import Head from '@/app/components/Head';
 
 function Encaissement() {
@@ -31,6 +31,7 @@ function Encaissement() {
         }
     }, []);
 
+    // Fetch commande by tableId when component mounts or tableId changes
     useEffect(() => {
         const fetchCommande = async () => {
             try {
@@ -108,12 +109,13 @@ function Encaissement() {
         });
     };
 
+    // Fonction pour finaliser l'encaissement
     const finaliserEncaissement = async () => {
         if (plats.length > 0) {
             alert('Veuillez encaisser tous les plats avant de finaliser');
             return;
         }
-        
+    
         try {
             if (!currentUserId) {
                 alert('Erreur: Utilisateur non connecté');
@@ -131,19 +133,27 @@ function Encaissement() {
             let missionMessage = '';
             if (commandesParTable && commandesParTable.plats.length > 0) {
                 try {
-                    console.log(`Mise à jour des missions pour ${commandesParTable.plats.length} plats encaissés`);
+                    console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId}`);
+                    console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, commandesParTable.plats.map(p => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
+                    
                     const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats);
-                    console.log(`Résultat mise à jour missions:`, missionUpdateResult);
+                    
+                    console.log(`💰 [ENCAISSEMENT DEBUG] Résultat mise à jour missions:`, missionUpdateResult);
                     
                     // Préparer un message informatif si des missions ont été mises à jour
                     if (missionUpdateResult.updatedMissions > 0) {
                         missionMessage = `\n🎯 ${missionUpdateResult.updatedMissions} mission(s) mise(s) à jour !`;
-                        console.log(`✅ ${missionUpdateResult.updatedMissions} mission(s) mise(s) à jour !`);
+                        if (missionUpdateResult.completedMissions && missionUpdateResult.completedMissions > 0) {
+                            missionMessage += `\n🏆 ${missionUpdateResult.completedMissions} mission(s) complétée(s) !`;
+                        }
+                        if (missionUpdateResult.totalPointsAwarded && missionUpdateResult.totalPointsAwarded > 0) {
+                            missionMessage += `\n⭐ ${missionUpdateResult.totalPointsAwarded} points gagnés !`;
+                        }
                     } else if (missionUpdateResult.processedDishes > 0) {
                         missionMessage = `\n📝 ${missionUpdateResult.processedDishes} plat(s) traité(s), aucune mission correspondante trouvée.`;
                     }
                 } catch (missionError) {
-                    console.error("Erreur lors de la mise à jour des missions:", missionError);
+                    console.error("💰 [ENCAISSEMENT ERROR] Erreur lors de la mise à jour des missions:", missionError);
                     missionMessage = `\n⚠️ Erreur lors de la mise à jour des missions, mais l'encaissement a réussi.`;
                     // Ne pas bloquer l'encaissement si les missions échouent
                     console.warn("L'encaissement continue malgré l'erreur des missions");

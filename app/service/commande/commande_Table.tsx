@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
 import Reglage from '@/app/components/reglage';
-import { getMissionPlatsForUser } from '@/app/firebase/firebaseMission';
+import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
 import { PlatItem } from '@/app/service/component/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

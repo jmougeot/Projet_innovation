@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 import { router } from 'expo-router';
-import { getUserMissions, getMission, updateUserMissionProgress } from '../../firebase/firebaseMission';
+import { getUserMissions, getMission, updateUserMissionProgress } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +21,7 @@ import { useFonts } from 'expo-font';
 interface UserMissionWithDetails {
   id: string;
   userId: string;
-  missionId: string;
+  missionId?: string;
   status: "pending" | "completed" | "failed";
   progression: number;
   currentValue?: number; // Valeur actuelle pour les missions avec targetValue
@@ -60,8 +60,12 @@ const UserMissionsPage = () => {
       // Pour chaque mission, récupérer les détails complets
       const missionsWithDetails = await Promise.all(
         missions.map(async (mission) => {
-          const missionDetails = await getMission(mission.missionId);
-          return { ...mission, missionDetails };
+          try {
+            const missionDetails = mission.missionId ? await getMission(mission.missionId) : null;
+            return { ...mission, missionDetails };
+          } catch (error) {
+            return { ...mission, missionDetails: null };
+          }
         })
       );
       
