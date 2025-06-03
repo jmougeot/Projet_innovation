@@ -54,7 +54,7 @@ export const MissionSearch: React.FC<MissionSearchProps> = ({
       
       {searchQuery.length > 0 && (
         <Text style={commonStyles.searchResultsText}>
-          Recherche: "{searchQuery}"
+          Recherche: &quot;{searchQuery}&quot;
         </Text>
       )}
     </View>

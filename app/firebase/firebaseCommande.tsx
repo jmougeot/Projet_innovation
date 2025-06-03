@@ -1,7 +1,6 @@
-import {collection, addDoc, doc, updateDoc, getDocs, getDoc, setDoc, query, where, orderBy, limit, deleteDoc } from "firebase/firestore";
+import {collection, addDoc, doc, updateDoc, getDocs, getDoc, setDoc, query, where, deleteDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { Plat } from "./firebaseMenu";
-import Commande from "../service/commande/commande_Table";
 // import statement removed as it was incomplete and not needed
 
 export interface PlatQuantite{
@@ -158,7 +157,6 @@ export async function updateCommande(documentId: string, newData: Partial<Comman
 export async function getCommandesByStatus(status: string, useCache = true): Promise<CommandeData[]> {
     try {
         const now = Date.now();
-        const cacheKey = `commandes_${status}`;
         
         // Pour les commandes, on utilise un cache très court car elles changent souvent
         if (useCache && commandesCache && (now - lastCommandesCacheUpdate) < COMMANDES_CACHE_DURATION) {

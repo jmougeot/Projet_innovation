@@ -91,14 +91,29 @@ export * from './firebaseMission';
 
 // Real-time cache system
 export { 
+  // Cache getter functions (recommended)
+  getRealtimeMenuCache,
+  getRealtimeStockCache,
+  getRealtimeOrdersCache,
+  getRealtimeTablesCache,
+  
+  // Cache instances (backward compatibility)
   realtimeMenuCache, 
   realtimeStockCache,
   realtimeOrdersCache,
   realtimeTablesCache,
+  
+  // React hooks
   useRealtimeMenu,
   useRealtimeStock,
   useRealtimeOrders,
-  useRealtimeTables
+  useRealtimeTables,
+  
+  // Utilities
+  clearAllCaches,
+  getAllCacheStatus,
+  forceReconnectAll,
+  debugCacheHealth
 } from './firebaseRealtimeCache';
 
 // Default exports for backward compatibility

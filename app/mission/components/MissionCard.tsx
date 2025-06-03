@@ -131,7 +131,7 @@ const MissionCard: React.FC<MissionCardProps> = ({
           style={[styles.assignButton, !showDeleteButtons && styles.assignButtonFull]}
           onPress={() => onAssignMission(mission.id)}
         >
-          <Text style={styles.assignButtonText}>S'inscrire</Text>
+          <Text style={styles.assignButtonText}>S&apos;inscrire</Text>
         </TouchableOpacity>
         
         {showDeleteButtons && (
