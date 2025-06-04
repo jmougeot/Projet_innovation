@@ -37,23 +37,22 @@ export type { Plat } from './firebaseMenu';
 
 // Order/Command management
 export {
-  addCommande,
+  createCommande,
+  terminerCommande,
+  getCommandesEnCours,
   getCommandeByTableId,
   CommandeEncaisse,
   updateCommande,
   getCommandesByStatus,
   updateStatusPlat,
   changeStatusCommande,
-  addOrder,
-  deleteOrder,
-  getArchivedOrders
-} from './firebaseCommande';
+  diagnosticCommandes,
+} from './firebaseCommandeOptimized';
 export type { 
   PlatQuantite, 
   CommandeData, 
-  ArchivedOrderData, 
   CreateOrderData 
-} from './firebaseCommande';
+} from './firebaseCommandeOptimized';
 
 // Stock management
 export { 
@@ -119,7 +118,7 @@ export {
 // Default exports for backward compatibility
 export { default as firebaseAuth } from './firebaseAuth';
 export { default as firebaseMenu } from './firebaseMenu';
-export { default as firebaseCommande } from './firebaseCommande';
+export { default as firebaseCommandeOptimized } from './firebaseCommandeOptimized';
 export { default as firebaseStock } from './firebaseStock';
 export { default as firebaseTables } from './firebaseTables';
 export { default as firebaseUser } from './firebaseUser';

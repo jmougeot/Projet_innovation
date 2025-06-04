@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import {CommandeData, PlatQuantite, getCommandeByTableId, CommandeEncaisse} from '@/app/firebase/firebaseCommande';
+import {CommandeData, PlatQuantite, getCommandeByTableId, terminerCommande, diagnosticCommandesByTable} from '@/app/firebase/firebaseCommandeOptimized';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
@@ -35,14 +35,26 @@ function Encaissement() {
     useEffect(() => {
         const fetchCommande = async () => {
             try {
+                console.log(`🔍 [ENCAISSEMENT DEBUG] Recherche commande pour table: ${tableId}`);
+                
+                // Exécuter le diagnostic pour comprendre ce qui se passe
+                await diagnosticCommandesByTable(Number(tableId));
+                
                 const commande = await getCommandeByTableId(Number(tableId));
+                console.log(`🔍 [ENCAISSEMENT DEBUG] Commande trouvée:`, commande);
+                
                 if (commande) {
                     setCommandesParTable(commande);
                     setPlats(commande.plats);
                     setIdCommande(commande.id);
+                    console.log(`✅ [ENCAISSEMENT DEBUG] ID commande défini: ${commande.id}`);
+                } else {
+                    console.log(`❌ [ENCAISSEMENT DEBUG] Aucune commande trouvée pour la table ${tableId}`);
+                    alert(`Aucune commande active trouvée pour la table ${tableId}. Vérifiez qu'une commande a été créée pour cette table.`);
                 }
             } catch (error) {
-                console.error("Erreur lors du chargement de la commande:", error);
+                console.error("💰 [ENCAISSEMENT ERROR] Erreur lors du chargement de la commande:", error);
+                alert("Erreur lors du chargement de la commande");
             }
         };
         
@@ -85,7 +97,7 @@ function Encaissement() {
                     : p
                 );
             }
-            return [...prev, { ...plat, status: 'en attente de paiement' }];
+            return [...prev, { ...plat, status: 'servi' }];
         });
     };
 
@@ -105,7 +117,7 @@ function Encaissement() {
                     : p
                 );
             }
-            return [...prev, { ...plat, status: 'encaissé' }];
+            return [...prev, { ...plat, status: 'servi' }];
         });
     };
 
@@ -160,7 +172,21 @@ function Encaissement() {
                 }
             }
             
-            CommandeEncaisse(Number(tableId));
+            // Replace ID usage with fresh lookup if needed
+            // Ensure we have the correct Firebase ID for the command
+            let commandeIdToUse = idCommande;
+            if (!commandeIdToUse) {
+                const fetchedCommande = await getCommandeByTableId(Number(tableId));
+                if (!fetchedCommande) {
+                    alert('Erreur: Aucune commande active trouvée pour cette table.');
+                    return;
+                }
+                commandeIdToUse = fetchedCommande.id;
+                setIdCommande(commandeIdToUse);
+            }
+             
+            console.log(`💰 [ENCAISSEMENT] Finalisation commande ID: ${commandeIdToUse} pour table ${tableId}`);
+            await terminerCommande(commandeIdToUse);
             
             // Afficher le message de succès avec les informations sur les missions
             alert(`Encaissement réussi !${missionMessage}`);

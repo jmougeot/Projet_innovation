@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, Pressable, Platform, Alert } from 'react-native';
 import { collection, onSnapshot, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
-import { CommandeData, PlatQuantite } from '@/app/firebase/firebaseCommande';
+import { CommandeData, PlatQuantite } from '@/app/firebase/firebaseCommandeOptimized';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 
@@ -13,9 +13,9 @@ const Cuisine = () => {
   });
 
   useEffect(() => {
-    // Écouter les changements en temps réel
-    const commandesRef = collection(db, 'commandes');
-    const q = query(commandesRef, where('status', 'in', ['en attente', 'en cours', 'prêt', 'servi']));
+    // Écouter les changements en temps réel depuis la nouvelle collection optimisée
+    const commandesRef = collection(db, 'commandes_en_cours');
+    const q = query(commandesRef, where('status', 'in', ['en_attente', 'en_preparation', 'pret', 'envoye']));
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const nouvellesCommandes = snapshot.docs.map(doc => ({
@@ -32,17 +32,23 @@ const Cuisine = () => {
     return null;
   }
 
-  // Function to get the next status
-  const getNextStatus = (currentStatus: string): string => {
+  // Function to get the next status - updated pour les nouveaux types
+  const getNextStatus = (currentStatus: string): 'en_attente' | 'en_preparation' | 'pret' | 'envoye' | 'servi' => {
     switch(currentStatus.toLowerCase()) {
       case 'en attente':
-        return 'en cours';
+      case 'en_attente':
+        return 'en_preparation';
       case 'en cours':
-        return 'prêt';
+      case 'en_preparation':
+        return 'pret';
       case 'prêt':
+      case 'pret':
+        return 'envoye';
+      case 'envoyé':
+      case 'envoye':
         return 'servi';
       default:
-        return currentStatus;
+        return 'en_attente';
     }
   };
 
@@ -64,8 +70,8 @@ const Cuisine = () => {
       const nextStatus = getNextStatus(currentStatus);
       console.log(`Updating dish ${platName} from ${currentStatus} to ${nextStatus}`);
 
-      // Get a reference to the document
-      const docRef = doc(db, "commandes", commandeToUpdate.id);
+      // Get a reference to the document dans la nouvelle collection
+      const docRef = doc(db, "commandes_en_cours", commandeToUpdate.id);
       
       // Get the latest document data
       const docSnap = await getDoc(docRef);
@@ -147,7 +153,7 @@ const Cuisine = () => {
             </View>
           </View>
           <View style={styles.content}>
-            {renderPlats(commandes.flatMap(c => c.plats), 'prêt')}
+            {renderPlats(commandes.flatMap(c => c.plats), 'pret')}
           </View>
         </View>
 

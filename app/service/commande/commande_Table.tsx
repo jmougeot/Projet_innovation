@@ -5,7 +5,7 @@ import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-import { addCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommande';
+import { createCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommandeOptimized';
 import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
 import { PlatItem } from '@/app/service/component/Plats';
@@ -127,7 +127,7 @@ export default function Commande() {
                 updatedPlats[platIndex].quantite += 1;
                 return updatedPlats;
             }
-            return [...prevPlats, { plat, quantite: 1, status: "en attente", tableId: Number(tableId) }];
+            return [...prevPlats, { plat, quantite: 1, status: "en_attente", tableId: Number(tableId) }];
         });
         
         setCommandesParTable((prevCommande) => {
@@ -136,9 +136,9 @@ export default function Commande() {
                 const newCommande: CommandeData = {
                     id: Date.now().toString(),
                     employeeId: "default",
-                    plats: [{ plat, quantite: 1, status: "en attente", tableId: Number(tableId) }],
+                    plats: [{ plat, quantite: 1, status: "en_attente", tableId: Number(tableId) }],
                     totalPrice: plat.price,
-                    status: "en attente",
+                    status: "en_attente",
                     timestamp: new Date(),
                     tableId: Number(tableId)
                 };
@@ -158,7 +158,7 @@ export default function Commande() {
             }
             
             const updatedCommande = { ...commande };
-            updatedCommande.plats = [...commande.plats, { plat, quantite: 1, status: "en attente", tableId: Number(tableId) }];
+            updatedCommande.plats = [...commande.plats, { plat, quantite: 1, status: "en_attente", tableId: Number(tableId) }];
             updatedCommande.totalPrice = updatedCommande.plats.reduce((total, p) => total + p.plat.price * p.quantite, 0);
             return updatedCommande;
         });
@@ -209,20 +209,33 @@ export default function Commande() {
     }
 
 // Fonction pour valider la commande
-    const validerCommande = (commandesParTable: CommandeData) => {
+    const validerCommande = async (commandesParTable: CommandeData) => {
         if (!commandesParTable || !commandesParTable.plats || commandesParTable.plats.length === 0) {
             alert('Veuillez ajouter des plats à la commande');
             return;
         }
         
-        if (commandeExistante) {
-            updateCommande(Idcommande, commandesParTable);
-        } else {
-            addCommande(commandesParTable);
-            setCommandeExistante(true);
+        try {
+            if (commandeExistante) {
+                await updateCommande(Idcommande, commandesParTable);
+            } else {
+                // ✅ CORRECTION: Capturer l'ID Firebase réel et mettre à jour l'état local
+                // Exclure l'ID temporaire avant d'envoyer à Firebase
+                const { id, ...commandeDataSansId } = commandesParTable;
+                const firebaseCommandeId = await createCommande(commandeDataSansId);
+                console.log(`🔄 [SYNC] ID local remplacé: ${Idcommande} → ${firebaseCommandeId}`);
+                setIdcommande(firebaseCommandeId);
+                setCommandeExistante(true);
+                
+                // Mettre à jour l'ID dans l'objet commande local aussi
+                setCommandesParTable(prev => prev ? { ...prev, id: firebaseCommandeId } : null);
+            }
+            alert('Commande envoyée');
+            router.replace("../(tabs)/plan_de_salle");
+        } catch (error) {
+            console.error("Erreur lors de la validation de la commande:", error);
+            alert('Erreur lors de l\'envoi de la commande');
         }
-        alert('Commande envoyée');
-        router.replace("../(tabs)/plan_de_salle");
     }
 
 // Affichage du composant principal

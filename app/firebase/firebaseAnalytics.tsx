@@ -8,7 +8,7 @@ import {
   Timestamp 
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
-import { CommandeData } from "./firebaseCommande";
+import { CommandeData } from "./firebaseCommandeOptimized";
 
 // ---- CACHE CONFIGURATION ----
 const ANALYTICS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes en millisecondes
@@ -19,6 +19,65 @@ let revenueAnalyticsCache: { [key: string]: RevenueData } = {};
 let dailyRevenueCache: { [key: string]: Array<{date: string, revenue: number}> } = {};
 let topMenuItemsCache: { [limitKey: string]: Array<{platName: string, totalRevenue: number, quantity: number}> } = {};
 let lastAnalyticsCacheUpdate = 0;
+
+// ---- HELPER FUNCTIONS ----
+/**
+ * Helper function to fetch orders from both active and completed collections
+ */
+async function fetchAllOrders(filter?: AnalyticsFilter) {
+  const allOrders: CommandeData[] = [];
+  
+  // Fetch from both collections
+  const collections = ['commandes_en_cours', 'commandes_terminees'];
+  
+  for (const collectionName of collections) {
+    let ordersQuery = collection(db, collectionName);
+    
+    // Apply filters if provided
+    if (filter) {
+      const constraints = [];
+      
+      if (filter.status) {
+        constraints.push(where("status", "==", filter.status));
+      }
+      
+      if (filter.employeeId) {
+        constraints.push(where("employeeId", "==", filter.employeeId));
+      }
+      
+      if (filter.startDate) {
+        const startTimestamp = Timestamp.fromDate(filter.startDate);
+        constraints.push(where("timestamp", ">=", startTimestamp));
+      }
+      
+      if (filter.endDate) {
+        const endTimestamp = Timestamp.fromDate(filter.endDate);
+        constraints.push(where("timestamp", "<=", endTimestamp));
+      }
+      
+      if (constraints.length > 0) {
+        ordersQuery = query(collection(db, collectionName), ...constraints) as any;
+      }
+    }
+    
+    const ordersSnapshot = await getDocs(ordersQuery);
+    ordersSnapshot.forEach((doc) => {
+      allOrders.push(doc.data() as CommandeData);
+    });
+  }
+  
+  return allOrders;
+}
+
+/**
+ * Helper function to convert Firestore timestamp to Date
+ */
+function timestampToDate(timestamp: Date | Timestamp): Date {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate();
+  }
+  return timestamp;
+}
 
 // ---- CACHE UTILITIES ----
 export const clearAnalyticsCache = () => {
@@ -91,38 +150,11 @@ export async function calculateRevenue(filter?: AnalyticsFilter): Promise<number
       return revenueCache[cacheKey];
     }
     
-    let ordersQuery = collection(db, "commandes");
-    
-    // Apply filters if provided
-    if (filter) {
-      const constraints = [];
-      
-      if (filter.status) {
-        constraints.push(where("status", "==", filter.status));
-      }
-      
-      if (filter.employeeId) {
-        constraints.push(where("employeeId", "==", filter.employeeId));
-      }
-      
-      if (filter.startDate) {
-        constraints.push(where("timestamp", ">=", filter.startDate.toISOString()));
-      }
-      
-      if (filter.endDate) {
-        constraints.push(where("timestamp", "<=", filter.endDate.toISOString()));
-      }
-      
-      if (constraints.length > 0) {
-        ordersQuery = query(collection(db, "commandes"), ...constraints) as any;
-      }
-    }
-
-    const ordersSnapshot = await getDocs(ordersQuery);
+    // Fetch orders from both collections
+    const allOrders = await fetchAllOrders(filter);
     let totalRevenue = 0;
 
-    ordersSnapshot.forEach((doc) => {
-      const orderData = doc.data() as CommandeData;
+    allOrders.forEach((orderData) => {
       totalRevenue += orderData.totalPrice || 0;
     });
 
@@ -162,39 +194,12 @@ export async function getRevenueAnalytics(filter?: AnalyticsFilter): Promise<Rev
       return revenueAnalyticsCache[cacheKey];
     }
     
-    let ordersQuery = collection(db, "commandes");
-    
-    // Apply filters if provided
-    if (filter) {
-      const constraints = [];
-      
-      if (filter.status) {
-        constraints.push(where("status", "==", filter.status));
-      }
-      
-      if (filter.employeeId) {
-        constraints.push(where("employeeId", "==", filter.employeeId));
-      }
-      
-      if (filter.startDate) {
-        constraints.push(where("timestamp", ">=", filter.startDate.toISOString()));
-      }
-      
-      if (filter.endDate) {
-        constraints.push(where("timestamp", "<=", filter.endDate.toISOString()));
-      }
-      
-      if (constraints.length > 0) {
-        ordersQuery = query(collection(db, "commandes"), ...constraints) as any;
-      }
-    }
-
-    const ordersSnapshot = await getDocs(ordersQuery);
+    // Fetch orders from both collections
+    const allOrders = await fetchAllOrders(filter);
     let totalRevenue = 0;
     let totalOrders = 0;
 
-    ordersSnapshot.forEach((doc) => {
-      const orderData = doc.data() as CommandeData;
+    allOrders.forEach((orderData) => {
       totalRevenue += orderData.totalPrice || 0;
       totalOrders++;
     });
@@ -245,20 +250,18 @@ export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<A
       return dailyRevenueCache[cacheKey];
     }
     
-    const ordersQuery = query(
-      collection(db, "commandes"),
-      where("timestamp", ">=", startDate.toISOString()),
-      where("timestamp", "<=", endDate.toISOString()),
-      where("status", "==", "encaissée"),
-      orderBy("timestamp", "asc")
-    );
-
-    const ordersSnapshot = await getDocs(ordersQuery);
+    // Create filter for date range and status
+    const filter: AnalyticsFilter = {
+      startDate,
+      endDate,
+      status: "encaissée"
+    };
+    
+    const allOrders = await fetchAllOrders(filter);
     const dailyRevenue: { [key: string]: number } = {};
 
-    ordersSnapshot.forEach((doc) => {
-      const orderData = doc.data() as CommandeData;
-      const orderDate = new Date(orderData.timestamp).toDateString();
+    allOrders.forEach((orderData) => {
+      const orderDate = timestampToDate(orderData.timestamp).toDateString();
       
       if (!dailyRevenue[orderDate]) {
         dailyRevenue[orderDate] = 0;
@@ -308,18 +311,13 @@ export async function getTopMenuItems(limitCount: number = 10): Promise<Array<{p
       return topMenuItemsCache[cacheKey];
     }
     
-    const ordersSnapshot = await getDocs(
-      query(
-        collection(db, "commandes"),
-        where("status", "==", "encaissée")
-      )
-    );
+    // Fetch all encaissée orders from both collections
+    const filter: AnalyticsFilter = { status: "encaissée" };
+    const allOrders = await fetchAllOrders(filter);
 
     const itemStats: { [key: string]: { revenue: number; quantity: number } } = {};
 
-    ordersSnapshot.forEach((doc) => {
-      const orderData = doc.data() as CommandeData;
-      
+    allOrders.forEach((orderData) => {
       orderData.plats?.forEach((platQuantite) => {
         const platName = platQuantite.plat.name;
         const itemRevenue = platQuantite.plat.price * platQuantite.quantite;
