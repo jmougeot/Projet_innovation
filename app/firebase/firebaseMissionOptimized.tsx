@@ -6,12 +6,14 @@ import {
   getDoc, 
   addDoc, 
   updateDoc, 
+  deleteDoc,
   query, 
   where, 
   writeBatch,
   serverTimestamp,
 
-  Timestamp
+  Timestamp,
+  deleteField
 } from 'firebase/firestore';
 
 // Import function to update user points and level
@@ -464,11 +466,14 @@ export const updateUserMissionProgress = async (
       } : {})
     };
     
-    console.log(`📊 [DEBUG] Données de mise à jour:`, updateData);
-    
     await updateDoc(participantRef, updateData);
-    console.log(`📊 [DEBUG] Document participant mis à jour avec succès`);
-    
+    if (isCompleted) {
+      // Remove userId field then delete participant doc post-completion
+      await updateDoc(participantRef, { userId: deleteField() });
+      await deleteDoc(participantRef);
+      console.log(`📄 Participant ${participantId} cleaned up after mission completion`);
+    }
+
     // Invalider le cache des missions utilisateur après mise à jour de la progression
     if (userMissionsCache[participant.userId]) {
       delete userMissionsCache[participant.userId];
