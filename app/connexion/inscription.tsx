@@ -5,7 +5,6 @@ import { signUpUser } from "../firebase/firebaseAuth";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import { Link, useRouter } from "expo-router";
-import { Picker } from "@react-native-picker/picker";
 
 const SignUpScreen = () => {
   const [email, setEmail] = useState("");
@@ -30,7 +29,7 @@ const SignUpScreen = () => {
         return;
       }
 
-      const user = await signUpUser({ email, password, name, role });
+      await signUpUser({ email, password, name, role });
       setMessage(`Inscription réussie ! Votre profil a bien été enregistré ${role === "employee" ? "Salarié" : "Gérant"}.`);
       setTimeout(() => {
         router.push('./connexion');
@@ -119,7 +118,7 @@ const SignUpScreen = () => {
               colors={['#CAE1EF', '#8BBAD7']}
               style={styles.gradientButton}
             >
-              <Text style={styles.buttonText}>S'INSCRIRE</Text>
+              <Text style={styles.buttonText}>S&apos;INSCRIRE</Text>
             </LinearGradient>
           </Pressable>
           

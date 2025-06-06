@@ -20,7 +20,7 @@ import {
 import { updatePointsAndLevel } from './firebaseUser';
 
 // Types importés des interfaces
-import type { Mission, MissionAssignment } from '../mission/types';
+import type { Mission } from '../mission/types';
 
 // ====== CACHE MANAGEMENT ======
 let missionsCache: Mission[] | null = null;
@@ -848,6 +848,7 @@ export const getMissionProgressAnalytics = async (userId: string) => {
           const mission = await getMission(userMission.missionId!);
           return { userMission, mission };
         } catch (error) {
+          console.warn('Error fetching mission:', error);
           return { userMission, mission: null };
         }
       })

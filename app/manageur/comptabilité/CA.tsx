@@ -148,7 +148,7 @@ const CAManagement = () => {
       ) : (
         <ScrollView style={styles.scrollView}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Chiffre d'Affaires du Restaurant</Text>
+            <Text style={styles.sectionTitle}>Chiffre d&apos;Affaires du Restaurant</Text>
             <View style={styles.caContainer}>
               <Text style={styles.label}>CA Total (€):</Text>
               <TextInput

@@ -14,12 +14,6 @@ export default function ManagerHome() {
     return null;
   }
 
-  // Fixed navigation function to handle type-safe routes
-  const navigateTo = (route: string) => {
-    // Use router.push with the appropriate type using as const
-    router.push(route as any);
-  };
-
   return (
     <View style={styles.container}>
       <View style={styles.headerSquare}>

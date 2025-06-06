@@ -9,8 +9,6 @@ import {
   query,
   orderBy,
   getDoc,
-  enableNetwork,
-  disableNetwork
 } from 'firebase/firestore';
 
 export interface Table {

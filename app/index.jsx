@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Image, Pressable, SafeAreaView, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, SafeAreaView, Platform } from "react-native";
 import { Link } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from 'expo-font';

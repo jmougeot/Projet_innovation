@@ -100,7 +100,6 @@ export default function Commande() {
         if (listPlats.length > 0) {
             console.log("Liste des plats avant mise à jour:", listPlats.map(p => p.id));
             console.log("Liste des IDs des plats avec mission:", missionPlatsIds);
-            
             const updatedPlats = listPlats.map(plat => {
                 const hasMission = plat.id ? missionPlatsIds.includes(plat.id) : false;
                 console.log(`Plat ${plat.name} (${plat.id}) a une mission: ${hasMission}`);
@@ -109,10 +108,9 @@ export default function Commande() {
                     mission: hasMission
                 };
             });
-            
             setListPlats(updatedPlats);
         }
-    }, [missionPlatsIds]); // Ne dépend que des missionPlatsIds pour éviter les boucles infinies
+    }, [missionPlatsIds, listPlats]); 
 
     if (!fontsLoaded) {
         return null;

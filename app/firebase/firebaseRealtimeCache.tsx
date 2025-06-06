@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   collection, 
   onSnapshot, 
   query,
-  where,
   DocumentData,
   Unsubscribe,
   getDocs,
@@ -30,6 +29,7 @@ class RealtimeCache<T> {
     try {
       const testQuery = query(collection(db, this.collectionName), limit(1));
       const snapshot = await getDocs(testQuery);
+      console.log(`Collection '${this.collectionName}' check:`, snapshot.size, 'documents');
       return true; // Collection exists (even if empty)
     } catch (error: any) {
       console.warn(`⚠️ Collection '${this.collectionName}' might not exist or is inaccessible:`, error.message);
@@ -279,10 +279,10 @@ interface Commande {
   id: string;
   tableId: string;
   status: string;
-  plats: Array<{
+  plats: {
     plat: Plat;
     quantite: number;
-  }>;
+  }[];
   timestamp: string;
   total: number;
 }

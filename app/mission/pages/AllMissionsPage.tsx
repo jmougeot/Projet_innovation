@@ -14,7 +14,6 @@ import { auth } from '../../firebase/firebaseConfig';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { MissionCard, MissionSearch, MissionFilters, ConfirmDeleteModal } from '../components';
-import { commonStyles } from '../styles';
 import { filterMissions, sortMissions } from '../utils';
 
 
@@ -33,8 +32,20 @@ const AllMissionsPage = () => {
   
   const currentUser = auth.currentUser;
   
+  // Appliquer les filtres
+  const applyFilters = React.useCallback((missionsToFilter: Mission[] = missions) => {
+    const filtered = filterMissions(missionsToFilter, {
+      searchQuery,
+      recurrence: selectedRecurrence as 'daily' | 'weekly' | 'monthly' | undefined,
+    });
+    
+    // Trier par titre par défaut
+    const sorted = sortMissions(filtered, 'titre', 'asc');
+    setFilteredMissions(sorted);
+  }, [missions, searchQuery, selectedRecurrence]);
+  
   // Charger toutes les missions
-  const loadAllMissions = async () => {
+  const loadAllMissions = React.useCallback(async () => {
     try {
       const allMissions = await getAllMissions();
       setMissions(allMissions);
@@ -46,28 +57,16 @@ const AllMissionsPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [applyFilters]);
   
   useEffect(() => {
     loadAllMissions();
-  }, []);
+  }, [loadAllMissions]);
   
-  // Appliquer les filtres
-  const applyFilters = (missionsToFilter: Mission[] = missions) => {
-    const filtered = filterMissions(missionsToFilter, {
-      searchQuery,
-      recurrence: selectedRecurrence as 'daily' | 'weekly' | 'monthly' | undefined,
-    });
-    
-    // Trier par titre par défaut
-    const sorted = sortMissions(filtered, 'titre', 'asc');
-    setFilteredMissions(sorted);
-  };
-
   // Effet pour appliquer les filtres quand ils changent
   useEffect(() => {
     applyFilters();
-  }, [searchQuery, selectedRecurrence, missions]);
+  }, [searchQuery, selectedRecurrence, missions, applyFilters]);
   
   // Gestionnaires de filtres
   const handleSearchChange = (query: string) => {
@@ -169,31 +168,6 @@ const AllMissionsPage = () => {
     } catch (error) {
       console.error('Erreur lors de l\'inscription à la mission:', error);
       Alert.alert('Erreur', 'Impossible de vous inscrire à cette mission');
-    }
-  };
-  
-  // Fonction utilitaire pour formater la date en toute sécurité (gardée pour compatibilité si nécessaire)
-  const formatDate = (dateValue: any) => {
-    if (!dateValue) return "Date non définie";
-    
-    try {
-      // Gestion des différentes formes possibles de date dans Firestore
-      let date;
-      if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-        // Cas des Timestamp Firestore
-        date = dateValue.toDate();
-      } else if (dateValue instanceof Date) {
-        // Cas des objets Date
-        date = dateValue;
-      } else {
-        // Essayer de convertir depuis une string ou un timestamp
-        date = new Date(dateValue);
-      }
-      
-      return date.toLocaleDateString();
-    } catch (error) {
-      console.warn("Erreur de formatage de date:", error);
-      return "Date invalide";
     }
   };
   

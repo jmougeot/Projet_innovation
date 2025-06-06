@@ -121,7 +121,7 @@ export const isValidDate = (dateValue: any): boolean => {
     }
     
     return !isNaN(date.getTime());
-  } catch (error) {
+  } catch {
     return false;
   }
 };

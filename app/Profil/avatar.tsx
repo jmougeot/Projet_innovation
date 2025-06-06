@@ -414,7 +414,7 @@ const ProfileAvatar = () => {
           
           <View style={styles.infoContent}>
             <View style={styles.performanceRow}>
-              <Text style={styles.performanceLabel}>Chiffre d'affaire</Text>
+              <Text style={styles.performanceLabel}>Chiffre d&apos;affaire</Text>
               <Text style={styles.performanceValue}>{profileData.chiffreAffaire.toLocaleString()} €</Text>
             </View>
             

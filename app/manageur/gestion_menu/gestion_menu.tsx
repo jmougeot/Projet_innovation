@@ -60,6 +60,7 @@ export default function Menu() {
       });
       setPlats(items)
     } catch (error) {
+      console.error('Error adding dish:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter le plat');
     }
   };

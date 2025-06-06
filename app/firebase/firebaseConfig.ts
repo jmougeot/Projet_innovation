@@ -15,14 +15,9 @@ import {
   getDoc, 
   setDoc, 
   updateDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  where,
   enableIndexedDbPersistence,
   enableNetwork,
   disableNetwork,
-  connectFirestoreEmulator,
   clearIndexedDbPersistence
 } from 'firebase/firestore';
 import { 
@@ -239,7 +234,7 @@ export const monitorFirebaseConnection = () => {
     } catch (error) {
       if (connectionStatus !== 'offline') {
         connectionStatus = 'offline';
-        console.log('🔴 Firebase offline - using cached data');
+        console.log('🔴 Firebase offline - using cached data', error);
       }
     }
   };

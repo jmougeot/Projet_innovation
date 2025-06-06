@@ -10,7 +10,7 @@ import {
   Platform
 } from 'react-native';
 import { router } from 'expo-router';
-import { getUserMissions, getMission, updateUserMissionProgress } from '../../firebase/firebaseMissionOptimized';
+import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,12 +33,8 @@ interface UserMissionWithDetails {
 }
 
 const UserMissionsPage = () => {
-  const [userMissions, setUserMissions] = useState<UserMissionWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
-  const [completedMissions, setCompletedMissions] = useState<UserMissionWithDetails[]>([]);
-  
+  const [loading, setLoading] = useState(true);
   const currentUser = auth.currentUser;
 
   const [fontsLoaded] = useFonts({
@@ -46,7 +42,7 @@ const UserMissionsPage = () => {
   });
 
   // Fonction pour charger les missions de l'utilisateur
-  const loadUserMissions = async () => {
+  const loadUserMissions = React.useCallback(async () => {
     if (!currentUser) {
       Alert.alert('Erreur', 'Vous devez être connecté pour voir vos missions');
       setLoading(false);
@@ -63,78 +59,27 @@ const UserMissionsPage = () => {
           try {
             const missionDetails = mission.missionId ? await getMission(mission.missionId) : null;
             return { ...mission, missionDetails };
-          } catch (error) {
+          } catch {
             return { ...mission, missionDetails: null };
           }
         })
       );
       
-      setUserMissions(missionsWithDetails);
-      
-      // Séparer les missions actives et complétées
+      // Séparer les missions actives
       const active = missionsWithDetails.filter(m => m.status === 'pending');
-      const completed = missionsWithDetails.filter(m => m.status === 'completed');
       
       setActiveMissions(active);
-      setCompletedMissions(completed);
-    } catch (error) {
-      console.error('Erreur lors de la récupération des missions:', error);
+    } catch {
+      console.error('Erreur lors de la récupération des missions');
       Alert.alert('Erreur', 'Impossible de charger vos missions');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     loadUserMissions();
-  }, []);
-
-  // Fonction pour rafraîchir la liste
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadUserMissions();
-  };
-
-  // Fonction pour formater la date en toute sécurité
-  const formatDate = (dateValue: any) => {
-    if (!dateValue) return "Date non définie";
-    
-    try {
-      // Gestion des différentes formes possibles de date dans Firestore
-      let date;
-      if (dateValue.toDate && typeof dateValue.toDate === 'function') {
-        // Cas des Timestamp Firestore
-        date = dateValue.toDate();
-      } else if (dateValue instanceof Date) {
-        // Cas des objets Date
-        date = dateValue;
-      } else {
-        // Essayer de convertir depuis une string ou un timestamp
-        date = new Date(dateValue);
-      }
-      
-      return date.toLocaleDateString();
-    } catch (error) {
-      console.warn("Erreur de formatage de date:", error);
-      return "Date invalide";
-    }
-  };
-
-  // Fonction pour afficher un indicateur de statut coloré
-  const renderStatusIndicator = (status: string) => {
-    let color = '#FFA500'; // Orange pour pending
-    if (status === 'completed') color = '#4CAF50'; // Vert pour completed
-    if (status === 'failed') color = '#F44336'; // Rouge pour failed
-
-    return (
-      <View style={[styles.statusIndicator, { backgroundColor: color }]}>
-        <Text style={styles.statusText}>
-          {status === 'pending' ? 'En cours' : status === 'completed' ? 'Terminée' : 'Échouée'}
-        </Text>
-      </View>
-    );
-  };
+  }, [loadUserMissions]);
 
   // Fonction pour déterminer la couleur de la barre de progression en fonction du pourcentage
   const getProgressColor = (percentage: number) => {
@@ -219,43 +164,6 @@ const UserMissionsPage = () => {
     );
   };
 
-  // Rendu d'une mission complétée (version simplifiée)
-  const renderCompletedMissionItem = (item: UserMissionWithDetails) => {
-    if (!item.missionDetails) return null;
-    
-    return (
-      <TouchableOpacity 
-        style={styles.completedMissionCard}
-        onPress={() => {
-          // Navigation vers le détail de la mission (à implémenter plus tard)
-        }}
-      >
-        <View style={styles.missionHeader}>
-          <Text style={styles.completedMissionTitle}>{item.missionDetails.titre || "Sans titre"}</Text>
-          <View style={[styles.statusIndicator, { backgroundColor: '#4CAF50' }]}>
-            <Text style={styles.statusText}>Terminée</Text>
-          </View>
-        </View>
-        
-        <View style={styles.completedMissionFooter}>
-          <View style={styles.pointsContainer}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.pointsText}>{item.missionDetails.points || 0} points</Text>
-          </View>
-          
-          {item.dateCompletion && (
-            <View style={styles.dateContainer}>
-              <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
-              <Text style={styles.dateText}>
-                Complétée le {formatDate(item.dateCompletion)}
-              </Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
   if (loading || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
@@ -304,33 +212,6 @@ const UserMissionsPage = () => {
           )}
         </ScrollView>
       </View>
-      
-      {/* Section missions complétées 
-      <View style={styles.sectionMissionsCompletees}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Missions complétées</Text>
-          <LinearGradient
-            colors={['transparent', '#CAE1EF', 'transparent']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.sectionSeparator}
-          />
-        </View>
-        
-        <ScrollView style={styles.scrollView}>
-          {completedMissions.length > 0 ? (
-            completedMissions.map((mission) => (
-              <View key={mission.id}>
-                {renderCompletedMissionItem(mission)}
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Aucune mission complétée</Text>
-            </View>
-          )}
-        </ScrollView>
-      </View>*/}
     </View>
   );
 };
@@ -372,13 +253,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: 'hidden'
   },
-  sectionMissionsCompletees: {
-    flex: 0.4,
-    marginBottom: 10,
-    backgroundColor: '#F3EFEF',
-    borderRadius: 20,
-    overflow: 'hidden'
-  },
   sectionHeader: {
     padding: 10,
     backgroundColor: '#194A8D',
@@ -415,20 +289,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 4,
     borderLeftColor: '#FFA500',
   },
-  completedMissionCard: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-    opacity: 0.85,
-  },
   missionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -437,13 +297,6 @@ const styles = StyleSheet.create({
   },
   missionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
-    marginRight: 8,
-    color: '#194A8D',
-  },
-  completedMissionTitle: {
-    fontSize: 16,
     fontWeight: 'bold',
     flex: 1,
     marginRight: 8,

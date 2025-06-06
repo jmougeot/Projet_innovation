@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import {CommandeData, PlatQuantite, getCommandeByTableId, terminerCommande, diagnosticCommandesByTable} from '@/app/firebase/firebaseCommandeOptimized';

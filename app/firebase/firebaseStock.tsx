@@ -1,14 +1,4 @@
-import { 
-  getFirestore, 
-  collection, 
-  addDoc, 
-  doc, 
-  getDoc, 
-  updateDoc, 
-  getDocs, 
-  setDoc, 
-  deleteDoc 
-} from "firebase/firestore";
+import { collection, addDoc, doc, getDoc, updateDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 
 // Interface for Stock data

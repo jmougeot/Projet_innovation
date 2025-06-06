@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator } from 'react-native';
+import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';

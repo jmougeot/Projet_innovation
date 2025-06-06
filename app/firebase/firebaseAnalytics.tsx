@@ -3,8 +3,6 @@ import {
   getDocs, 
   query, 
   where, 
-  orderBy, 
-  limit,
   Timestamp 
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
@@ -16,8 +14,8 @@ const ANALYTICS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes en millisecondes
 // Variables de cache
 let revenueCache: { [key: string]: number } = {};
 let revenueAnalyticsCache: { [key: string]: RevenueData } = {};
-let dailyRevenueCache: { [key: string]: Array<{date: string, revenue: number}> } = {};
-let topMenuItemsCache: { [limitKey: string]: Array<{platName: string, totalRevenue: number, quantity: number}> } = {};
+let dailyRevenueCache: { [key: string]: {date: string, revenue: number}[] } = {};
+let topMenuItemsCache: { [limitKey: string]: {platName: string, totalRevenue: number, quantity: number}[] } = {};
 let lastAnalyticsCacheUpdate = 0;
 
 // ---- HELPER FUNCTIONS ----
@@ -239,7 +237,7 @@ export async function getRevenueAnalytics(filter?: AnalyticsFilter): Promise<Rev
  * @param endDate - End date for the period
  * @returns Promise<Array<{date: string, revenue: number}>>
  */
-export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<Array<{date: string, revenue: number}>> {
+export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<{date: string, revenue: number}[]> {
   try {
     const now = Date.now();
     const cacheKey = `${startDate.toISOString()}_${endDate.toISOString()}`;
@@ -300,7 +298,7 @@ export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<A
  * @param limit - Number of top items to return (default: 10)
  * @returns Promise<Array<{platName: string, totalRevenue: number, quantity: number}>>
  */
-export async function getTopMenuItems(limitCount: number = 10): Promise<Array<{platName: string, totalRevenue: number, quantity: number}>> {
+export async function getTopMenuItems(limitCount: number = 10): Promise<{platName: string, totalRevenue: number, quantity: number}[]> {
   try {
     const now = Date.now();
     const cacheKey = `limit_${limitCount}`;

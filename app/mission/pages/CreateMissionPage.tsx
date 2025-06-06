@@ -152,6 +152,7 @@ const CreateMissionPage = () => {
       // Si c'est une mission collective
       if (formData.isCollective) {
         const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue);
+        console.log('Collective mission created:', collectiveResult);
       } else {
         console.log(`Création de ${formData.selectedUsers.length} missions individuelles`);
         const assignmentResults = [];
