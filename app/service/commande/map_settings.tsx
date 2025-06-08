@@ -10,8 +10,8 @@ import {
   TableShapeRenderer
 } from '../components/Table';
 import TableComponent from '../components/Table';
-import ConfirmModal from './components/ConfirmModal';
-import TableOptionsModal from './components/TableOptionsModal';
+import ConfirmModal from '../components/ConfirmModal';
+import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Obtenir les dimensions de l'écran

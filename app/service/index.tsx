@@ -42,17 +42,6 @@ export default function ServiceHome() {
             Consulter et gérer vos missions du service
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.card}
-          onPress={() => router.push('/service/commande/change_plan' as any)}
-        >
-          <MaterialIcons name="dashboard" size={32} color="#52c41a" />
-          <Text style={styles.cardTitle}>Gestion des Tables</Text>
-          <Text style={styles.cardDescription}>
-            Organiser le plan de salle - Système simplifié
-          </Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );

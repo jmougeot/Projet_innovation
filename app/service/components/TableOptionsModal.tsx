@@ -41,7 +41,7 @@ export default function TableOptionsModal({
             
             <Pressable style={styles.deleteButton} onPress={onDelete}>
               <MaterialIcons name="delete" size={20} color="#fff" />
-              <Text style={styles.deleteButtonText}>Supprimer tout</Text>
+              <Text style={styles.deleteButtonText}>Supprimer</Text>
             </Pressable>
           </View>
           
