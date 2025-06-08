@@ -17,7 +17,7 @@ export const filterMissions = (
     if (filters.searchQuery) {
       const query = filters.searchQuery.toLowerCase();
       const matchesTitle = mission.titre.toLowerCase().includes(query);
-      const matchesDescription = mission.description.toLowerCase().includes(query);
+      const matchesDescription = mission.description?.toLowerCase().includes(query) || false;
       
       if (!matchesTitle && !matchesDescription) {
         return false;

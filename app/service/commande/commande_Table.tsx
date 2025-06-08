@@ -8,7 +8,7 @@ import { useFonts } from 'expo-font';
 import { createCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommandeOptimized';
 import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
-import { PlatItem } from '@/app/service/component/Plats';
+import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function Commande() {

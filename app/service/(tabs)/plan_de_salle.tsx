@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
-import Reglage from '@/app/components/reglage';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Head from '@/app/components/Head';
-
-// Match table size with change_plan.tsx
-const TABLE_SIZE = 50;
+import TableViewBase, { 
+  TABLE_SIZE, 
+  getStatusColor, 
+  getStatusText, 
+  getNextStatus 
+} from '../components/TableViewBase';
+import TableShapeRenderer from '../../components/TableShapeRenderer';
 
 export default function PlanDeSalle() {
   const router = useRouter();
@@ -35,7 +36,7 @@ export default function PlanDeSalle() {
     },
     {
       label: 'Modifier le plan',
-      onPress: () => {router.push('../commande/change_plan')}
+      onPress: () => {router.push('../commande/map_settings');}
     },
   ];
 
@@ -83,28 +84,6 @@ export default function PlanDeSalle() {
       alert("Erreur lors de la modification du statut");
     }
   };
-
-  const getNextStatus = (currentStatus: Table['status']): Table['status'] => {
-    const statuses: Table['status'][] = ['libre', 'reservee', 'occupee'];
-    const currentIndex = statuses.indexOf(currentStatus);
-    return statuses[(currentIndex + 1) % statuses.length];
-  };
-
-  const getStatusColor = (status: Table['status']) => {
-    switch (status) {
-      case 'libre': return '#4CAF50';
-      case 'occupee': return '#EFBC51'; // Changed to match commande_Table color
-      case 'reservee': return '#CAE1EF'; // Changed to match commande_Table color
-    }
-  };
-
-  const getStatusText = (status: Table['status']) => {
-    switch (status) {
-      case 'libre': return 'Libre';
-      case 'occupee': return 'Occupée';
-      case 'reservee': return 'Réservée';
-    }
-  };
   
   // Sort tables for list view
   const sortedTables = [...tables].sort((a, b) => {
@@ -139,9 +118,12 @@ export default function PlanDeSalle() {
             onLongPress={() => handleTableLongPress(table.id, table.status)}
             delayLongPress={500}
           >
-            <Text style={styles.tableNumero}>{table.numero}</Text>
-            <MaterialIcons name="people" size={24} color="#194A8D" />
-            <Text style={styles.placesText}>{table.places} places</Text>
+            <TableShapeRenderer
+              table={table}
+              size={TABLE_SIZE}
+              showText={true}
+              textColor="#194A8D"
+            />
           </TouchableOpacity>
         ))}
       </View>
@@ -186,56 +168,35 @@ export default function PlanDeSalle() {
     </Pressable>
   );
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems}/>
-
-      <Head title="Plan de Salle" />
-
+  const renderContent = () => (
+    <>
       <View style={styles.toggleContainer}>
         {renderToggleButton('plan', 'Vue Plan')}
         {renderToggleButton('liste', 'Liste des Tables')}
       </View>
+      {viewMode === 'plan' ? renderPlanView() : renderListView()}
+    </>
+  );
 
-      <View style={styles.contentContainer}>
-        <View style={styles.legende}>
-          <View style={styles.legendeItem}>
-            <View style={[styles.legendeCarre, { backgroundColor: '#4CAF50' }]} />
-            <Text style={styles.legendeText}>Libre</Text>
-          </View>
-          <View style={styles.legendeItem}>
-            <View style={[styles.legendeCarre, { backgroundColor: '#CAE1EF' }]} />
-            <Text style={styles.legendeText}>Réservée</Text>
-          </View>
-          <View style={styles.legendeItem}>
-            <View style={[styles.legendeCarre, { backgroundColor: '#EFBC51' }]} />
-            <Text style={styles.legendeText}>Occupée</Text>
-          </View>
-        </View>
-        
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#194A8D" />
-            <Text style={styles.loadingText}>Chargement des tables...</Text>
-          </View>
-        ) : (
-          viewMode === 'plan' ? renderPlanView() : renderListView()
-        )}
-      </View>
-    </SafeAreaView>
+  return (
+    <TableViewBase
+      title="Plan de Salle"
+      loading={loading}
+      tables={tables}
+      customMenuItems={customMenuItems}
+    >
+      {renderContent()}
+    </TableViewBase>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#194A8D', // Matched with commande_Table.tsx
-    },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 15,
+    paddingHorizontal: 10,
+    paddingTop: 10,
   },
   toggleButton: {
     backgroundColor: '#CAE1EF',
@@ -256,37 +217,6 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: '#083F8C',
     fontWeight: 'bold',
-  },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#F3EFEF',
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  legende: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#F3EFEF',
-  },
-  legendeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendeCarre: {
-    width: 16,
-    height: 16,
-    marginRight: 8,
-    borderRadius: 4,
-  },
-  legendeText: {
-    color: '#083F8C',
-  },
-  scrollContainer: {
-    flex: 1,
-    backgroundColor: '#F3EFEF',
   },
   planContainer: {
     position: 'relative',
@@ -309,13 +239,13 @@ const styles = StyleSheet.create({
   },
   tableNumero: {
     color: '#194A8D',
-    fontSize: 16,  // Reduced font size to match smaller table
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 2,
   },
   placesText: {
     color: '#194A8D',
-    fontSize: 12,  // Reduced font size
+    fontSize: 12,
     marginTop: 2,
   },
   listContainer: {
@@ -358,16 +288,5 @@ const styles = StyleSheet.create({
     color: '#194A8D',
     fontSize: 16,
     fontWeight: '500',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F3EFEF',
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#194A8D',
-    fontSize: 16,
   },
 });

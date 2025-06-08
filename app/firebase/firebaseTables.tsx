@@ -10,13 +10,18 @@ import {
   orderBy,
   getDoc,
 } from 'firebase/firestore';
+import { getRealtimeTablesCache } from './firebaseRealtimeCache';
 
 export interface Table {
   id: number;
   numero: string;
   places: number;
   status: 'libre' | 'occupee' | 'reservee';
-  position: { x: number; y: number };
+  position: { 
+    x: number; 
+    y: number; 
+    shape?: 'round' | 'square' | 'rectangle' | 'oval';
+  };
 }
 
 const TABLES_COLLECTION = 'tables';
@@ -66,6 +71,15 @@ export const clearTablesCache = () => {
   tablesCache = null;
   lastCacheUpdate = 0;
   console.log('🗑️ Cache des tables vidé');
+  
+  // Également vider le cache temps réel
+  try {
+    const realtimeCache = getRealtimeTablesCache();
+    realtimeCache.clearCache();
+    console.log('🗑️ Cache temps réel des tables vidé');
+  } catch (error) {
+    console.warn('⚠️ Impossible de vider le cache temps réel:', error);
+  }
 };
 
 // Obtenir les informations du cache
@@ -168,8 +182,12 @@ export const deleteTable = async (tableId: number): Promise<void> => {
   try {
     const tableRef = doc(db, TABLES_COLLECTION, tableId.toString());
     await deleteDoc(tableRef);
+    
+    // Invalider le cache après suppression
+    clearTablesCache();
+    console.log(`✅ Table ${tableId} supprimée`);
   } catch (error) {
-    console.error("Error deleting table:", error);
+    console.error("❌ Erreur lors de la suppression de la table:", error);
     throw error;
   }
 };
@@ -181,15 +199,19 @@ export const initializeDefaultTables = async (): Promise<void> => {
     
     if (existingTables.length === 0) {
       const defaultTables: Table[] = [
-        { id: 1, numero: "T1", places: 4, status: 'libre', position: { x: 10, y: 0 } },
-        { id: 2, numero: "T2", places: 2, status: 'occupee', position: { x: 1, y: 0 } },
-        { id: 3, numero: "T3", places: 6, status: 'reservee', position: { x: 2, y: 0 } },
-        { id: 4, numero: "T4", places: 4, status: 'libre', position: { x: 0, y: 1 } },
-        { id: 5, numero: "T5", places: 8, status: 'libre', position: { x: 1, y: 1 } },
-        { id: 6, numero: "T6", places: 2, status: 'occupee', position: { x: 2, y: 1 } },
+        { id: 1, numero: "T1", places: 4, status: 'libre', position: { x: 10, y: 0, shape: 'round' } },
+        { id: 2, numero: "T2", places: 2, status: 'occupee', position: { x: 1, y: 0, shape: 'square' } },
+        { id: 3, numero: "T3", places: 6, status: 'reservee', position: { x: 2, y: 0, shape: 'rectangle' } },
+        { id: 4, numero: "T4", places: 4, status: 'libre', position: { x: 0, y: 1, shape: 'round' } },
+        { id: 5, numero: "T5", places: 8, status: 'libre', position: { x: 1, y: 1, shape: 'oval' } },
+        { id: 6, numero: "T6", places: 2, status: 'occupee', position: { x: 2, y: 1, shape: 'square' } },
       ];
       
       await Promise.all(defaultTables.map(table => saveTable(table)));
+      
+      // Invalider le cache après initialisation
+      clearTablesCache();
+      console.log('✅ Tables par défaut initialisées');
     }
   } catch (error) {
     console.error("Error initializing default tables:", error);
