@@ -1,21 +1,77 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
-import TableViewBase, { 
+import { 
+  TableViewWithShapeRenderer,
   TABLE_SIZE, 
   getStatusColor, 
   getStatusText, 
-  getNextStatus 
-} from '../components/TableViewBase';
-import TableShapeRenderer from '../../components/TableShapeRenderer';
+  getNextStatus,
+  TableShapeRenderer
+} from '../components/Table';
+
+// Interface pour les propriétés du TouchableTable
+interface TouchableTableProps {
+  table: Table;
+  size?: number;
+  showText?: boolean;
+  textColor?: string;
+  style?: any;
+  onPress: (tableId: number, tableNumber: string) => void;
+  onLongPress: (tableId: number, currentStatus: Table['status']) => void;
+}
+
+// Composant TouchableTable pour le mode plan
+const TouchableTable: React.FC<TouchableTableProps> = ({
+  table,
+  size,
+  showText = true,
+  textColor = '#194A8D',
+  style,
+  onPress,
+  onLongPress
+}) => {
+  return (
+    <TouchableOpacity
+      style={[
+        style,
+        { 
+          left: table.position.x,
+          top: table.position.y,
+          position: 'absolute',
+        }
+      ]}
+      onPress={() => onPress(table.id, table.numero)}  
+      onLongPress={() => onLongPress(table.id, table.status)}
+      delayLongPress={500}
+    >
+      <TableShapeRenderer
+        table={table}
+        size={size}
+        showText={showText}
+        textColor={textColor}
+        backgroundColor={getStatusColor(table.status)}
+      />
+    </TouchableOpacity>
+  );
+};
 
 export default function PlanDeSalle() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'plan' | 'liste'>('plan');
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+
+  const handleEditModeToggle = (enabled: boolean) => {
+    setIsEditMode(enabled);
+    if (enabled) {
+      // Optionally navigate to map settings when entering edit mode
+      router.push('../commande/map_settings');
+    }
+  };
 
   const customMenuItems = [
     {
@@ -33,11 +89,7 @@ export default function PlanDeSalle() {
         // Logout logic
       },
       isLogout: true
-    },
-    {
-      label: 'Modifier le plan',
-      onPress: () => {router.push('../commande/map_settings');}
-    },
+    }
   ];
 
   // Load tables from Firebase
@@ -103,28 +155,15 @@ export default function PlanDeSalle() {
     >
       <View style={styles.planContainer}>
         {tables.map((table) => (
-          <TouchableOpacity
+          <TouchableTable
             key={table.id}
-            style={[
-              styles.table,
-              { 
-                backgroundColor: getStatusColor(table.status),
-                // Use direct positioning to match change_plan.tsx
-                left: table.position.x,
-                top: table.position.y,
-              }
-            ]}
-            onPress={() => handleTablePress(table.id, table.numero)}  
-            onLongPress={() => handleTableLongPress(table.id, table.status)}
-            delayLongPress={500}
-          >
-            <TableShapeRenderer
-              table={table}
-              size={TABLE_SIZE}
-              showText={true}
-              textColor="#194A8D"
-            />
-          </TouchableOpacity>
+            table={table}
+            size={TABLE_SIZE}
+            showText={true}
+            textColor="#194A8D"
+            onPress={handleTablePress}
+            onLongPress={handleTableLongPress}
+          />
         ))}
       </View>
     </View>
@@ -179,14 +218,17 @@ export default function PlanDeSalle() {
   );
 
   return (
-    <TableViewBase
+    <TableViewWithShapeRenderer
       title="Plan de Salle"
       loading={loading}
       tables={tables}
       customMenuItems={customMenuItems}
+      enableEditMode={true}
+      isEditMode={isEditMode}
+      onEditModeToggle={handleEditModeToggle}
     >
       {renderContent()}
-    </TableViewBase>
+    </TableViewWithShapeRenderer>
   );
 }
 
@@ -223,19 +265,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     padding: 20,
-  },
-  table: {
-    position: 'absolute',
-    width: TABLE_SIZE,
-    height: TABLE_SIZE,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
   tableNumero: {
     color: '#194A8D',

@@ -1,51 +1,68 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, PanResponder, Alert, Dimensions, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, Pressable, PanResponder, Alert, Dimensions, ActivityIndicator, TouchableOpacity } from "react-native";
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
 import { Table, getTables, updateTablePosition, saveTable, deleteTable, updateTables, clearTablesCache } from '../../firebase/firebaseTables';
 import { getRealtimeTablesCache } from '../../firebase/firebaseRealtimeCache';
-import TableViewBase, { 
-  EDIT_TABLE_WIDTH, 
-  EDIT_TABLE_HEIGHT, 
-  getStatusColor 
-} from '../components/TableViewBase';
-import TableComponent from '../components/Table'; // Nouvel import
-import TableShapeRenderer from '../components/TableShapeRenderer'; // Nouveau renderer
-import ConfirmModal from './components/ConfirmModal'; // Nouveau modal de confirmation
+import { 
+  TableViewWithShapeRenderer,
+  getStatusColor,
+  TableShapeRenderer
+} from '../components/Table';
+import TableComponent from '../components/Table';
+import ConfirmModal from './components/ConfirmModal';
+import TableOptionsModal from './components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Obtenir les dimensions de l'écran
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Interface pour les propriétés de la table draggable
+// Constantes pour les dimensions de la table
+const TABLE_WIDTH = 80;
+const TABLE_HEIGHT = 80;
+
 interface DraggableTableProps {
   table: Table;
+  size?: number;
+  showText?: boolean;
+  textColor?: string;
+  style?: any;
   onPositionChange: (id: number, x: number, y: number) => void;
   onEditTable: (table: Table) => void;
+  onDeleteTable: (table: Table) => void;
   workspaceWidth: number;
   workspaceHeight: number;
 }
 
-// Constantes pour les dimensions de la table
-const TABLE_WIDTH = EDIT_TABLE_WIDTH;
-const TABLE_HEIGHT = EDIT_TABLE_HEIGHT;
-
-// Composant Table draggable
-const DraggableTable: React.FC<DraggableTableProps> = ({ table, onPositionChange, onEditTable, workspaceWidth, workspaceHeight }) => {
+// Composant DraggableTable pour le mode édition
+const DraggableTable: React.FC<DraggableTableProps> = ({
+  table,
+  size,
+  showText = true,
+  textColor = '#194A8D',
+  style,
+  onPositionChange,
+  onEditTable,
+  onDeleteTable,
+  workspaceWidth,
+  workspaceHeight
+}) => {
   const [position, setPosition] = useState({ x: table.position.x, y: table.position.y });
   const [lastTap, setLastTap] = useState<number | null>(null);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
 
-  // Mettre à jour la position locale quand la table change (important pour le bouton annuler)
+  // Mettre à jour la position locale quand la table change
   useEffect(() => {
     setPosition({ x: table.position.x, y: table.position.y });
   }, [table.position.x, table.position.y, table.id]);
 
   // Fonction pour contraindre la position dans les limites du workspace
   const constrainPosition = (newX: number, newY: number) => {
+    const tableSize = size || 60;
     const minX = 0;
-    const maxX = workspaceWidth - TABLE_WIDTH - 20; // Marge pour les bordures
+    const maxX = workspaceWidth - tableSize - 20;
     const minY = 0;
-    const maxY = workspaceHeight - TABLE_HEIGHT - 20; // Marge pour les bordures
+    const maxY = workspaceHeight - tableSize - 20;
 
     const constrainedX = Math.max(minX, Math.min(maxX, newX));
     const constrainedY = Math.max(minY, Math.min(maxY, newY));
@@ -54,21 +71,28 @@ const DraggableTable: React.FC<DraggableTableProps> = ({ table, onPositionChange
   };
 
   const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
     onMoveShouldSetPanResponder: () => true,
-    onPanResponderGrant: () => {
+    onPanResponderGrant: (evt) => {
+      // Empêcher la sélection de texte dès le début du touch
+      evt.preventDefault?.();
+      
       // Début du drag - gérer le double-tap
       const now = Date.now();
       const DOUBLE_TAP_DELAY = 300;
       
       if (lastTap && (now - lastTap) < DOUBLE_TAP_DELAY) {
-        // Double-tap détecté - ouvrir l'édition
-        onEditTable(table);
+        // Double-tap détecté - ouvrir la modal d'options
+        setShowOptionsModal(true);
         setLastTap(null);
       } else {
         setLastTap(now);
       }
     },
     onPanResponderMove: (evt, gestureState) => {
+      // Empêcher la sélection pendant le mouvement
+      evt.preventDefault?.();
+      
       const newX = position.x + gestureState.dx;
       const newY = position.y + gestureState.dy;
       const constrainedPosition = constrainPosition(newX, newY);
@@ -87,19 +111,62 @@ const DraggableTable: React.FC<DraggableTableProps> = ({ table, onPositionChange
     <View
       {...panResponder.panHandlers}
       style={[
-        styles.table,
+        style,
         {
           left: position.x,
           top: position.y,
-          backgroundColor: getStatusColor(table.status),
+          position: 'absolute',
         }
       ]}
+      // Propriétés pour empêcher la sélection de texte
+      pointerEvents="box-only"
+      // @ts-ignore - Propriétés spécifiques React Native
+      accessible={false}
+      importantForAccessibility="no"
     >
-      <TableShapeRenderer
-        table={table}
-        size={TABLE_WIDTH}
-        showText={true}
-        textColor="#194A8D"
+      <View 
+        style={[
+          { 
+            userSelect: 'none', // Pour le web
+            // @ts-ignore - Propriétés spécifiques à React Native
+            selectable: false,
+            allowFontScaling: false,
+          },
+          // @ts-ignore - Styles web pour empêcher la sélection
+          {
+            WebkitUserSelect: 'none',
+            MozUserSelect: 'none', 
+            msUserSelect: 'none',
+            WebkitTouchCallout: 'none',
+            WebkitTapHighlightColor: 'transparent',
+          } as any
+        ]}
+        // @ts-ignore - Propriétés supplémentaires pour empêcher la sélection
+        accessible={false}
+        importantForAccessibility="no"
+        pointerEvents="none"
+      >
+        <TableShapeRenderer
+          table={table}
+          size={size}
+          showText={showText}
+          textColor={textColor}
+          backgroundColor={getStatusColor(table.status)}
+        />
+      </View>
+      
+      <TableOptionsModal
+        visible={showOptionsModal}
+        tableName={table.numero}
+        onEdit={() => {
+          setShowOptionsModal(false);
+          onEditTable(table);
+        }}
+        onDelete={() => {
+          setShowOptionsModal(false);
+          onDeleteTable(table);
+        }}
+        onCancel={() => setShowOptionsModal(false)}
       />
     </View>
   );
@@ -346,9 +413,12 @@ export default function MapSettings() {
       });
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
-      Alert.alert('Erreur', 'Impossible de supprimer la table');
     }
   }, [checkForUnsavedChanges]);
+
+  const handleDeleteTable = useCallback((table: Table) => {
+    removeTable(table.id);
+  }, [removeTable]);
 
   useEffect(() => {
     loadTables();
@@ -361,15 +431,14 @@ export default function MapSettings() {
 
   if (!fontsLoaded) {
     return (
-      <TableViewBase
+      <TableViewWithShapeRenderer
         title="Modifier le Plan de Salle"
         loading={true}
         tables={tables}
         customMenuItems={customMenuItems}
-        showLegend={false}
-      >
+        showLegend={false}>
         <View />
-      </TableViewBase>
+      </TableViewWithShapeRenderer>
     );
   }
 
@@ -389,8 +458,12 @@ export default function MapSettings() {
           <DraggableTable
             key={`${table.id}-${table.position.x}-${table.position.y}`}
             table={table}
+            size={TABLE_WIDTH}
+            showText={true}
+            textColor="#194A8D"
             onPositionChange={handlePositionChange}
             onEditTable={handleEditTable}
+            onDeleteTable={handleDeleteTable}
             workspaceWidth={workspaceWidth}
             workspaceHeight={workspaceHeight}
           />
@@ -452,7 +525,7 @@ export default function MapSettings() {
   );
 
   return (
-    <TableViewBase
+    <TableViewWithShapeRenderer
       title="Modifier le Plan de Salle"
       loading={loading}
       tables={tables}
@@ -471,6 +544,7 @@ export default function MapSettings() {
         onSave={handleSaveTable}
         initialTable={editingTable || undefined}
         isEditing={!!editingTable}
+        tableStatus={editingTable?.status || 'libre'}
       />
       
       {/* Modal de confirmation d'annulation */}
@@ -483,7 +557,7 @@ export default function MapSettings() {
         onCancel={() => setShowDiscardModal(false)}
         onConfirm={confirmDiscardChanges}
       />
-    </TableViewBase>
+    </TableViewWithShapeRenderer>
   );
 }
 
@@ -528,21 +602,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#194A8D',
     minHeight: 300, // Hauteur minimum
-  },
-  table: {
-    position: 'absolute',
-    width: TABLE_WIDTH,
-    height: TABLE_HEIGHT,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    borderWidth: 2,
-    borderColor: '#CAE1EF',
   },
   tableText: {
     color: '#194A8D',

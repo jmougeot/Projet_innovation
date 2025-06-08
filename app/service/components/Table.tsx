@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,26 +8,257 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
-  ScrollView
+  ScrollView,
+  ActivityIndicator,
+  PanResponder
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
 import { Table as TableType } from '@/app/firebase/firebaseTables';
+import Head from '@/app/components/Head';
+import Reglage from '@/app/components/reglage';
 
 // Get screen dimensions for responsive design
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Interface pour les props du composant
+// Constantes communes
+export const TABLE_SIZE = 50;
+export const EDIT_TABLE_WIDTH = 80;
+export const EDIT_TABLE_HEIGHT = 80;
+
+// Types de formes de tables disponibles
+export type TableShape = 'round' | 'square' | 'rectangle' | 'oval';
+
+// Fonctions utilitaires communes
+export const getStatusColor = (status: TableType['status']) => {
+  switch (status) {
+    case 'libre': return '#4CAF50';
+    case 'occupee': return '#EFBC51';
+    case 'reservee': return '#CAE1EF';
+  }
+};
+
+export const getStatusText = (status: TableType['status']) => {
+  switch (status) {
+    case 'libre': return 'Libre';
+    case 'occupee': return 'Occupée';
+    case 'reservee': return 'Réservée';
+  }
+};
+
+export const getNextStatus = (currentStatus: TableType['status']): TableType['status'] => {
+  const statuses: TableType['status'][] = ['libre', 'reservee', 'occupee'];
+  const currentIndex = statuses.indexOf(currentStatus);
+  return statuses[(currentIndex + 1) % statuses.length];
+};
+
+// Interface pour les propriétés du TableShapeRenderer
+interface TableShapeRendererProps {
+  table: TableType;
+  size?: number;
+  showText?: boolean;
+  textColor?: string;
+  backgroundColor?: string;
+}
+
+// Interface pour les propriétés du TableViewWithShapeRenderer
+export interface TableViewBaseProps {
+  title: string;
+  loading: boolean;
+  tables?: TableType[]; // Made optional since it's not used in the component
+  customMenuItems?: {
+    label: string;
+    onPress: () => void;
+    isLogout?: boolean;
+  }[];
+  children: React.ReactNode;
+  showLegend?: boolean;
+  enableEditMode?: boolean;
+  isEditMode?: boolean;
+  onEditModeToggle?: (enabled: boolean) => void;
+}
+
+// Composant TableShapeRenderer intégré
+export const TableShapeRenderer: React.FC<TableShapeRendererProps> = ({
+  table,
+  size = screenWidth * 0.1,
+  showText = true,
+  textColor = '#194A8D',
+  backgroundColor
+}) => {
+  const shape = table.position.shape || 'round';
+  
+  const getShapeStyle = () => {
+    const baseStyle = {
+      width: size,
+      height: size,
+      justifyContent: 'center' as const,
+      alignItems: 'center' as const,
+      backgroundColor: backgroundColor || '#CAE1EF',
+      elevation: 3,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    };
+
+    switch (shape) {
+      case 'round':
+        return {
+          ...baseStyle,
+          borderRadius: size / 2, // Perfectly round
+        };
+      case 'square':
+        return {
+          ...baseStyle,
+          borderRadius: 4, // Sharp corners for square
+        };
+      case 'rectangle':
+        return {
+          ...baseStyle,
+          width: size * 1.4, // Wider for rectangle
+          height: size * 0.8, // Shorter height for rectangle
+          borderRadius: 6,
+        };
+      case 'oval':
+        return {
+          ...baseStyle,
+          width: size * 1.3, // Slightly wider for oval
+          height: size * 0.9, // Slightly shorter for oval
+          borderRadius: size / 2, // High border radius for oval shape
+        };
+      default:
+        return {
+          ...baseStyle,
+          borderRadius: size / 2,
+        };
+    }
+  };
+
+  const getFontSize = () => {
+    if (size < 50) return 8;
+    if (size < 70) return 10;
+    return 12;
+  };
+
+  return (
+    <View style={getShapeStyle()}>
+      {showText && (
+        <Text
+          style={[
+            tableShapeStyles.tableText,
+            {
+              color: textColor,
+              fontSize: getFontSize(),
+            },
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          // @ts-ignore - Propriétés pour empêcher la sélection
+          selectable={false}
+          allowFontScaling={false}
+        >
+          {table.numero}
+        </Text>
+      )}
+      
+      {/* Indicateur de nombre de places */}
+      {table.places && (
+        <View style={[tableShapeStyles.placesIndicator, { top: -3, left: -3 }]}>
+          <Text 
+            style={[tableShapeStyles.placesText, { fontSize: Math.max(6, size * 0.12) }]}
+            // @ts-ignore - Propriétés pour empêcher la sélection
+            selectable={false}
+            allowFontScaling={false}
+          >
+            {table.places}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// Composant de base pour les vues de tables avec mode édition
+export const TableViewWithShapeRenderer: React.FC<TableViewBaseProps> = ({
+  title,
+  loading,
+  customMenuItems = [],
+  children,
+  showLegend = true,
+  enableEditMode = false,
+  isEditMode = false,
+  onEditModeToggle
+}) => {
+  const renderEditModeToggle = () => {
+    if (!enableEditMode || !onEditModeToggle) return null;
+    
+    return (
+      <TouchableOpacity
+        style={[baseStyles.editModeButton, isEditMode && baseStyles.editModeButtonActive]}
+        onPress={() => onEditModeToggle(!isEditMode)}
+      >
+        <MaterialIcons 
+          name={isEditMode ? "edit-off" : "edit"} 
+          size={20} 
+          color={isEditMode ? "#EFBC51" : "#194A8D"} 
+        />
+        <Text style={[baseStyles.editModeText, isEditMode && baseStyles.editModeTextActive]}>
+          {isEditMode ? "Quitter Édition" : "Modifier Plan"}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderLegend = () => (
+    <View style={baseStyles.legende}>
+      <View style={baseStyles.legendeItem}>
+        <View style={[baseStyles.legendeCarre, { backgroundColor: '#4CAF50' }]} />
+        <Text style={baseStyles.legendeText}>Libre</Text>
+      </View>
+      <View style={baseStyles.legendeItem}>
+        <View style={[baseStyles.legendeCarre, { backgroundColor: '#CAE1EF' }]} />
+        <Text style={baseStyles.legendeText}>Réservée</Text>
+      </View>
+      <View style={baseStyles.legendeItem}>
+        <View style={[baseStyles.legendeCarre, { backgroundColor: '#EFBC51' }]} />
+        <Text style={baseStyles.legendeText}>Occupée</Text>
+      </View>
+    </View>
+  );
+
+  const renderLoading = () => (
+    <View style={baseStyles.loadingContainer}>
+      <ActivityIndicator size="large" color="#194A8D" />
+      <Text style={baseStyles.loadingText}>Chargement des tables...</Text>
+    </View>
+  );
+
+  return (
+    <SafeAreaView style={baseStyles.container}>
+      <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems} />
+      <Head title={title} />
+      
+      <View style={baseStyles.contentContainer}>
+        {showLegend && renderLegend()}
+        {renderEditModeToggle()}
+        
+        {loading ? renderLoading() : children}
+      </View>
+    </SafeAreaView>
+  );
+};
+
+// Interface pour les props du composant modal
 interface TableComponentProps {
   visible: boolean;
   onClose: () => void;
   onSave: (table: Omit<TableType, 'id' | 'status'>) => void;
   initialTable?: Partial<TableType>;
   isEditing?: boolean;
+  tableStatus?: TableType['status']; // Nouveau prop pour le statut de la table
 }
-
-// Types de formes de tables disponibles
-export type TableShape = 'round' | 'square' | 'rectangle' | 'oval';
 
 interface TableShapeOption {
   shape: TableShape;
@@ -80,14 +311,16 @@ const TableShapePreview: React.FC<{
   isSelected: boolean;
   onSelect: () => void;
   option: TableShapeOption;
-}> = ({ shape, isSelected, onSelect, option }) => {
+  tableStatus?: TableType['status']; // Nouveau prop pour le statut de la table
+}> = ({ shape, isSelected, onSelect, option, tableStatus = 'libre' }) => {
   const getShapeStyle = () => {
+    // Utiliser la couleur du statut de la table ou les couleurs par défaut pour la sélection
+    const statusColor = getStatusColor(tableStatus);
+    const selectedColor = '#194A8D'; // Couleur pour l'état sélectionné
+    
+    const baseSize = screenWidth * 0.15;
     const baseStyle = {
-      width: screenWidth * 0.15,
-      height: screenWidth * 0.15,
-      backgroundColor: isSelected ? '#194A8D' : '#CAE1EF',
-      borderWidth: 2,
-      borderColor: isSelected ? '#CAE1EF' : '#194A8D',
+      backgroundColor: isSelected ? selectedColor : statusColor,
       justifyContent: 'center' as const,
       alignItems: 'center' as const,
       margin: 5,
@@ -95,15 +328,35 @@ const TableShapePreview: React.FC<{
 
     switch (shape) {
       case 'round':
-        return { ...baseStyle, borderRadius: screenWidth * 0.075 };
+        return { 
+          ...baseStyle, 
+          width: baseSize,
+          height: baseSize,
+          borderRadius: baseSize / 2 // Perfectly round
+        };
       case 'square':
-        return { ...baseStyle, borderRadius: 8 };
+        return { 
+          ...baseStyle, 
+          width: baseSize,
+          height: baseSize,
+          borderRadius: 4 // Sharp corners for square
+        };
       case 'rectangle':
-        return { ...baseStyle, width: screenWidth * 0.2, borderRadius: 8 };
+        return { 
+          ...baseStyle, 
+          width: baseSize * 1.4, // Wider for rectangle
+          height: baseSize * 0.8, // Shorter height
+          borderRadius: 6 
+        };
       case 'oval':
-        return { ...baseStyle, width: screenWidth * 0.2, borderRadius: screenWidth * 0.075 };
+        return { 
+          ...baseStyle, 
+          width: baseSize * 1.3, // Wider for oval
+          height: baseSize * 0.9, // Slightly shorter
+          borderRadius: baseSize / 2 // High border radius for oval shape
+        };
       default:
-        return baseStyle;
+        return { ...baseStyle, width: baseSize, height: baseSize, borderRadius: 8 };
     }
   };
 
@@ -129,7 +382,8 @@ const TableComponent: React.FC<TableComponentProps> = ({
   onClose,
   onSave,
   initialTable,
-  isEditing = false
+  isEditing = false,
+  tableStatus = 'libre' // Valeur par défaut
 }) => {
   const [selectedShape, setSelectedShape] = useState<TableShape>(
     (initialTable?.position as any)?.shape || 'round'
@@ -230,6 +484,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
                     isSelected={selectedShape === option.shape}
                     onSelect={() => setSelectedShape(option.shape)}
                     option={option}
+                    tableStatus={tableStatus}
                   />
                 ))}
               </View>
@@ -313,6 +568,107 @@ const TableComponent: React.FC<TableComponentProps> = ({
     </Modal>
   );
 };
+
+const baseStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: '#194A8D',
+  },
+  contentContainer: {
+    flex: 1,
+    backgroundColor: '#F3EFEF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginTop: 5,
+  },
+  legende: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#F3EFEF',
+  },
+  legendeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendeCarre: {
+    width: 14,
+    height: 14,
+    marginRight: 6,
+    borderRadius: 3,
+  },
+  legendeText: {
+    color: '#083F8C',
+    fontSize: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F3EFEF',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#194A8D',
+    fontSize: 16,
+  },
+  editModeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#CAE1EF',
+    marginHorizontal: 15,
+    marginVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  editModeButtonActive: {
+    backgroundColor: '#EFBC51',
+  },
+  editModeText: {
+    color: '#194A8D',
+    fontWeight: 'bold',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  editModeTextActive: {
+    color: '#194A8D',
+  },
+});
+
+const tableShapeStyles = StyleSheet.create({
+  tableText: {
+    fontWeight: 'bold',
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    zIndex: 2,
+  },
+  placesIndicator: {
+    position: 'absolute',
+    backgroundColor: '#194A8D',
+    borderRadius: 8,
+    minWidth: 12,
+    minHeight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 2,
+  },
+  placesText: {
+    color: '#CAE1EF',
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+});
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -472,5 +828,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+
 
 export default TableComponent;
