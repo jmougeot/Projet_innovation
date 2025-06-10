@@ -196,7 +196,11 @@ const CreateMissionPage = () => {
       });
       
       // Navigation
-      router.back();
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/mission');
+      }
     } catch (error) {
       console.error('Erreur lors de la création de la mission:', error);
       Alert.alert('Erreur', `Impossible de créer la mission: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

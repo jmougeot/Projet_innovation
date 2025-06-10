@@ -10,6 +10,7 @@ import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
 import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
@@ -23,16 +24,7 @@ export default function Commande() {
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     
 // Définition des éléments du menu personnalisé
-    const customMenuItems = [
-        {
-            label: 'Accueil',
-            onPress: () => router.replace('/')
-        },
-        {
-            label: 'Connexion',
-            onPress: () => router.replace('/connexion/connexion')
-        }
-    ];
+    const customMenuItems = getPlanDeSalleMenuItems();
 
 // Chargement des polices personnalisées
     const [fontsLoaded] = useFonts({

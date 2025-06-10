@@ -7,6 +7,8 @@ import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
 import Head from '@/app/components/Head';
+import Reglage from '@/app/components/reglage';
+import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
 
 function Encaissement() {
     const { tableId } = useLocalSearchParams();
@@ -19,6 +21,9 @@ function Encaissement() {
     const [totalEncaisses, setTotalEncaisses] = useState<number>(0);
     const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque'>('carte');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+    // Navigation menu items pour le plan de salle
+    const customMenuItems = getPlanDeSalleMenuItems();
 
     useEffect(() => {
         const user = auth.currentUser;
@@ -219,6 +224,7 @@ function Encaissement() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <Reglage position={{ top: 10, right: 15 }} menuItems={customMenuItems} />
             <Head title={'Encaissement Table'} />
             
             <View style={styles.paymentMethodsContainer}>

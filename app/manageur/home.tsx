@@ -38,7 +38,7 @@ export default function ManagerHome() {
           <View style={styles.menuGrid}>
             <Pressable 
               style={styles.menuItem}
-              onPress={() => router.push('/service/plan_de_salle' as any)}
+              onPress={() => router.push('/service/(tabs)/plan_de_salle' as any)}
             >
               <View style={styles.iconContainer}>
                 <Ionicons name="restaurant-outline" size={32} color="#194A8D" />
@@ -48,7 +48,7 @@ export default function ManagerHome() {
 
             <Pressable 
               style={styles.menuItem}
-              onPress={() => router.push('/cuisine/cuisine' as any)}
+              onPress={() => router.push('/cuisine/(tabs)/cuisine' as any)}
             >
               <View style={styles.iconContainer}>
                 <Ionicons name="fast-food-outline" size={32} color="#194A8D" />
@@ -58,7 +58,7 @@ export default function ManagerHome() {
 
             <Pressable 
               style={styles.menuItem}
-              onPress={() => router.push('/cuisine/stock' as any)}
+              onPress={() => router.push('/cuisine/(tabs)/stock' as any)}
             >
               <View style={styles.iconContainer}>
                 <Ionicons name="cube-outline" size={32} color="#194A8D" />
@@ -127,19 +127,19 @@ export default function ManagerHome() {
           <View style={styles.statsContainer}>
             <Pressable 
                 style= {styles.statsBox}
-                onPress={() => router.push('/cuisine/stock' as any)}
+                onPress={() => router.push('/mission/pages/AllMissionsPage' as any)}
               >
                 <View style={styles.iconContainer}>
-                  <Ionicons name="cube-outline" size={32} color="#194A8D" />
+                  <Ionicons name="list-outline" size={32} color="#194A8D" />
                 </View>
                 <Text style={styles.statsLabel}>Toutes les missions</Text>
             </Pressable>
             <Pressable 
                 style= {styles.statsBox}
-                onPress={() => router.push('/cuisine/stock' as any)}
+                onPress={() => router.push('/mission/pages/CreateMissionPage' as any)}
               >
                 <View style={styles.iconContainer}>
-                  <Ionicons name="cube-outline" size={32} color="#194A8D" />
+                  <Ionicons name="add-circle-outline" size={32} color="#194A8D" />
                 </View>
                 <Text style={styles.statsLabel}>Ajouter une mission</Text>
             </Pressable>

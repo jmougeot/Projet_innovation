@@ -13,13 +13,27 @@ import TableComponent from '../components/Table';
 import ConfirmModal from '../components/ConfirmModal';
 import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
+import Reglage from '@/app/components/reglage';
+import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
+import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
 
-// Obtenir les dimensions de l'écran
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+// Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
+const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
 
-// Constantes pour les dimensions de la table
-const TABLE_WIDTH = 80;
-const TABLE_HEIGHT = 80;
+// Fonctions utilitaires pour normaliser les positions
+const normalizePosition = (position: { x: number, y: number }, workspaceSize: number) => {
+  return {
+    x: Math.min(Math.max(position.x / workspaceSize, 0), 1 - TABLE_SIZE_RATIO),
+    y: Math.min(Math.max(position.y / workspaceSize, 0), 1 - TABLE_SIZE_RATIO)
+  };
+};
+
+const denormalizePosition = (normalizedPosition: { x: number, y: number }, workspaceSize: number) => {
+  return {
+    x: normalizedPosition.x * workspaceSize,
+    y: normalizedPosition.y * workspaceSize
+  };
+};
 
 interface DraggableTableProps {
   table: Table;
@@ -47,14 +61,24 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
   workspaceWidth,
   workspaceHeight
 }) => {
-  const [position, setPosition] = useState({ x: table.position.x, y: table.position.y });
+  const [position, setPosition] = useState(() => {
+    // Dénormaliser la position pour l'affichage
+    return denormalizePosition(
+      { x: table.position.x, y: table.position.y },
+      workspaceWidth
+    );
+  });
   const [lastTap, setLastTap] = useState<number | null>(null);
   const [showOptionsModal, setShowOptionsModal] = useState(false);
 
   // Mettre à jour la position locale quand la table change
   useEffect(() => {
-    setPosition({ x: table.position.x, y: table.position.y });
-  }, [table.position.x, table.position.y, table.id]);
+    const denormalizedPos = denormalizePosition(
+      { x: table.position.x, y: table.position.y },
+      workspaceWidth
+    );
+    setPosition(denormalizedPos);
+  }, [table.position.x, table.position.y, table.id, workspaceWidth]);
 
   // Fonction pour contraindre la position dans les limites du workspace
   const constrainPosition = (newX: number, newY: number) => {
@@ -103,7 +127,10 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
       const finalY = position.y + gestureState.dy;
       const constrainedPosition = constrainPosition(finalX, finalY);
       setPosition(constrainedPosition);
-      onPositionChange(table.id, constrainedPosition.x, constrainedPosition.y);
+      
+      // Normaliser la position avant de l'envoyer
+      const normalizedPosition = normalizePosition(constrainedPosition, workspaceWidth);
+      onPositionChange(table.id, normalizedPosition.x, normalizedPosition.y);
     },
   });
 
@@ -189,9 +216,13 @@ export default function MapSettings() {
   // État pour le modal de confirmation d'annulation
   const [showDiscardModal, setShowDiscardModal] = useState(false);
 
-  // Dimensions du workspace adaptives
-  const workspaceWidth = screenWidth - 40; // Marge de 20px de chaque côté
-  const workspaceHeight = screenHeight * 0.5; // 50% de la hauteur de l'écran
+  // Dimensions du workspace adaptives avec le hook personnalisé
+  const { size: workspaceSize, screenWidth, screenHeight } = useWorkspaceSize();
+  const workspaceWidth = workspaceSize;
+  const workspaceHeight = workspaceSize;
+
+  // Calcul des dimensions des tables proportionnelles au workspace
+  const tableSize = workspaceSize * TABLE_SIZE_RATIO;
 
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
@@ -201,7 +232,13 @@ export default function MapSettings() {
   const customMenuItems = [
     {
       label: 'Retour au plan',
-      onPress: () => router.back()
+      onPress: () => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/service');
+        }
+      }
     },
     {
       label: 'Profil',
@@ -355,8 +392,10 @@ export default function MapSettings() {
       } else {
         // Création d'une nouvelle table
         const newId = tables.length > 0 ? Math.max(...tables.map(t => t.id)) + 1 : 1;
-        const maxX = workspaceWidth - TABLE_WIDTH - 20;
-        const maxY = workspaceHeight - TABLE_HEIGHT - 20;
+        
+        // Générer une position aléatoire normalisée (0-1)
+        const randomNormalizedX = Math.random() * (1 - TABLE_SIZE_RATIO - 0.1) + 0.05;
+        const randomNormalizedY = Math.random() * (1 - TABLE_SIZE_RATIO - 0.1) + 0.05;
         
         const newTable: Table = {
           ...tableData,
@@ -364,8 +403,8 @@ export default function MapSettings() {
           status: "libre",
           position: {
             ...tableData.position, // Preserve the shape and other position properties
-            x: Math.min(Math.random() * (maxX - 50) + 25, maxX),
-            y: Math.min(Math.random() * (maxY - 50) + 25, maxY)
+            x: randomNormalizedX,
+            y: randomNormalizedY
           }
         };
 
@@ -442,85 +481,50 @@ export default function MapSettings() {
     );
   }
 
-  const renderWorkspace = () => (
-    <View style={styles.workspaceContainer}>
-      <View style={styles.header}>
-        {hasUnsavedChanges && (
-          <View style={styles.unsavedIndicator}>
-            <MaterialIcons name="warning" size={16} color="#EFBC51" />
-            <Text style={styles.unsavedText}>Modifications non sauvegardées</Text>
-          </View>
-        )}
-      </View>
-
-      <View style={styles.workspace}>
-        {tables.map((table) => (
-          <DraggableTable
-            key={`${table.id}-${table.position.x}-${table.position.y}`}
-            table={table}
-            size={TABLE_WIDTH}
-            showText={true}
-            textColor="#194A8D"
-            onPositionChange={handlePositionChange}
-            onEditTable={handleEditTable}
-            onDeleteTable={handleDeleteTable}
-            workspaceWidth={workspaceWidth}
-            workspaceHeight={workspaceHeight}
-          />
-        ))}
-        
-        <View style={styles.coordinates}>
-          {tables.map((table) => (
-            <Text key={`coord-${table.id}`} style={styles.coordText}>
-              {table.numero}: X: {Math.round(table.position.x)}, Y: {Math.round(table.position.y)}
-            </Text>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.controls}>
-        {hasUnsavedChanges && (
-          <Pressable 
-            style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
-            onPress={saveAllChanges}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#194A8D" />
-            ) : (
-              <>
-                <MaterialIcons name="save" size={20} color="#194A8D" />
-                <Text style={styles.saveButtonText}>Sauvegarder</Text>
-              </>
-            )}
-          </Pressable>
-        )}
-        
-        {hasUnsavedChanges && (
-          <Pressable 
-            style={styles.discardButton} 
-            onPress={() => {
-              console.log('🟡 Discard button pressed!');
-              discardChanges();
-            }}
-            disabled={saving}
-          >
-            <MaterialIcons name="undo" size={20} color="#fff" />
-            <Text style={styles.discardButtonText}>Annuler</Text>
-          </Pressable>
-        )}
-        
-        <Pressable style={styles.addButton} onPress={addNewTable}>
-          <Text style={styles.addButtonText}>+ Nouvelle table</Text>
-        </Pressable>
-        
+  // Composant pour les contrôles (boutons)
+  const renderControls = () => (
+    <View style={styles.controls}>
+      {hasUnsavedChanges && (
         <Pressable 
-          style={[styles.addButton, styles.removeButton]} 
-          onPress={() => tables.length > 0 && removeTable(tables[tables.length - 1].id)}
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+          onPress={saveAllChanges}
+          disabled={saving}
         >
-          <Text style={[styles.addButtonText, styles.removeButtonText]}>- Supprimer dernière</Text>
+          {saving ? (
+            <ActivityIndicator size="small" color="#194A8D" />
+          ) : (
+            <>
+              <MaterialIcons name="save" size={20} color="#194A8D" />
+              <Text style={styles.saveButtonText}>Sauvegarder</Text>
+            </>
+          )}
         </Pressable>
-      </View>
+      )}
+      
+      {hasUnsavedChanges && (
+        <Pressable 
+          style={styles.discardButton} 
+          onPress={() => {
+            console.log('🟡 Discard button pressed!');
+            discardChanges();
+          }}
+          disabled={saving}
+        >
+          <MaterialIcons name="undo" size={20} color="#fff" />
+          <Text style={styles.discardButtonText}>Annuler</Text>
+        </Pressable>
+      )}
+      
+      <Pressable style={styles.addButton} onPress={addNewTable}>
+        <Text style={styles.addButtonText}>+ Nouvelle table</Text>
+      </Pressable>
+      
+      <Pressable 
+        style={[styles.addButton, styles.removeButton]} 
+        onPress={() => tables.length > 0 && removeTable(tables[tables.length - 1].id)}
+      >
+        <Text style={[styles.addButtonText, styles.removeButtonText]}>- Supprimer dernière</Text>
+      </Pressable>
     </View>
   );
 
@@ -532,7 +536,28 @@ export default function MapSettings() {
       customMenuItems={customMenuItems}
       showLegend={false}
     >
-      {renderWorkspace()}
+      <WorkspaceContainer
+        hasUnsavedChanges={hasUnsavedChanges}
+        coordinatesComponent={<WorkspaceCoordinates tables={tables.map(table => ({ ...table, id: table.id.toString() }))} />}
+        style={{ flex: 1 }}
+      >
+        {tables.map((table) => (
+          <DraggableTable
+            key={`${table.id}-${table.position.x}-${table.position.y}`}
+            table={table}
+            size={tableSize}
+            showText={true}
+            textColor="#194A8D"
+            onPositionChange={handlePositionChange}
+            onEditTable={handleEditTable}
+            onDeleteTable={handleDeleteTable}
+            workspaceWidth={workspaceWidth}
+            workspaceHeight={workspaceHeight}
+          />
+        ))}
+      </WorkspaceContainer>
+
+      {renderControls()}
       
       {/* Modal de création/édition de table */}
       <TableComponent
@@ -616,7 +641,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.95)',
     padding: 8,
     borderRadius: 8,
-    maxWidth: screenWidth * 0.4, // 40% de la largeur de l'écran
+    maxWidth: '40%', // 40% de la largeur de l'écran
     maxHeight: 150,
     overflow: 'hidden',
   },

@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
-import { View,Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
-import Reglage from '@/app/components/reglage';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Head from '@/app/components/Head';
-
-// Match table size with change_plan.tsx
-const TABLE_SIZE = 50;
+import Header from '@/app/components/Header';
+import { 
+  TableShapeRenderer, 
+  getStatusColor, 
+  getStatusText, 
+  getNextStatus
+} from '../components/Table';
+import { WorkspaceContainer, useWorkspaceSize } from '../components/Workspace';
 
 export default function PlanDeSalle() {
   const router = useRouter();
@@ -16,40 +19,36 @@ export default function PlanDeSalle() {
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  const customMenuItems = [
-    {
-      label: 'Profil',
-      onPress: () => {}},
-    {
-      label: 'Paramètres',
-      onPress: () => {
-        // Open settings
-      }
-    },
-    {
-      label: 'Déconnexion',
-      onPress: () => {
-        // Logout logic
-      },
-      isLogout: true
-    },
-    {
-      label: 'Modifier le plan',
-      onPress: () => {router.push('../commande/map_settings');}
-    },
-  ];
+  // Utilisation du hook pour les dimensions adaptatives
+  const { size: workspaceSize } = useWorkspaceSize();
+  
+  // Proportions relatives pour les dimensions des tables (même système que map_settings.tsx)
+  const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
+  const tableSize = workspaceSize * TABLE_SIZE_RATIO;
 
-  // Load tables from Firebase
+  // Fonction utilitaire pour dénormaliser les positions (même logique que map_settings.tsx)
+  const denormalizePosition = (normalizedPosition: { x: number, y: number }, workspaceSize: number) => {
+    return {
+      x: normalizedPosition.x * workspaceSize,
+      y: normalizedPosition.y * workspaceSize
+    };
+  };
+
+  // Fonction pour déterminer si une position est normalisée (0-1) ou absolue
+  const isNormalizedPosition = (position: { x: number, y: number }) => {
+    return position.x <= 1 && position.y <= 1 && position.x >= 0 && position.y >= 0;
+  };
+
+  // Charger les tables au démarrage
   useEffect(() => {
     const loadTables = async () => {
       try {
         setLoading(true);
-        // Initialize with default tables if none exist
         await initializeDefaultTables();
         const tablesData = await getTables();
         setTables(tablesData);
       } catch (error) {
-        console.error("Error loading tables:", error);
+        console.error("Erreur lors du chargement des tables:", error);
         alert("Erreur lors du chargement des tables");
       } finally {
         setLoading(false);
@@ -59,113 +58,106 @@ export default function PlanDeSalle() {
     loadTables();
   }, []);
 
-  const handleTablePress = (tableId: number, tablenumber : string) => {
+  const handleTablePress = (tableId: number, tablenumber: string) => {
     router.push({
       pathname: "../commande/commande_Table",
-      params: { tableId: tableId , tablenumber: tablenumber }
+      params: { tableId: tableId, tablenumber: tablenumber }
     });
   };
 
-  // Change table status on long press
+  // Changer le statut de la table (appui long)
   const handleTableLongPress = async (tableId: number, currentStatus: Table['status']) => {
     try {
       const nextStatus = getNextStatus(currentStatus);
       await updateTableStatus(tableId, nextStatus);
       
-      // Update local state
       setTables(prevTables => 
         prevTables.map(table => 
           table.id === tableId ? { ...table, status: nextStatus } : table
         )
       );
     } catch (error) {
-      console.error("Error updating table status:", error);
+      console.error("Erreur lors de la modification du statut:", error);
       alert("Erreur lors de la modification du statut");
     }
   };
 
-  const getNextStatus = (currentStatus: Table['status']): Table['status'] => {
-    const statuses: Table['status'][] = ['libre', 'reservee', 'occupee'];
-    const currentIndex = statuses.indexOf(currentStatus);
-    return statuses[(currentIndex + 1) % statuses.length];
-  };
-
-  const getStatusColor = (status: Table['status']) => {
-    switch (status) {
-      case 'libre': return '#4CAF50';
-      case 'occupee': return '#EFBC51'; // Changed to match commande_Table color
-      case 'reservee': return '#CAE1EF'; // Changed to match commande_Table color
-    }
-  };
-
-  const getStatusText = (status: Table['status']) => {
-    switch (status) {
-      case 'libre': return 'Libre';
-      case 'occupee': return 'Occupée';
-      case 'reservee': return 'Réservée';
-    }
-  };
-  
-  // Sort tables for list view
+  // Trier les tables par numéro pour la vue liste
   const sortedTables = [...tables].sort((a, b) => {
-    // Extract numbers from table numbers (assuming format "T1", "T2", etc.)
     const numA = parseInt(a.numero.replace(/\D/g, ''));
     const numB = parseInt(b.numero.replace(/\D/g, ''));
     return numA - numB;
   });
 
+  // Vue plan avec workspace
   const renderPlanView = () => (
-    <View 
-      style={{
-        width: '100%',
-        height: '100%',
-        backgroundColor: '#F3EFEF',
-      }}
-    >
-      <View style={styles.planContainer}>
-        {tables.map((table) => (
+    <WorkspaceContainer style={{ flex: 1 }}>
+      {tables.map((table) => {
+        // Déterminer la position finale à utiliser
+        let finalPosition = { x: table.position.x, y: table.position.y };
+        
+        // Si la position est normalisée (0-1), la dénormaliser
+        if (isNormalizedPosition(table.position)) {
+          finalPosition = denormalizePosition(table.position, workspaceSize);
+        }
+        // Sinon, utiliser la position absolue directement (rétrocompatibilité)
+
+        return (
           <TouchableOpacity
             key={table.id}
-            style={[
-              styles.table,
-              { 
-                backgroundColor: getStatusColor(table.status),
-                // Use direct positioning to match change_plan.tsx
-                left: table.position.x,
-                top: table.position.y,
-              }
-            ]}
+            style={[styles.tableContainer, { 
+              left: finalPosition.x,
+              top: finalPosition.y,
+            }]}
             onPress={() => handleTablePress(table.id, table.numero)}  
             onLongPress={() => handleTableLongPress(table.id, table.status)}
             delayLongPress={500}
+            activeOpacity={0.8}
           >
-            <Text style={styles.tableNumero}>{table.numero}</Text>
-            <MaterialIcons name="people" size={24} color="#194A8D" />
-            <Text style={styles.placesText}>{table.places} places</Text>
+            <TableShapeRenderer
+              table={table}
+              size={tableSize}
+              backgroundColor={getStatusColor(table.status)}
+              textColor="#194A8D"
+              showText={true}
+            />
           </TouchableOpacity>
-        ))}
-      </View>
-    </View>
+        );
+      })}
+    </WorkspaceContainer>
   );
 
+  // Vue liste des tables
   const renderListView = () => (
     <ScrollView style={styles.listContainer}>
       {sortedTables.map((table) => (
         <TouchableOpacity
           key={table.id}
-          style={[
-            styles.tableListItem,
-            { backgroundColor: getStatusColor(table.status) }
-          ]}
+          style={[styles.tableListItem, { backgroundColor: getStatusColor(table.status) }]}
           onPress={() => handleTablePress(table.id, table.numero)}
           onLongPress={() => handleTableLongPress(table.id, table.status)}
           delayLongPress={500}
+          activeOpacity={0.8}
         >
           <View style={styles.tableListInfo}>
-            <Text style={styles.tableListNumero}>{table.numero}</Text>
+            <View style={styles.tableListLeft}>
+              <TableShapeRenderer
+                table={table}
+                size={tableSize * 0.5} // 50% de la taille normale pour la vue liste
+                backgroundColor={getStatusColor(table.status)}
+                textColor="#194A8D"
+                showText={true}
+              />
+            </View>
             <View style={styles.tableListDetails}>
-              <MaterialIcons name="people" size={18} color="#194A8D" />
-              <Text style={styles.tableListPlaces}>{table.places} places</Text>
+              <Text style={styles.tableListNumero}>{table.numero}</Text>
+              <View style={styles.tableListMeta}>
+                <MaterialIcons name="people" size={18} color="#194A8D" />
+                <Text style={styles.tableListPlaces}>{table.places} places</Text>
+                <Text style={styles.tableListShape}>
+                  • {table.position.shape || 'rond'}
+                </Text>
+              </View>
             </View>
           </View>
           <Text style={styles.tableListStatus}>{getStatusText(table.status)}</Text>
@@ -174,12 +166,10 @@ export default function PlanDeSalle() {
     </ScrollView>
   );
 
+  // Boutons de basculement vue plan/liste
   const renderToggleButton = (mode: 'plan' | 'liste', text: string) => (
     <Pressable
-      style={[
-        styles.toggleButton,
-        viewMode === mode ? styles.activeToggle : {}
-      ]}
+      style={[styles.toggleButton, viewMode === mode && styles.activeToggle]}
       onPress={() => setViewMode(mode)}
     >
       <Text style={styles.toggleButtonText}>{text}</Text>
@@ -188,16 +178,21 @@ export default function PlanDeSalle() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems}/>
+      <Header 
+        title="Plan de Salle" 
+        showBackButton={true}
+        backgroundColor="#194A8D"
+        textColor="#FFFFFF"
+        useHeadComponent={true}
+        customBackRoute="/service"
+      />
+      
+      <View style={styles.contentWrapper}>
+        <View style={styles.toggleContainer}>
+          {renderToggleButton('plan', 'Vue Plan')}
+          {renderToggleButton('liste', 'Liste des Tables')}
+        </View>
 
-      <Head title="Plan de Salle" />
-
-      <View style={styles.toggleContainer}>
-        {renderToggleButton('plan', 'Vue Plan')}
-        {renderToggleButton('liste', 'Liste des Tables')}
-      </View>
-
-      <View style={styles.contentContainer}>
         <View style={styles.legende}>
           <View style={styles.legendeItem}>
             <View style={[styles.legendeCarre, { backgroundColor: '#4CAF50' }]} />
@@ -212,7 +207,7 @@ export default function PlanDeSalle() {
             <Text style={styles.legendeText}>Occupée</Text>
           </View>
         </View>
-        
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#194A8D" />
@@ -229,17 +224,25 @@ export default function PlanDeSalle() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 10,
-    backgroundColor: '#194A8D', // Matched with commande_Table.tsx
-    },
+    backgroundColor: '#194A8D',
+  },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: '#F3EFEF',
+    margin: 10,
+    borderRadius: 20,
+    padding: 15,
+  },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 15,
+    paddingHorizontal: 10,
+    backgroundColor: 'transparent',
   },
   toggleButton: {
     backgroundColor: '#CAE1EF',
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 25,
     elevation: 2,
@@ -256,118 +259,108 @@ const styles = StyleSheet.create({
   toggleButtonText: {
     color: '#083F8C',
     fontWeight: 'bold',
-  },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#F3EFEF',
-    borderRadius: 20,
-    overflow: 'hidden',
+    fontSize: 16,
   },
   legende: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'center',        // Centre les éléments horizontalement
+    alignItems: 'center',            // Centre les éléments verticalement
+    marginBottom: 15,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: '#F3EFEF',
-  },
-  legendeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendeCarre: {
-    width: 16,
-    height: 16,
-    marginRight: 8,
-    borderRadius: 4,
-  },
-  legendeText: {
-    color: '#083F8C',
-  },
-  scrollContainer: {
-    flex: 1,
-    backgroundColor: '#F3EFEF',
-  },
-  planContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    padding: 20,
-  },
-  table: {
-    position: 'absolute',
-    width: TABLE_SIZE,
-    height: TABLE_SIZE,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  tableNumero: {
-    color: '#194A8D',
-    fontSize: 16,  // Reduced font size to match smaller table
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  placesText: {
-    color: '#194A8D',
-    fontSize: 12,  // Reduced font size
-    marginTop: 2,
-  },
-  listContainer: {
-    flex: 1,
-    padding: 10,
-    backgroundColor: '#F3EFEF',
-  },
-  tableListItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    marginVertical: 5,
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 15,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
+  legendeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendeCarre: {
+    width: 15,
+    height: 15,
+    borderRadius: 3,
+    marginRight: 5,
+  },
+  legendeText: {
+    color: '#194A8D',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  tableContainer: {
+    position: 'absolute',
+  },
+  listContainer: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  tableListItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    marginVertical: 8,
+    borderRadius: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
   tableListInfo: {
-    flexDirection: 'column',
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  tableListLeft: {
+    marginRight: 15,
+  },
+  tableListDetails: {
+    flex: 1,
   },
   tableListNumero: {
     color: '#194A8D',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 4,
   },
-  tableListDetails: {
+  tableListMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    flexWrap: 'wrap',
   },
   tableListPlaces: {
     color: '#194A8D',
     fontSize: 14,
-    marginLeft: 4,
+    marginLeft: 6,
+    marginRight: 8,
+  },
+  tableListShape: {
+    color: '#194A8D',
+    fontSize: 12,
+    fontStyle: 'italic',
+    opacity: 0.8,
   },
   tableListStatus: {
     color: '#194A8D',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    textAlign: 'center',
+    minWidth: 80,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F3EFEF',
+    backgroundColor: 'transparent',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 15,
     color: '#194A8D',
     fontSize: 16,
+    fontWeight: '500',
   },
 });

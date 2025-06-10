@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, StatusBar, Platform } from 'react-na
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import Head from './Head';
 
 interface HeaderProps {
   title: string;
@@ -14,6 +15,8 @@ interface HeaderProps {
   };
   backgroundColor?: string;
   textColor?: string;
+  useHeadComponent?: boolean; // Nouvelle prop pour choisir d'utiliser Head ou non
+  customBackRoute?: string; // Nouvelle prop pour spécifier une route de retour personnalisée
 }
 
 const Header = ({ 
@@ -22,15 +25,26 @@ const Header = ({
   onBackPress,
   rightAction,
   backgroundColor = 'transparent',
-  textColor = '#FFFFFF'
+  textColor = '#FFFFFF',
+  useHeadComponent = false,
+  customBackRoute
 }: HeaderProps) => {
   const insets = useSafeAreaInsets();
 
   const handleBackPress = () => {
     if (onBackPress) {
       onBackPress();
+    } else if (customBackRoute) {
+      // Si une route personnalisée est spécifiée, l'utiliser
+      router.replace(customBackRoute as any);
     } else {
-      router.back();
+      // Vérifier s'il y a un écran précédent avant d'appeler router.back()
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        // Si pas d'écran précédent, rediriger vers la page d'accueil
+        router.replace('/');
+      }
     }
   };
 
@@ -46,37 +60,65 @@ const Header = ({
     >
       <StatusBar barStyle="light-content" />
       
-      <View style={styles.contentContainer}>
-        {showBackButton && (
-          <Pressable 
-            style={styles.backButton}
-            onPress={handleBackPress}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      {useHeadComponent ? (
+        <View style={styles.headComponentContainer}>
+          <View style={styles.navigationRow}>
+            {showBackButton && (
+              <Pressable 
+                style={styles.backButton}
+                onPress={handleBackPress}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <MaterialIcons name="arrow-back" size={24} color={textColor} />
+              </Pressable>
+            )}
+            
+            {rightAction && (
+              <Pressable 
+                style={styles.rightAction}
+                onPress={rightAction.onPress}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                {rightAction.icon}
+              </Pressable>
+            )}
+          </View>
+          
+          <Head title={title} />
+        </View>
+      ) : (
+        <View style={styles.contentContainer}>
+          {showBackButton && (
+            <Pressable 
+              style={styles.backButton}
+              onPress={handleBackPress}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialIcons name="arrow-back" size={24} color={textColor} />
+            </Pressable>
+          )}
+          
+          <Text 
+            style={[styles.title, { color: textColor }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            <MaterialIcons name="arrow-back" size={24} color={textColor} />
-          </Pressable>
-        )}
-        
-        <Text 
-          style={[styles.title, { color: textColor }]}
-          numberOfLines={1}
-          ellipsizeMode="tail"
-        >
-          {title}
-        </Text>
-        
-        {rightAction ? (
-          <Pressable 
-            style={styles.rightAction}
-            onPress={rightAction.onPress}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            {rightAction.icon}
-          </Pressable>
-        ) : (
-          <View style={styles.rightActionPlaceholder} />
-        )}
-      </View>
+            {title}
+          </Text>
+          
+          {rightAction ? (
+            <Pressable 
+              style={styles.rightAction}
+              onPress={rightAction.onPress}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              {rightAction.icon}
+            </Pressable>
+          ) : (
+            <View style={styles.rightActionPlaceholder} />
+          )}
+        </View>
+      )}
     </View>
   );
 };
@@ -92,6 +134,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 56,
+  },
+  headComponentContainer: {
+    alignItems: 'center',
+    position: 'relative',
+  },
+  navigationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    position: 'absolute',
+    top: 0,
+    zIndex: 20,
+    paddingHorizontal: 8,
   },
   backButton: {
     width: 40,

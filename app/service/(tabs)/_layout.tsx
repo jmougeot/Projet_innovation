@@ -1,51 +1,59 @@
 import { Tabs } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 
-export default function AppLayout() {
+export default function ServiceTabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#2196F3',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#194A8D',
+        tabBarInactiveTintColor: '#83A8C6',
         tabBarStyle: {
-          backgroundColor: 'white',
+          backgroundColor: '#F3EFEF',
           borderTopWidth: 1,
-          borderTopColor: '#e0e0e0',
+          borderTopColor: '#CAE1EF',
+          height: 60,
+          paddingTop: 5,
+          paddingBottom: 5,
         },
         headerStyle: {
-          backgroundColor: '#2196F3',
+          backgroundColor: '#194A8D',
         },
         headerTintColor: 'white',
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
       }}>
+      
       <Tabs.Screen
         name="index"
         options={{
           headerShown: false,
-          title: 'Cuisine',
+          title: 'Cuisine Service',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="point-of-sale" size={size} color={color} />
+            <MaterialIcons name="restaurant-menu" size={size} color={color} />
           ),
         }}
       />
       
       <Tabs.Screen
-        name="AffichageMission"
+        name="plan_de_salle"
         options={{
           headerShown: false,
-          title: 'Mission',
+          title: 'Plan de Salle',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="inventory" size={size} color={color} />
+            <MaterialIcons name="table-restaurant" size={size} color={color} />
           ),
         }}
       />
 
       <Tabs.Screen
-        name="plan_de_salle"
+        name="AffichageMission"
         options={{
           headerShown: false,
-          title: 'Plan',
+          title: 'Missions',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="analytics" size={size} color={color} />
+            <MaterialIcons name="assignment" size={size} color={color} />
           ),
         }}
       />

@@ -5,12 +5,16 @@ import { db } from '@/app/firebase/firebaseConfig';
 import { CommandeData, PlatQuantite } from '@/app/firebase/firebaseCommandeOptimized';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
+import Reglage from '@/app/components/reglage';
+import { getCuisineServiceMenuItems } from '../components/ServiceNavigation';
 
 const Cuisine = () => {
   const [commandes, setCommandes] = useState<CommandeData[]>([]);
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
+
+  const cuisineMenuItems = getCuisineServiceMenuItems();
 
   useEffect(() => {
     // Écouter les changements en temps réel depuis la nouvelle collection optimisée
@@ -135,6 +139,7 @@ const Cuisine = () => {
 
   return (
     <View style={styles.container}>
+      <Reglage position={{ top: 10, right: 15 }} menuItems={cuisineMenuItems} />
       <View style={styles.headerSquare}>
         <Text style={styles.headerSquareText}>Cuisine</Text>
       </View>
