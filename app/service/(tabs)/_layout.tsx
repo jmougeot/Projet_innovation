@@ -26,7 +26,7 @@ export default function ServiceTabsLayout() {
       }}>
       
       <Tabs.Screen
-        name="index"
+        name="kitchen"
         options={{
           headerShown: false,
           title: 'Cuisine Service',
