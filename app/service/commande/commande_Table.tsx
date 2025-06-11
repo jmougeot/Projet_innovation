@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { auth } from '@/app/firebase/firebaseConfig';
@@ -11,10 +11,12 @@ import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized'
 import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
+import { useRestaurantSelection } from '@/app/firebase/RestaurantSelectionContext';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
     const { tablenumber} = useLocalSearchParams();
+    const { selectedRestaurant } = useRestaurantSelection();
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
@@ -44,18 +46,29 @@ export default function Commande() {
 // Chargement des plats depuis Firebase
     useEffect(() => {
         const fetchPlats = async () => {
-            const platsData = await get_plats();
-            setListPlats(platsData);
+            if (!selectedRestaurant) {
+                console.warn('Aucun restaurant sélectionné pour charger les plats');
+                return;
+            }
+            
+            try {
+                const platsData = await get_plats(true, selectedRestaurant.id);
+                setListPlats(platsData);
+            } catch (error) {
+                console.error('Erreur lors du chargement des plats:', error);
+                Alert.alert('Erreur', 'Impossible de charger le menu');
+            }
         };
         fetchPlats();
-    }, []);
+    }, [selectedRestaurant]);
 
 // Chargement des plats avec missions pour l'utilisateur actuel
     useEffect(() => {
         const fetchMissionPlats = async () => {
-            if (!currentUserId) return; // Ensure currentUserId is not null
+            if (!currentUserId || !selectedRestaurant) return;
+            
             try {
-                const platIds = await getMissionPlatsForUser(currentUserId);
+                const platIds = await getMissionPlatsForUser(currentUserId, selectedRestaurant.id);
                 console.log("Plats avec missions:", platIds); // Ajout de log pour déboguer
                 setMissionPlatsIds(platIds);
             } catch (error) {
@@ -64,7 +77,7 @@ export default function Commande() {
         };
         
         fetchMissionPlats();
-    }, [currentUserId]);
+    }, [currentUserId, selectedRestaurant]);
 
 // Chargement de la commande existante pour la table
     useEffect(() => {
@@ -204,15 +217,20 @@ export default function Commande() {
             alert('Veuillez ajouter des plats à la commande');
             return;
         }
+
+        if (!selectedRestaurant) {
+            Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+            return;
+        }
         
         try {
             if (commandeExistante) {
-                await updateCommande(Idcommande, commandesParTable);
+                await updateCommande(Idcommande, commandesParTable, selectedRestaurant.id);
             } else {
                 // ✅ CORRECTION: Capturer l'ID Firebase réel et mettre à jour l'état local
                 // Exclure l'ID temporaire avant d'envoyer à Firebase
                 const { id, ...commandeDataSansId } = commandesParTable;
-                const firebaseCommandeId = await createCommande(commandeDataSansId);
+                const firebaseCommandeId = await createCommande(commandeDataSansId, selectedRestaurant.id);
                 console.log(`🔄 [SYNC] ID local remplacé: ${Idcommande} → ${firebaseCommandeId}`);
                 setIdcommande(firebaseCommandeId);
                 setCommandeExistante(true);

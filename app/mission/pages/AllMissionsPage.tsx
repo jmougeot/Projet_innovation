@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getAllMissions, assignMissionToUser, deleteMission } from '../../firebase/firebaseMissionOptimized';
-import { DEFAULT_RESTAURANT_ID } from '../../firebase/firebaseRestaurant';
 import { auth } from '../../firebase/firebaseConfig';
+import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { MissionCard, MissionSearch, MissionFilters, ConfirmDeleteModal } from '../components';
@@ -32,6 +32,7 @@ const AllMissionsPage = () => {
   
   
   const currentUser = auth.currentUser;
+  const { selectedRestaurant } = useRestaurantSelection();
   
   // Appliquer les filtres
   const applyFilters = React.useCallback((missionsToFilter: Mission[] = missions) => {
@@ -47,8 +48,15 @@ const AllMissionsPage = () => {
   
   // Charger toutes les missions
   const loadAllMissions = React.useCallback(async () => {
+    if (!selectedRestaurant) {
+      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
-      const allMissions = await getAllMissions(DEFAULT_RESTAURANT_ID);
+      const allMissions = await getAllMissions(selectedRestaurant.id);
       setMissions(allMissions);
       applyFilters(allMissions);
     } catch (error) {
@@ -58,7 +66,7 @@ const AllMissionsPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [applyFilters]);
+  }, [applyFilters, selectedRestaurant]);
   
   useEffect(() => {
     loadAllMissions();
@@ -106,7 +114,7 @@ const AllMissionsPage = () => {
 
   // Confirmer la suppression
   const confirmDeletion = async () => {
-    if (!confirmDeleteMission) return;
+    if (!confirmDeleteMission || !selectedRestaurant) return;
     
     console.log('[DEBUG] 🗑️ Suppression confirmée pour mission:', confirmDeleteMission.id);
     
@@ -116,7 +124,7 @@ const AllMissionsPage = () => {
       console.log('[DEBUG] ✅ deletingMissionId réglé à:', confirmDeleteMission.id);
       
       console.log('[DEBUG] 📞 Appel de deleteMission avec ID:', confirmDeleteMission.id);
-      const result = await deleteMission(confirmDeleteMission.id, DEFAULT_RESTAURANT_ID);
+      const result = await deleteMission(confirmDeleteMission.id, selectedRestaurant.id);
       console.log('[DEBUG] ✅ deleteMission terminé avec succès. Résultat:', result);
       
       console.log('[DEBUG] 📢 Mission supprimée avec succès !');
@@ -159,9 +167,14 @@ const AllMissionsPage = () => {
       Alert.alert('Erreur', 'Vous devez être connecté pour vous inscrire à une mission');
       return;
     }
+
+    if (!selectedRestaurant) {
+      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+      return;
+    }
     
     try {
-      await assignMissionToUser(missionId, currentUser.uid, DEFAULT_RESTAURANT_ID);
+      await assignMissionToUser(missionId, currentUser.uid, selectedRestaurant.id);
       Alert.alert('Succès', 'Vous êtes maintenant inscrit à cette mission');
       
       // Rediriger vers la page des missions de l'utilisateur

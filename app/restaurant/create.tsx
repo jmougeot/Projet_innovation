@@ -14,6 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
+import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
+import { createInitialRestaurantAccess } from '../firebase/restaurantAccess';
 import {
   initializeRestaurant,
   migrateExistingDataToRestaurant,
@@ -39,6 +41,7 @@ interface RestaurantFormData {
 export default function CreateRestaurant() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const { user, refreshRestaurants } = useRestaurantSelection();
   const [formData, setFormData] = useState<RestaurantFormData>({
     name: '',
     address: '',
@@ -96,8 +99,15 @@ export default function CreateRestaurant() {
   const handleCreateRestaurant = async () => {
     if (!validateForm()) return;
 
+    if (!user) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer un restaurant');
+      return;
+    }
+
     try {
       setLoading(true);
+
+      console.log('Starting restaurant creation for user:', user.uid);
 
       const restaurantSettings: RestaurantSettings = {
         business_hours: {
@@ -121,20 +131,36 @@ export default function CreateRestaurant() {
         settings: restaurantSettings,
       };
 
-      // Create the restaurant
-      await initializeRestaurant(restaurantData);
+      console.log('Creating restaurant with data:', restaurantData);
+
+      // Create the restaurant and get its ID
+      const restaurantId = await initializeRestaurant(restaurantData);
+      console.log('Restaurant created with ID:', restaurantId);
+
+      // Create access record for the creator as owner
+      console.log('Creating access record for owner...');
+      await createInitialRestaurantAccess(user.uid, restaurantId);
+      console.log('Access record created successfully');
+
+      // Refresh the restaurants list
+      console.log('Refreshing restaurants list...');
+      await refreshRestaurants();
+      console.log('Restaurants list refreshed');
 
       // Migrate existing data if requested
       if (formData.migrateExistingData) {
         try {
-          await migrateExistingDataToRestaurant(DEFAULT_RESTAURANT_ID);
+          console.log('Starting data migration...');
+          await migrateExistingDataToRestaurant(restaurantId);
+          console.log('Data migration completed successfully');
+          
           Alert.alert(
             'Succès',
             'Restaurant créé avec succès ! Vos données existantes ont été migrées vers la nouvelle structure.',
             [
               {
                 text: 'OK',
-                onPress: () => router.replace('/restaurant')
+                onPress: () => router.replace('/restaurant/select')
               }
             ]
           );
@@ -146,7 +172,7 @@ export default function CreateRestaurant() {
             [
               {
                 text: 'OK',
-                onPress: () => router.replace('/restaurant')
+                onPress: () => router.replace('/restaurant/select')
               }
             ]
           );
@@ -158,14 +184,21 @@ export default function CreateRestaurant() {
           [
             {
               text: 'OK',
-              onPress: () => router.replace('/restaurant')
+              onPress: () => router.replace('/restaurant/select')
             }
           ]
         );
       }
     } catch (error) {
       console.error('Erreur lors de la création du restaurant:', error);
-      Alert.alert('Erreur', 'Une erreur s\'est produite lors de la création du restaurant');
+      
+      // More detailed error message
+      let errorMessage = 'Une erreur s\'est produite lors de la création du restaurant';
+      if (error instanceof Error) {
+        errorMessage += ': ' + error.message;
+      }
+      
+      Alert.alert('Erreur', errorMessage);
     } finally {
       setLoading(false);
     }

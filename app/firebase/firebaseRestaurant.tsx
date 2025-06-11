@@ -23,17 +23,6 @@ import type { Plat } from './firebaseMenu';
 
 // ====== RESTAURANT INTERFACES ======
 
-export interface RestaurantAnalytics {
-  daily_revenue: number;
-  monthly_revenue: number;
-  yearly_revenue: number;
-  total_orders: number;
-  popular_dishes: string[];
-  average_order_value: number;
-  peak_hours: { hour: number; order_count: number }[];
-  last_updated: Timestamp;
-}
-
 export interface RestaurantSettings {
   business_hours: {
     open_time: string;
@@ -58,7 +47,7 @@ export interface Restaurant {
   created_at: Timestamp;
   updated_at: Timestamp;
   settings: RestaurantSettings;
-  analytics: RestaurantAnalytics;
+
   
   // Sub-collections references (data will be stored in sub-collections)
   rooms: Room[];
@@ -103,16 +92,6 @@ const getDefaultRestaurantSettings = (): RestaurantSettings => ({
   default_room_name: "Salle principale"
 });
 
-const getDefaultRestaurantAnalytics = (): RestaurantAnalytics => ({
-  daily_revenue: 0,
-  monthly_revenue: 0,
-  yearly_revenue: 0,
-  total_orders: 0,
-  popular_dishes: [],
-  average_order_value: 0,
-  peak_hours: [],
-  last_updated: serverTimestamp() as Timestamp
-});
 
 // ====== MAIN RESTAURANT FUNCTIONS ======
 
@@ -123,15 +102,29 @@ export const initializeRestaurant = async (
   restaurantData: Partial<Restaurant> = {}
 ): Promise<string> => {
   try {
-    const restaurantId = DEFAULT_RESTAURANT_ID;
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
+    // Generate unique restaurant ID if not provided
+    let restaurantId: string;
+    let restaurantRef: any;
+    
+    if (restaurantData.id) {
+      // Use provided ID
+      restaurantId = restaurantData.id;
+      restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
+    } else {
+      // Generate new unique ID
+      const tempRef = doc(collection(db, RESTAURANTS_COLLECTION));
+      restaurantId = tempRef.id;
+      restaurantRef = tempRef;
+    }
     
     // Check if restaurant already exists
     const existingDoc = await getDoc(restaurantRef);
     if (existingDoc.exists()) {
-      console.log('✅ Restaurant déjà initialisé');
+      console.log(`✅ Restaurant déjà initialisé avec l'ID: ${restaurantId}`);
       return restaurantId;
     }
+
+    console.log(`🏗️ Création du restaurant avec l'ID: ${restaurantId}`);
 
     const defaultRestaurant: Omit<Restaurant, 'id'> = {
       name: restaurantData.name || "Mon Restaurant",
@@ -142,7 +135,6 @@ export const initializeRestaurant = async (
       created_at: serverTimestamp() as Timestamp,
       updated_at: serverTimestamp() as Timestamp,
       settings: { ...getDefaultRestaurantSettings(), ...restaurantData.settings },
-      analytics: getDefaultRestaurantAnalytics(),
       rooms: [],
       active_orders: [],
       completed_orders: [],
@@ -293,34 +285,6 @@ export const updateRestaurant = async (
     console.log('✅ Restaurant mis à jour');
   } catch (error) {
     console.error('❌ Erreur lors de la mise à jour du restaurant:', error);
-    throw error;
-  }
-};
-
-/**
- * 📊 UPDATE RESTAURANT ANALYTICS
- */
-export const updateRestaurantAnalytics = async (
-  restaurantId: string = DEFAULT_RESTAURANT_ID,
-  analyticsData: Partial<RestaurantAnalytics>
-): Promise<void> => {
-  try {
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
-    
-    const updatedAnalytics = {
-      analytics: {
-        ...analyticsData,
-        last_updated: serverTimestamp()
-      },
-      updated_at: serverTimestamp()
-    };
-    
-    await updateDoc(restaurantRef, updatedAnalytics);
-    
-    clearRestaurantCache();
-    console.log('✅ Analytics du restaurant mises à jour');
-  } catch (error) {
-    console.error('❌ Erreur lors de la mise à jour des analytics:', error);
     throw error;
   }
 };
@@ -557,7 +521,6 @@ export default {
   initializeRestaurant,
   getRestaurant,
   updateRestaurant,
-  updateRestaurantAnalytics,
   updateRestaurantSettings,
   
   // Sub-collections

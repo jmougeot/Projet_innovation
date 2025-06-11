@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import {CommandeData, PlatQuantite, getCommandeByTableId, terminerCommande, diagnosticCommandesByTable} from '@/app/firebase/firebaseCommandeOptimized';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
+import { useRestaurantSelection } from '@/app/firebase/RestaurantSelectionContext';
 import Head from '@/app/components/Head';
 import Reglage from '@/app/components/reglage';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
 
 function Encaissement() {
     const { tableId } = useLocalSearchParams();
+    const { selectedRestaurant } = useRestaurantSelection();
     const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
@@ -150,24 +152,29 @@ function Encaissement() {
             let missionMessage = '';
             if (commandesParTable && commandesParTable.plats.length > 0) {
                 try {
-                    console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId}`);
-                    console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, commandesParTable.plats.map(p => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
-                    
-                    const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats);
-                    
-                    console.log(`💰 [ENCAISSEMENT DEBUG] Résultat mise à jour missions:`, missionUpdateResult);
-                    
-                    // Préparer un message informatif si des missions ont été mises à jour
-                    if (missionUpdateResult.updatedMissions > 0) {
-                        missionMessage = `\n🎯 ${missionUpdateResult.updatedMissions} mission(s) mise(s) à jour !`;
-                        if (missionUpdateResult.completedMissions && missionUpdateResult.completedMissions > 0) {
-                            missionMessage += `\n🏆 ${missionUpdateResult.completedMissions} mission(s) complétée(s) !`;
+                    if (!selectedRestaurant) {
+                        console.warn('💰 [ENCAISSEMENT WARNING] Aucun restaurant sélectionné, mise à jour des missions ignorée');
+                        missionMessage = `\n⚠️ Aucun restaurant sélectionné, missions non mises à jour.`;
+                    } else {
+                        console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId} et restaurant: ${selectedRestaurant.id}`);
+                        console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, commandesParTable.plats.map(p => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
+                        
+                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats, selectedRestaurant.id);
+                        
+                        console.log(`💰 [ENCAISSEMENT DEBUG] Résultat mise à jour missions:`, missionUpdateResult);
+                        
+                        // Préparer un message informatif si des missions ont été mises à jour
+                        if (missionUpdateResult.updatedMissions > 0) {
+                            missionMessage = `\n🎯 ${missionUpdateResult.updatedMissions} mission(s) mise(s) à jour !`;
+                            if (missionUpdateResult.completedMissions && missionUpdateResult.completedMissions > 0) {
+                                missionMessage += `\n🏆 ${missionUpdateResult.completedMissions} mission(s) complétée(s) !`;
+                            }
+                            if (missionUpdateResult.totalPointsAwarded && missionUpdateResult.totalPointsAwarded > 0) {
+                                missionMessage += `\n⭐ ${missionUpdateResult.totalPointsAwarded} points gagnés !`;
+                            }
+                        } else if (missionUpdateResult.processedDishes > 0) {
+                            missionMessage = `\n📝 ${missionUpdateResult.processedDishes} plat(s) traité(s), aucune mission correspondante trouvée.`;
                         }
-                        if (missionUpdateResult.totalPointsAwarded && missionUpdateResult.totalPointsAwarded > 0) {
-                            missionMessage += `\n⭐ ${missionUpdateResult.totalPointsAwarded} points gagnés !`;
-                        }
-                    } else if (missionUpdateResult.processedDishes > 0) {
-                        missionMessage = `\n📝 ${missionUpdateResult.processedDishes} plat(s) traité(s), aucune mission correspondante trouvée.`;
                     }
                 } catch (missionError) {
                     console.error("💰 [ENCAISSEMENT ERROR] Erreur lors de la mise à jour des missions:", missionError);

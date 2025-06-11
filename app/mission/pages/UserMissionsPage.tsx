@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
-import { DEFAULT_RESTAURANT_ID } from '../../firebase/firebaseRestaurant';
 import { auth } from '../../firebase/firebaseConfig';
+import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,6 +37,7 @@ const UserMissionsPage = () => {
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const currentUser = auth.currentUser;
+  const { selectedRestaurant } = useRestaurantSelection();
 
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
@@ -50,15 +51,21 @@ const UserMissionsPage = () => {
       return;
     }
 
+    if (!selectedRestaurant) {
+      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+      setLoading(false);
+      return;
+    }
+
     try {
       // Récupérer les missions de l'utilisateur
-      const missions = await getUserMissions(currentUser.uid, DEFAULT_RESTAURANT_ID);
+      const missions = await getUserMissions(currentUser.uid, selectedRestaurant.id);
       
       // Pour chaque mission, récupérer les détails complets
       const missionsWithDetails = await Promise.all(
         missions.map(async (mission) => {
           try {
-            const missionDetails = mission.missionId ? await getMission(mission.missionId, DEFAULT_RESTAURANT_ID) : null;
+            const missionDetails = mission.missionId ? await getMission(mission.missionId, selectedRestaurant.id) : null;
             return { ...mission, missionDetails };
           } catch {
             return { ...mission, missionDetails: null };
@@ -76,7 +83,7 @@ const UserMissionsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser, selectedRestaurant]);
 
   useEffect(() => {
     loadUserMissions();

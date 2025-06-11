@@ -28,7 +28,7 @@ export default function RestaurantIndex() {
 
   useEffect(() => {
     if (selectedRestaurant) {
-      setRestaurant(selectedRestaurant as any);
+      setRestaurant(selectedRestaurant as unknown as Restaurant);
       setLoading(false);
     } else {
       checkRestaurantExists();
@@ -195,14 +195,6 @@ export default function RestaurantIndex() {
                   <MaterialIcons name="settings" size={24} color="#fff" />
                   <Text style={styles.primaryButtonText}>Gérer le restaurant</Text>
                 </Pressable>
-                
-                {/* Bouton Administration pour owners et admins */}
-                {(selectedRestaurantRole === 'owner' || selectedRestaurantRole === 'admin') && (
-                  <Pressable style={styles.adminButton} onPress={() => router.push('/restaurant/admin' as any)}>
-                    <MaterialIcons name="admin-panel-settings" size={24} color="#E53E3E" />
-                    <Text style={styles.adminButtonText}>Administration</Text>
-                  </Pressable>
-                )}
               </View>
             </View>
           ) : (
@@ -343,23 +335,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  adminButton: {
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#E53E3E',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    gap: 8,
-  },
-  adminButtonText: {
-    color: '#E53E3E',
     fontSize: 16,
     fontWeight: 'bold',
   },

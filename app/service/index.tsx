@@ -154,6 +154,17 @@ export default function ServiceHome() {
                 Ajouter une nouvelle mission
               </Text>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/restaurant/select' as any)}
+            >
+              <MaterialIcons name="restaurant" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Gestion Restaurant</Text>
+              <Text style={styles.cardDescription}>
+                Configurer et gérer votre restaurant
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </ScrollView>

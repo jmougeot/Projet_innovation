@@ -36,10 +36,9 @@ const LoginScreen: React.FC = () => {
       const userDoc = await getDoc(doc(db, "users", user.uid));
       const userData = userDoc.data() as UserData;
 
-      if (userData?.role === "manager") {
-        router.replace("/" as any);  // Use absolute path instead of relative;
-      } else if (userData?.role === "employee") {
-        router.replace("/" as any);  // Use absolute path instead of relative;
+      // Après une connexion réussie, rediriger vers la sélection de restaurant
+      if (userData?.role === "manager" || userData?.role === "employee") {
+        router.replace("/restaurant/select" as any);
       } else {
         setMessage("Rôle utilisateur non reconnu");
       }
