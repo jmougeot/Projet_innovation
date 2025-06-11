@@ -2,19 +2,15 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, Pressable, PanResponder, Alert, Dimensions, ActivityIndicator, TouchableOpacity } from "react-native";
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
-import { Table, getTables, updateTablePosition, saveTable, deleteTable, updateTables, clearTablesCache } from '../../firebase/firebaseTables';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Table, getTables, saveTable, deleteTable, updateTables, clearTablesCache } from '../../firebase/firebaseTables';
 import { getRealtimeTablesCache } from '../../firebase/firebaseRealtimeCache';
-import { 
-  TableViewWithShapeRenderer,
-  getStatusColor,
-  TableShapeRenderer
-} from '../components/Table';
+import { getStatusColor, TableShapeRenderer } from '../components/Table';
 import TableComponent from '../components/Table';
 import ConfirmModal from '../components/ConfirmModal';
 import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
-import Reglage from '@/app/components/reglage';
-import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
+import Header from '@/app/components/Header';
 import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
 
 // Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
@@ -227,33 +223,6 @@ export default function MapSettings() {
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
-
-  // Menu items pour le composant Reglage
-  const customMenuItems = [
-    {
-      label: 'Retour au plan',
-      onPress: () => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/service');
-        }
-      }
-    },
-    {
-      label: 'Profil',
-      onPress: () => {}
-    },
-    {
-      label: 'Paramètres',
-      onPress: () => {}
-    },
-    {
-      label: 'Déconnexion',
-      onPress: () => {},
-      isLogout: true
-    },
-  ];
 
   // Chargement des tables depuis Firebase
   const loadTables = useCallback(async () => {
@@ -468,16 +437,50 @@ export default function MapSettings() {
     console.log('🎛️ Controls state changed - hasUnsavedChanges:', hasUnsavedChanges, 'saving:', saving);
   }, [hasUnsavedChanges, saving]);
 
+  // Menu items pour le composant réglage
+  const reglageMenuItems = [
+    {
+      label: 'Retour au plan',
+      onPress: () => {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/service');
+        }
+      }
+    },
+    {
+      label: 'Profil',
+      onPress: () => router.push('/Profil/avatar' as any)
+    },
+    {
+      label: 'Paramètres',
+      onPress: () => {}
+    },
+    {
+      label: 'Déconnexion',
+      onPress: () => {},
+      isLogout: true
+    },
+  ];
+
   if (!fontsLoaded) {
     return (
-      <TableViewWithShapeRenderer
-        title="Modifier le Plan de Salle"
-        loading={true}
-        tables={tables}
-        customMenuItems={customMenuItems}
-        showLegend={false}>
-        <View />
-      </TableViewWithShapeRenderer>
+      <SafeAreaView style={styles.container}>
+        <Header 
+          title="Modifier le Plan de Salle" 
+          showBackButton={true}
+          backgroundColor="#194A8D"
+          textColor="#FFFFFF"
+          useHeadComponent={true}
+          customBackRoute="/service"
+          showReglage={true}
+          reglageMenuItems={reglageMenuItems}
+        />
+        <View style={styles.contentWrapper}>
+          <ActivityIndicator size="large" color="#194A8D" />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -529,64 +532,82 @@ export default function MapSettings() {
   );
 
   return (
-    <TableViewWithShapeRenderer
-      title="Modifier le Plan de Salle"
-      loading={loading}
-      tables={tables}
-      customMenuItems={customMenuItems}
-      showLegend={false}
-    >
-      <WorkspaceContainer
-        hasUnsavedChanges={hasUnsavedChanges}
-        coordinatesComponent={<WorkspaceCoordinates tables={tables.map(table => ({ ...table, id: table.id.toString() }))} />}
-        style={{ flex: 1 }}
-      >
-        {tables.map((table) => (
-          <DraggableTable
-            key={`${table.id}-${table.position.x}-${table.position.y}`}
-            table={table}
-            size={tableSize}
-            showText={true}
-            textColor="#194A8D"
-            onPositionChange={handlePositionChange}
-            onEditTable={handleEditTable}
-            onDeleteTable={handleDeleteTable}
-            workspaceWidth={workspaceWidth}
-            workspaceHeight={workspaceHeight}
-          />
-        ))}
-      </WorkspaceContainer>
+    <SafeAreaView style={styles.container}>
+      <Header 
+        title="Modifier le Plan de Salle" 
+        showBackButton={true}
+        backgroundColor="#194A8D"
+        textColor="#FFFFFF"
+        useHeadComponent={true}
+        customBackRoute="/service"
+        showReglage={true}
+        reglageMenuItems={reglageMenuItems}
+      />
+      
+      <View style={styles.contentWrapper}>
+        <WorkspaceContainer
+          hasUnsavedChanges={hasUnsavedChanges}
+          coordinatesComponent={<WorkspaceCoordinates tables={tables.map(table => ({ ...table, id: table.id.toString() }))} />}
+          style={{ flex: 1 }}
+        >
+          {tables.map((table) => (
+            <DraggableTable
+              key={`${table.id}-${table.position.x}-${table.position.y}`}
+              table={table}
+              size={tableSize}
+              showText={true}
+              textColor="#194A8D"
+              onPositionChange={handlePositionChange}
+              onEditTable={handleEditTable}
+              onDeleteTable={handleDeleteTable}
+              workspaceWidth={workspaceWidth}
+              workspaceHeight={workspaceHeight}
+            />
+          ))}
+        </WorkspaceContainer>
 
-      {renderControls()}
-      
-      {/* Modal de création/édition de table */}
-      <TableComponent
-        visible={showTableModal}
-        onClose={() => {
-          setShowTableModal(false);
-          setEditingTable(null);
-        }}
-        onSave={handleSaveTable}
-        initialTable={editingTable || undefined}
-        isEditing={!!editingTable}
-        tableStatus={editingTable?.status || 'libre'}
-      />
-      
-      {/* Modal de confirmation d'annulation */}
-      <ConfirmModal
-        visible={showDiscardModal}
-        title="Annuler les modifications"
-        message="Êtes-vous sûr de vouloir annuler toutes les modifications non sauvegardées ?"
-        cancelText="Non"
-        confirmText="Oui"
-        onCancel={() => setShowDiscardModal(false)}
-        onConfirm={confirmDiscardChanges}
-      />
-    </TableViewWithShapeRenderer>
+        {renderControls()}
+        
+        {/* Modal de création/édition de table */}
+        <TableComponent
+          visible={showTableModal}
+          onClose={() => {
+            setShowTableModal(false);
+            setEditingTable(null);
+          }}
+          onSave={handleSaveTable}
+          initialTable={editingTable || undefined}
+          isEditing={!!editingTable}
+          tableStatus={editingTable?.status || 'libre'}
+        />
+        
+        {/* Modal de confirmation d'annulation */}
+        <ConfirmModal
+          visible={showDiscardModal}
+          title="Annuler les modifications"
+          message="Êtes-vous sûr de vouloir annuler toutes les modifications non sauvegardées ?"
+          cancelText="Non"
+          confirmText="Oui"
+          onCancel={() => setShowDiscardModal(false)}
+          onConfirm={confirmDiscardChanges}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#194A8D',
+  },
+  contentWrapper: {
+    flex: 1,
+    backgroundColor: '#F3EFEF',
+    margin: 10,
+    borderRadius: 20,
+    padding: 15,
+  },
   workspaceContainer: {
     flex: 1,
   },

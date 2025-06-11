@@ -1,15 +1,5 @@
 import { db } from './firebaseConfig';
-import { 
-  collection, 
-  getDocs, 
-  doc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query,
-  orderBy,
-  getDoc,
-} from 'firebase/firestore';
+import { collection,  getDocs, doc, setDoc, updateDoc,  deleteDoc, query, orderBy, getDoc,} from 'firebase/firestore';
 import { getRealtimeTablesCache } from './firebaseRealtimeCache';
 
 export interface Table {
@@ -23,13 +13,54 @@ export interface Table {
     shape?: 'round' | 'square' | 'rectangle' | 'oval';
   };
 }
+export interface Room {
+  name : string
+  listTable : Table[]
+}
 
+
+const ROOM_COLLECTION = 'room'
 const TABLES_COLLECTION = 'tables';
 
 // Cache local pour optimiser les performances
 let tablesCache: Table[] | null = null;
+let roomCache: Room[] | null = null;
 let lastCacheUpdate = 0;
-const CACHE_DURATION = 300000; // 5 minutes (300 secondes) - Optimisé pour réduire les requêtes Firebase tout en gardant les données à jour
+const CACHE_DURATION = 300000;
+
+// Room management
+
+export const getRoom = async (useCache = true) : Promise<Room[]> => {
+  try {
+    const now = Date.now();
+    if (useCache && roomCache && (now - lastCacheUpdate)< CACHE_DURATION) {
+      console.log ('room cherged from the local cache')
+      return roomCache; 
+    }
+    console.log ('room charged from firebase')
+    const roomQuery = query(collection(db, ROOM_COLLECTION), orderBy('id'))
+    const snapshot = await getDocs(roomQuery);
+    const rooms = snapshot.docs.map(doc => doc.data() as Room);
+    roomCache = rooms;
+    lastCacheUpdate = now;
+        console.log(`✅ ${rooms.length} tables chargées et mises en cache`);
+    return rooms;
+  }
+  catch (error) {
+    console.error("❌ Erreur lors du chargement des tables:", error);
+    
+    // En cas d'erreur, retourner le cache si disponible
+    if (roomCache) {
+      console.log('🔄 Utilisation du cache de secours');
+      return roomCache;
+    }
+  throw error;
+  }
+};
+
+
+
+
 
 // Get all tables avec cache optimisé
 export const getTables = async (useCache = true): Promise<Table[]> => {

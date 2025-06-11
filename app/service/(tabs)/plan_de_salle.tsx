@@ -176,6 +176,27 @@ export default function PlanDeSalle() {
     </Pressable>
   );
 
+  // Menu items pour le composant réglage
+  const reglageMenuItems = [
+    {
+      label: 'Modifier le plan',
+      onPress: () => router.push('/service/commande/map_settings' as any)
+    },
+    {
+      label: 'Profil',
+      onPress: () => router.push('/Profil/avatar' as any)
+    },
+    {
+      label: 'Paramètres',
+      onPress: () => {}
+    },
+    {
+      label: 'Déconnexion',
+      onPress: () => {},
+      isLogout: true
+    },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <Header 
@@ -185,6 +206,8 @@ export default function PlanDeSalle() {
         textColor="#FFFFFF"
         useHeadComponent={true}
         customBackRoute="/service"
+        showReglage={true}
+        reglageMenuItems={reglageMenuItems}
       />
       
       <View style={styles.contentWrapper}>

@@ -4,6 +4,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import Head from './Head';
+import Reglage from './reglage';
+
+interface MenuItem {
+  label: string;
+  onPress: () => void;
+  isLogout?: boolean;
+}
 
 interface HeaderProps {
   title: string;
@@ -17,6 +24,8 @@ interface HeaderProps {
   textColor?: string;
   useHeadComponent?: boolean; // Nouvelle prop pour choisir d'utiliser Head ou non
   customBackRoute?: string; // Nouvelle prop pour spécifier une route de retour personnalisée
+  showReglage?: boolean; // Nouvelle prop pour afficher le composant réglage
+  reglageMenuItems?: MenuItem[]; // Menu items personnalisés pour réglage
 }
 
 const Header = ({ 
@@ -27,7 +36,9 @@ const Header = ({
   backgroundColor = 'transparent',
   textColor = '#FFFFFF',
   useHeadComponent = false,
-  customBackRoute
+  customBackRoute,
+  showReglage = false,
+  reglageMenuItems = []
 }: HeaderProps) => {
   const insets = useSafeAreaInsets();
 
@@ -73,15 +84,27 @@ const Header = ({
               </Pressable>
             )}
             
-            {rightAction && (
-              <Pressable 
-                style={styles.rightAction}
-                onPress={rightAction.onPress}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                {rightAction.icon}
-              </Pressable>
-            )}
+            <View style={styles.rightActions}>
+              {rightAction && (
+                <Pressable 
+                  style={[styles.rightAction, { marginRight: showReglage ? 8 : 0 }]}
+                  onPress={rightAction.onPress}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {rightAction.icon}
+                </Pressable>
+              )}
+              
+              {showReglage && (
+                <View style={styles.reglageContainer}>
+                  <Reglage
+                    menuItems={reglageMenuItems}
+                    iconSize={28}
+                    position={{ top: 0, right: 0 }}
+                  />
+                </View>
+              )}
+            </View>
           </View>
           
           <Head title={title} />
@@ -106,17 +129,31 @@ const Header = ({
             {title}
           </Text>
           
-          {rightAction ? (
-            <Pressable 
-              style={styles.rightAction}
-              onPress={rightAction.onPress}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              {rightAction.icon}
-            </Pressable>
-          ) : (
-            <View style={styles.rightActionPlaceholder} />
-          )}
+          <View style={styles.rightActions}>
+            {rightAction && (
+              <Pressable 
+                style={[styles.rightAction, { marginRight: showReglage ? 8 : 0 }]}
+                onPress={rightAction.onPress}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                {rightAction.icon}
+              </Pressable>
+            )}
+            
+            {showReglage && (
+              <View style={styles.reglageContainer}>
+                <Reglage
+                  menuItems={reglageMenuItems}
+                  iconSize={28}
+                  position={{ top: 0, right: 0 }}
+                />
+              </View>
+            )}
+            
+            {!rightAction && !showReglage && (
+              <View style={styles.rightActionPlaceholder} />
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -174,6 +211,17 @@ const styles = StyleSheet.create({
   rightActionPlaceholder: {
     width: 40,
     marginLeft: 8,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  reglageContainer: {
+    position: 'relative',
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });
 
