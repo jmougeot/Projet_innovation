@@ -124,6 +124,17 @@ export default function ServiceHome() {
           <View style={styles.menuGrid}>
             <TouchableOpacity 
               style={styles.card}
+              onPress={() => router.push('/restaurant' as any)}
+            >
+              <MaterialIcons name="business" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Mon Restaurant</Text>
+              <Text style={styles.cardDescription}>
+                Configuration et paramètres
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.card}
               onPress={() => router.push('/service/commande/map_settings' as any)}
             >
               <MaterialIcons name="edit-location" size={40} color="#194A8D" />

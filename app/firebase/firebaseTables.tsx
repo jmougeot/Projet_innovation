@@ -34,7 +34,7 @@ export const getRoom = async (useCache = true) : Promise<Room[]> => {
   try {
     const now = Date.now();
     if (useCache && roomCache && (now - lastCacheUpdate)< CACHE_DURATION) {
-      console.log ('room cherged from the local cache')
+      console.log ('room charged from the local cache')
       return roomCache; 
     }
     console.log ('room charged from firebase')
@@ -44,6 +44,18 @@ export const getRoom = async (useCache = true) : Promise<Room[]> => {
     roomCache = rooms;
     lastCacheUpdate = now;
         console.log(`✅ ${rooms.length} tables chargées et mises en cache`);
+      if (rooms.length == 0) {
+
+        const defaultRoom: Room = {
+          name: 'salle 1',
+          listTable: [
+            { id: 1, numero: "T1", places: 4, status: 'libre', position: { x: 10, y: 0, shape: 'round' } }
+          ]
+        };
+        const roomRef = doc(db, ROOM_COLLECTION, 'salle1');
+        await setDoc(roomRef, defaultRoom);
+        console.log('✅ Salle par défaut "salle 1" créée');
+      }
     return rooms;
   }
   catch (error) {

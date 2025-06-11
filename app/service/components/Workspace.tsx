@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, Dimensions } from 'react-native';
 
 // ===================== TYPES ET INTERFACES =====================
 

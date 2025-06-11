@@ -26,7 +26,7 @@ const TableComponent: React.FC<TableComponentProps> = ({
   isEditing = false,
   tableStatus = 'libre' // Valeur par défaut
 }) => {
-  const { width: workspaceWidth, screenWidth, screenHeight } = useWorkspaceDimensions();
+  const { screenWidth, screenHeight } = useWorkspaceDimensions();
   
   const [selectedShape, setSelectedShape] = useState<TableShape>(
     (initialTable?.position as any)?.shape || 'round'

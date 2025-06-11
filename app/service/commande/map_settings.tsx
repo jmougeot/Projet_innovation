@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, PanResponder, Alert, Dimensions, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicator } from "react-native";
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Table, getTables, saveTable, deleteTable, updateTables, clearTablesCache } from '../../firebase/firebaseTables';
 import { getRealtimeTablesCache } from '../../firebase/firebaseRealtimeCache';
-import { getStatusColor, TableShapeRenderer } from '../components/Table';
-import TableComponent from '../components/Table';
+import TableComponent, { getStatusColor, TableShapeRenderer } from '../components/Table';
 import ConfirmModal from '../components/ConfirmModal';
 import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -213,7 +212,7 @@ export default function MapSettings() {
   const [showDiscardModal, setShowDiscardModal] = useState(false);
 
   // Dimensions du workspace adaptives avec le hook personnalisé
-  const { size: workspaceSize, screenWidth, screenHeight } = useWorkspaceSize();
+  const { size: workspaceSize } = useWorkspaceSize();
   const workspaceWidth = workspaceSize;
   const workspaceHeight = workspaceSize;
 
@@ -398,7 +397,7 @@ export default function MapSettings() {
       console.error('Erreur lors de la sauvegarde:', error);
       Alert.alert('Erreur', 'Impossible de sauvegarder la table');
     }
-  }, [editingTable, tables, workspaceWidth, workspaceHeight, checkForUnsavedChanges]);
+  }, [editingTable, tables, checkForUnsavedChanges]);
 
   const handleEditTable = useCallback((table: Table) => {
     setEditingTable(table);
@@ -464,7 +463,7 @@ export default function MapSettings() {
     },
   ];
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || loading) {
     return (
       <SafeAreaView style={styles.container}>
         <Header 
@@ -479,6 +478,9 @@ export default function MapSettings() {
         />
         <View style={styles.contentWrapper}>
           <ActivityIndicator size="large" color="#194A8D" />
+          <Text style={{ textAlign: 'center', marginTop: 20, color: '#194A8D' }}>
+            {!fontsLoaded ? 'Chargement des polices...' : 'Chargement des tables...'}
+          </Text>
         </View>
       </SafeAreaView>
     );
