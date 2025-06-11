@@ -8,7 +8,6 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
-  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,7 +16,6 @@ import Header from '@/app/components/Header';
 import {
   getRestaurant,
   updateRestaurant,
-  updateRestaurantSettings,
   migrateExistingDataToRestaurant,
   syncRestaurantData,
   clearRestaurantCache,
@@ -39,7 +37,7 @@ interface SettingsFormData {
   defaultRoomName: string;
 }
 
-export default function RestaurantSettings() {
+export default function RestaurantSettingsPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -328,7 +326,7 @@ export default function RestaurantSettings() {
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Horaires d'ouverture</Text>
+          <Text style={styles.sectionTitle}>Horaires d&apos;ouverture</Text>
           
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
@@ -464,7 +462,7 @@ export default function RestaurantSettings() {
               <Text style={styles.actionTitle}>Synchronisation</Text>
             </View>
             <Text style={styles.actionDescription}>
-              Synchroniser les données entre l'ancienne et la nouvelle structure
+              Synchroniser les données entre l&apos;ancienne et la nouvelle structure
             </Text>
             <Pressable 
               style={[styles.actionButton, syncing && styles.actionButtonDisabled]} 

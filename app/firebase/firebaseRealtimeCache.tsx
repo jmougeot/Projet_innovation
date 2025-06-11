@@ -311,10 +311,14 @@ export const realtimeOrdersCache = getRealtimeOrdersCache();
 // Real-time Tables Cache
 interface Table {
   id: number;
-  numero: number;
-  status: 'libre' | 'occupée' | 'reservée' | 'sale';
+  numero: string;
+  status: 'libre' | 'occupee' | 'reservee';
   places: number;
-  position?: { x: number; y: number };
+  position: { 
+    x: number; 
+    y: number; 
+    shape?: 'round' | 'square' | 'rectangle' | 'oval';
+  };
 }
 
 export const getRealtimeTablesCache = (): RealtimeCache<Table> => {

@@ -7,29 +7,42 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { CommandeData } from "./firebaseCommandeOptimized";
+import { DEFAULT_RESTAURANT_ID } from "./firebaseRestaurant";
 
 // ---- CACHE CONFIGURATION ----
 const ANALYTICS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes en millisecondes
 
-// Variables de cache
-let revenueCache: { [key: string]: number } = {};
-let revenueAnalyticsCache: { [key: string]: RevenueData } = {};
-let dailyRevenueCache: { [key: string]: {date: string, revenue: number}[] } = {};
-let topMenuItemsCache: { [limitKey: string]: {platName: string, totalRevenue: number, quantity: number}[] } = {};
+// Variables de cache - now organized by restaurant
+let revenueCache: { [restaurantKey: string]: { [filterKey: string]: number } } = {};
+let revenueAnalyticsCache: { [restaurantKey: string]: { [filterKey: string]: RevenueData } } = {};
+let dailyRevenueCache: { [restaurantKey: string]: { [dateKey: string]: {date: string, revenue: number}[] } } = {};
+let topMenuItemsCache: { [restaurantKey: string]: { [limitKey: string]: {platName: string, totalRevenue: number, quantity: number}[] } } = {};
 let lastAnalyticsCacheUpdate = 0;
+
+// Collections - using restaurant-based structure
+const RESTAURANTS_COLLECTION = 'restaurants';
+
+// Helper functions to get collection references
+const getRestaurantRefForAnalytics = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return `${RESTAURANTS_COLLECTION}/${restaurantId}`;
+};
+
+const getCommandesCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID, collectionName: string) => {
+  return collection(db, `${getRestaurantRefForAnalytics(restaurantId)}/${collectionName}`);
+};
 
 // ---- HELPER FUNCTIONS ----
 /**
  * Helper function to fetch orders from both active and completed collections
  */
-async function fetchAllOrders(filter?: AnalyticsFilter) {
+async function fetchAllOrders(restaurantId: string = DEFAULT_RESTAURANT_ID, filter?: AnalyticsFilter) {
   const allOrders: CommandeData[] = [];
   
   // Fetch from both collections
   const collections = ['commandes_en_cours', 'commandes_terminees'];
   
   for (const collectionName of collections) {
-    let ordersQuery = collection(db, collectionName);
+    let ordersQuery = getCommandesCollectionRef(restaurantId, collectionName);
     
     // Apply filters if provided
     if (filter) {
@@ -54,7 +67,7 @@ async function fetchAllOrders(filter?: AnalyticsFilter) {
       }
       
       if (constraints.length > 0) {
-        ordersQuery = query(collection(db, collectionName), ...constraints) as any;
+        ordersQuery = query(getCommandesCollectionRef(restaurantId, collectionName), ...constraints) as any;
       }
     }
     
@@ -78,25 +91,34 @@ function timestampToDate(timestamp: Date | Timestamp): Date {
 }
 
 // ---- CACHE UTILITIES ----
-export const clearAnalyticsCache = () => {
-  revenueCache = {};
-  revenueAnalyticsCache = {};
-  dailyRevenueCache = {};
-  topMenuItemsCache = {};
+export const clearAnalyticsCache = (restaurantId?: string) => {
+  if (restaurantId) {
+    delete revenueCache[restaurantId];
+    delete revenueAnalyticsCache[restaurantId];
+    delete dailyRevenueCache[restaurantId];
+    delete topMenuItemsCache[restaurantId];
+    console.log(`🧹 Cache d'analytics nettoyé pour le restaurant ${restaurantId}`);
+  } else {
+    revenueCache = {};
+    revenueAnalyticsCache = {};
+    dailyRevenueCache = {};
+    topMenuItemsCache = {};
+    console.log('🧹 Cache d\'analytics nettoyé pour tous les restaurants');
+  }
   lastAnalyticsCacheUpdate = 0;
-  console.log('🧹 Cache d\'analytics nettoyé');
 };
 
-export const getAnalyticsCacheInfo = () => {
+export const getAnalyticsCacheInfo = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   const now = Date.now();
   const cacheAge = now - lastAnalyticsCacheUpdate;
   const isValid = cacheAge < ANALYTICS_CACHE_DURATION;
   
   return {
-    revenueCacheSize: Object.keys(revenueCache).length,
-    revenueAnalyticsCacheSize: Object.keys(revenueAnalyticsCache).length,
-    dailyRevenueCacheSize: Object.keys(dailyRevenueCache).length,
-    topMenuItemsCacheSize: Object.keys(topMenuItemsCache).length,
+    restaurantId,
+    revenueCacheSize: Object.keys(revenueCache[restaurantId] || {}).length,
+    revenueAnalyticsCacheSize: Object.keys(revenueAnalyticsCache[restaurantId] || {}).length,
+    dailyRevenueCacheSize: Object.keys(dailyRevenueCache[restaurantId] || {}).length,
+    topMenuItemsCacheSize: Object.keys(topMenuItemsCache[restaurantId] || {}).length,
     cacheAge: Math.round(cacheAge / 1000), // en secondes
     isValid,
     duration: ANALYTICS_CACHE_DURATION / 1000 // en secondes
@@ -134,22 +156,28 @@ export interface AnalyticsFilter {
 
 /**
  * Calculate total revenue from all orders
+ * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
  * @param filter - Optional filter for specific time period or status
  * @returns Promise<number>
  */
-export async function calculateRevenue(filter?: AnalyticsFilter): Promise<number> {
+export async function calculateRevenue(restaurantId: string = DEFAULT_RESTAURANT_ID, filter?: AnalyticsFilter): Promise<number> {
   try {
     const now = Date.now();
-    const cacheKey = createFilterKey(filter);
+    const filterKey = createFilterKey(filter);
+    
+    // Initialize restaurant cache if it doesn't exist
+    if (!revenueCache[restaurantId]) {
+      revenueCache[restaurantId] = {};
+    }
     
     // Vérifier le cache d'abord
-    if (revenueCache[cacheKey] !== undefined && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
-      console.log(`📦 Chiffre d'affaires récupéré depuis le cache (clé: ${cacheKey})`);
-      return revenueCache[cacheKey];
+    if (revenueCache[restaurantId][filterKey] !== undefined && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
+      console.log(`📦 Chiffre d'affaires récupéré depuis le cache (restaurant: ${restaurantId}, clé: ${filterKey})`);
+      return revenueCache[restaurantId][filterKey];
     }
     
     // Fetch orders from both collections
-    const allOrders = await fetchAllOrders(filter);
+    const allOrders = await fetchAllOrders(restaurantId, filter);
     let totalRevenue = 0;
 
     allOrders.forEach((orderData) => {
@@ -157,19 +185,19 @@ export async function calculateRevenue(filter?: AnalyticsFilter): Promise<number
     });
 
     // Mettre en cache
-    revenueCache[cacheKey] = totalRevenue;
+    revenueCache[restaurantId][filterKey] = totalRevenue;
     lastAnalyticsCacheUpdate = now;
-    console.log(`💾 Chiffre d'affaires mis en cache (${totalRevenue}€, clé: ${cacheKey})`);
+    console.log(`💾 Chiffre d'affaires mis en cache (${totalRevenue}€, restaurant: ${restaurantId}, clé: ${filterKey})`);
 
     return totalRevenue;
   } catch (error) {
     console.error("❌ Erreur lors du calcul du chiffre d'affaires:", error);
     
     // En cas d'erreur, retourner le cache si disponible
-    const cacheKey = createFilterKey(filter);
-    if (revenueCache[cacheKey] !== undefined) {
-      console.log(`🔄 Utilisation du cache de secours pour le chiffre d'affaires (clé: ${cacheKey})`);
-      return revenueCache[cacheKey];
+    const filterKey = createFilterKey(filter);
+    if (revenueCache[restaurantId] && revenueCache[restaurantId][filterKey] !== undefined) {
+      console.log(`🔄 Utilisation du cache de secours pour le chiffre d'affaires (restaurant: ${restaurantId}, clé: ${filterKey})`);
+      return revenueCache[restaurantId][filterKey];
     }
     
     throw error;
@@ -178,22 +206,28 @@ export async function calculateRevenue(filter?: AnalyticsFilter): Promise<number
 
 /**
  * Get comprehensive revenue analytics
+ * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
  * @param filter - Optional filter for specific time period or status
  * @returns Promise<RevenueData>
  */
-export async function getRevenueAnalytics(filter?: AnalyticsFilter): Promise<RevenueData> {
+export async function getRevenueAnalytics(restaurantId: string = DEFAULT_RESTAURANT_ID, filter?: AnalyticsFilter): Promise<RevenueData> {
   try {
     const now = Date.now();
-    const cacheKey = createFilterKey(filter);
+    const filterKey = createFilterKey(filter);
+    
+    // Initialize restaurant cache if it doesn't exist
+    if (!revenueAnalyticsCache[restaurantId]) {
+      revenueAnalyticsCache[restaurantId] = {};
+    }
     
     // Vérifier le cache d'abord
-    if (revenueAnalyticsCache[cacheKey] && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
-      console.log(`📦 Analytics de revenus récupérées depuis le cache (clé: ${cacheKey})`);
-      return revenueAnalyticsCache[cacheKey];
+    if (revenueAnalyticsCache[restaurantId][filterKey] && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
+      console.log(`📦 Analytics de revenus récupérées depuis le cache (restaurant: ${restaurantId}, clé: ${filterKey})`);
+      return revenueAnalyticsCache[restaurantId][filterKey];
     }
     
     // Fetch orders from both collections
-    const allOrders = await fetchAllOrders(filter);
+    const allOrders = await fetchAllOrders(restaurantId, filter);
     let totalRevenue = 0;
     let totalOrders = 0;
 
@@ -212,19 +246,19 @@ export async function getRevenueAnalytics(filter?: AnalyticsFilter): Promise<Rev
     };
     
     // Mettre en cache
-    revenueAnalyticsCache[cacheKey] = analytics;
+    revenueAnalyticsCache[restaurantId][filterKey] = analytics;
     lastAnalyticsCacheUpdate = now;
-    console.log(`💾 Analytics de revenus mises en cache (${totalOrders} commandes, ${totalRevenue}€, clé: ${cacheKey})`);
+    console.log(`💾 Analytics de revenus mises en cache (${totalOrders} commandes, ${totalRevenue}€, restaurant: ${restaurantId}, clé: ${filterKey})`);
 
     return analytics;
   } catch (error) {
     console.error("❌ Erreur lors de la récupération des analytics:", error);
     
     // En cas d'erreur, retourner le cache si disponible
-    const cacheKey = createFilterKey(filter);
-    if (revenueAnalyticsCache[cacheKey]) {
-      console.log(`🔄 Utilisation du cache de secours pour les analytics de revenus (clé: ${cacheKey})`);
-      return revenueAnalyticsCache[cacheKey];
+    const filterKey = createFilterKey(filter);
+    if (revenueAnalyticsCache[restaurantId] && revenueAnalyticsCache[restaurantId][filterKey]) {
+      console.log(`🔄 Utilisation du cache de secours pour les analytics de revenus (restaurant: ${restaurantId}, clé: ${filterKey})`);
+      return revenueAnalyticsCache[restaurantId][filterKey];
     }
     
     throw error;
@@ -235,17 +269,23 @@ export async function getRevenueAnalytics(filter?: AnalyticsFilter): Promise<Rev
  * Get daily revenue for a specific period
  * @param startDate - Start date for the period
  * @param endDate - End date for the period
+ * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
  * @returns Promise<Array<{date: string, revenue: number}>>
  */
-export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<{date: string, revenue: number}[]> {
+export async function getDailyRevenue(startDate: Date, endDate: Date, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<{date: string, revenue: number}[]> {
   try {
     const now = Date.now();
-    const cacheKey = `${startDate.toISOString()}_${endDate.toISOString()}`;
+    const dateKey = `${startDate.toISOString()}_${endDate.toISOString()}`;
+    
+    // Initialize restaurant cache if it doesn't exist
+    if (!dailyRevenueCache[restaurantId]) {
+      dailyRevenueCache[restaurantId] = {};
+    }
     
     // Vérifier le cache d'abord
-    if (dailyRevenueCache[cacheKey] && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
-      console.log(`📦 Revenus quotidiens récupérés depuis le cache (${dailyRevenueCache[cacheKey].length} jours)`);
-      return dailyRevenueCache[cacheKey];
+    if (dailyRevenueCache[restaurantId][dateKey] && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
+      console.log(`📦 Revenus quotidiens récupérés depuis le cache (${dailyRevenueCache[restaurantId][dateKey].length} jours, restaurant: ${restaurantId})`);
+      return dailyRevenueCache[restaurantId][dateKey];
     }
     
     // Create filter for date range and status
@@ -255,7 +295,7 @@ export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<{
       status: "encaissée"
     };
     
-    const allOrders = await fetchAllOrders(filter);
+    const allOrders = await fetchAllOrders(restaurantId, filter);
     const dailyRevenue: { [key: string]: number } = {};
 
     allOrders.forEach((orderData) => {
@@ -274,19 +314,19 @@ export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<{
     }));
     
     // Mettre en cache
-    dailyRevenueCache[cacheKey] = result;
+    dailyRevenueCache[restaurantId][dateKey] = result;
     lastAnalyticsCacheUpdate = now;
-    console.log(`💾 Revenus quotidiens mis en cache (${result.length} jours, clé: ${cacheKey})`);
+    console.log(`💾 Revenus quotidiens mis en cache (${result.length} jours, restaurant: ${restaurantId}, clé: ${dateKey})`);
 
     return result;
   } catch (error) {
     console.error("❌ Erreur lors de la récupération du chiffre d'affaires quotidien:", error);
     
     // En cas d'erreur, retourner le cache si disponible
-    const cacheKey = `${startDate.toISOString()}_${endDate.toISOString()}`;
-    if (dailyRevenueCache[cacheKey]) {
-      console.log(`🔄 Utilisation du cache de secours pour les revenus quotidiens (${dailyRevenueCache[cacheKey].length} jours)`);
-      return dailyRevenueCache[cacheKey];
+    const dateKey = `${startDate.toISOString()}_${endDate.toISOString()}`;
+    if (dailyRevenueCache[restaurantId] && dailyRevenueCache[restaurantId][dateKey]) {
+      console.log(`🔄 Utilisation du cache de secours pour les revenus quotidiens (${dailyRevenueCache[restaurantId][dateKey].length} jours, restaurant: ${restaurantId})`);
+      return dailyRevenueCache[restaurantId][dateKey];
     }
     
     throw error;
@@ -295,23 +335,29 @@ export async function getDailyRevenue(startDate: Date, endDate: Date): Promise<{
 
 /**
  * Get top performing menu items by revenue
- * @param limit - Number of top items to return (default: 10)
+ * @param limitCount - Number of top items to return (default: 10)
+ * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
  * @returns Promise<Array<{platName: string, totalRevenue: number, quantity: number}>>
  */
-export async function getTopMenuItems(limitCount: number = 10): Promise<{platName: string, totalRevenue: number, quantity: number}[]> {
+export async function getTopMenuItems(limitCount: number = 10, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<{platName: string, totalRevenue: number, quantity: number}[]> {
   try {
     const now = Date.now();
     const cacheKey = `limit_${limitCount}`;
     
+    // Initialize restaurant cache if it doesn't exist
+    if (!topMenuItemsCache[restaurantId]) {
+      topMenuItemsCache[restaurantId] = {};
+    }
+    
     // Vérifier le cache d'abord
-    if (topMenuItemsCache[cacheKey] && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
-      console.log(`📦 Top plats récupérés depuis le cache (${topMenuItemsCache[cacheKey].length} plats, limite: ${limitCount})`);
-      return topMenuItemsCache[cacheKey];
+    if (topMenuItemsCache[restaurantId][cacheKey] && (now - lastAnalyticsCacheUpdate) < ANALYTICS_CACHE_DURATION) {
+      console.log(`📦 Top plats récupérés depuis le cache (${topMenuItemsCache[restaurantId][cacheKey].length} plats, limite: ${limitCount}, restaurant: ${restaurantId})`);
+      return topMenuItemsCache[restaurantId][cacheKey];
     }
     
     // Fetch all encaissée orders from both collections
     const filter: AnalyticsFilter = { status: "encaissée" };
-    const allOrders = await fetchAllOrders(filter);
+    const allOrders = await fetchAllOrders(restaurantId, filter);
 
     const itemStats: { [key: string]: { revenue: number; quantity: number } } = {};
 
@@ -339,9 +385,9 @@ export async function getTopMenuItems(limitCount: number = 10): Promise<{platNam
       .slice(0, limitCount);
     
     // Mettre en cache
-    topMenuItemsCache[cacheKey] = result;
+    topMenuItemsCache[restaurantId][cacheKey] = result;
     lastAnalyticsCacheUpdate = now;
-    console.log(`💾 Top plats mis en cache (${result.length} plats, limite: ${limitCount})`);
+    console.log(`💾 Top plats mis en cache (${result.length} plats, limite: ${limitCount}, restaurant: ${restaurantId})`);
 
     return result;
   } catch (error) {
@@ -349,9 +395,9 @@ export async function getTopMenuItems(limitCount: number = 10): Promise<{platNam
     
     // En cas d'erreur, retourner le cache si disponible
     const cacheKey = `limit_${limitCount}`;
-    if (topMenuItemsCache[cacheKey]) {
-      console.log(`🔄 Utilisation du cache de secours pour les top plats (${topMenuItemsCache[cacheKey].length} plats, limite: ${limitCount})`);
-      return topMenuItemsCache[cacheKey];
+    if (topMenuItemsCache[restaurantId] && topMenuItemsCache[restaurantId][cacheKey]) {
+      console.log(`🔄 Utilisation du cache de secours pour les top plats (${topMenuItemsCache[restaurantId][cacheKey].length} plats, limite: ${limitCount}, restaurant: ${restaurantId})`);
+      return topMenuItemsCache[restaurantId][cacheKey];
     }
     
     throw error;

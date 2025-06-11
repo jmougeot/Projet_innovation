@@ -18,16 +18,29 @@ import {
 
 // Import function to update user points and level
 import { updatePointsAndLevel } from './firebaseUser';
+import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 // Types importés des interfaces
 import type { Mission } from '../mission/types';
 
 // ====== CACHE MANAGEMENT ======
-let missionsCache: Mission[] | null = null;
+let missionsCache: Map<string, Mission[]> = new Map(); // Cache par restaurantId
 let individualMissionCache: { [missionId: string]: Mission } = {};
 let userMissionsCache: { [userId: string]: UserMissionParticipant[] } = {};
 let lastMissionsCacheUpdate = 0;
 const MISSIONS_CACHE_DURATION = 60000; // 1 minute
+
+// Collections - using restaurant/missions sub-collections structure
+const RESTAURANTS_COLLECTION = 'restaurants';
+
+// Helper functions to get collection references
+const getRestaurantRefForMissions = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return doc(db, RESTAURANTS_COLLECTION, restaurantId);
+};
+
+const getMissionsCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return collection(getRestaurantRefForMissions(restaurantId), 'missions');
+};
 
 // ====== TYPES INTERFACES ======
 
@@ -58,20 +71,26 @@ interface CollectiveMissionData {
 
 // ====== CACHE UTILITIES ======
 
-export const clearMissionsCache = () => {
-  missionsCache = null;
+export const clearMissionsCache = (restaurantId?: string) => {
+  if (restaurantId) {
+    missionsCache.delete(restaurantId);
+    console.log(`🗑️ Cache des missions vidé pour le restaurant ${restaurantId}`);
+  } else {
+    missionsCache.clear();
+    console.log('🗑️ Cache des missions vidé pour tous les restaurants');
+  }
   individualMissionCache = {};
   userMissionsCache = {};
   lastMissionsCacheUpdate = 0;
-  console.log('🗑️ Cache des missions vidé');
 };
 
-export const getMissionsCacheInfo = () => {
+export const getMissionsCacheInfo = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   const now = Date.now();
-  const timeLeft = missionsCache ? Math.max(0, MISSIONS_CACHE_DURATION - (now - lastMissionsCacheUpdate)) : 0;
+  const cachedMissions = missionsCache.get(restaurantId);
+  const timeLeft = cachedMissions ? Math.max(0, MISSIONS_CACHE_DURATION - (now - lastMissionsCacheUpdate)) : 0;
   return {
-    isActive: missionsCache !== null,
-    allMissionsCount: missionsCache?.length || 0,
+    isActive: !!cachedMissions,
+    allMissionsCount: cachedMissions?.length || 0,
     individualMissionsCount: Object.keys(individualMissionCache).length,
     userMissionsCount: Object.keys(userMissionsCache).length,
     timeLeftMs: timeLeft,
@@ -83,9 +102,9 @@ export const getMissionsCacheInfo = () => {
 
 // ====== MISSIONS DE BASE ======
 
-export const createMission = async (mission: Omit<Mission, 'id'>) => {
+export const createMission = async (mission: Omit<Mission, 'id'>, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
-    const missionsRef = collection(db, 'missions');
+    const missionsRef = getMissionsCollectionRef(restaurantId);
     const docRef = await addDoc(missionsRef, {
       ...mission,
       createdAt: serverTimestamp(),
@@ -93,8 +112,8 @@ export const createMission = async (mission: Omit<Mission, 'id'>) => {
     });
     await updateDoc(docRef, { id: docRef.id });
 
-    missionsCache = null;
-    console.log('🔄 Cache des missions invalidé après création');
+    clearMissionsCache(restaurantId);
+    console.log(`🔄 Cache des missions invalidé après création dans le restaurant ${restaurantId}`);
 
     return { id: docRef.id };
   } catch (error) {
@@ -103,7 +122,7 @@ export const createMission = async (mission: Omit<Mission, 'id'>) => {
   }
 };
 
-export const getMission = async (id: string): Promise<Mission | null> => {
+export const getMission = async (id: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Mission | null> => {
   try {
     const now = Date.now();
     
@@ -113,7 +132,7 @@ export const getMission = async (id: string): Promise<Mission | null> => {
       return individualMissionCache[id];
     }
 
-    const missionRef = doc(db, 'missions', id);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), id);
     const missionDoc = await getDoc(missionRef);
     
     if (missionDoc.exists()) {
@@ -143,17 +162,18 @@ export const getMission = async (id: string): Promise<Mission | null> => {
   }
 };
 
-export const getAllMissions = async (): Promise<Mission[]> => {
+export const getAllMissions = async (restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Mission[]> => {
   try {
     const now = Date.now();
     
     // Vérifier le cache d'abord
-    if (missionsCache && (now - lastMissionsCacheUpdate) < MISSIONS_CACHE_DURATION) {
-      console.log(`📦 Liste des missions récupérée depuis le cache (${missionsCache.length} missions)`);
-      return missionsCache;
+    const cachedMissions = missionsCache.get(restaurantId);
+    if (cachedMissions && (now - lastMissionsCacheUpdate) < MISSIONS_CACHE_DURATION) {
+      console.log(`📦 Liste des missions récupérée depuis le cache (${cachedMissions.length} missions) pour le restaurant ${restaurantId}`);
+      return cachedMissions;
     }
 
-    const missionsRef = collection(db, 'missions');
+    const missionsRef = getMissionsCollectionRef(restaurantId);
     const querySnapshot = await getDocs(missionsRef);
     
     const missions = querySnapshot.docs.map(doc => ({ 
@@ -162,7 +182,7 @@ export const getAllMissions = async (): Promise<Mission[]> => {
     } as Mission));
 
     // Mettre en cache
-    missionsCache = missions;
+    missionsCache.set(restaurantId, missions);
     lastMissionsCacheUpdate = now;
     
     // Mettre à jour le cache individuel aussi
@@ -170,35 +190,36 @@ export const getAllMissions = async (): Promise<Mission[]> => {
       individualMissionCache[mission.id] = mission;
     });
     
-    console.log(`💾 Liste des missions mise en cache (${missions.length} missions)`);
+    console.log(`💾 Liste des missions mise en cache (${missions.length} missions) pour le restaurant ${restaurantId}`);
     return missions;
   } catch (error) {
     console.error("❌ Erreur lors de la récupération des missions:", error);
     
     // En cas d'erreur, retourner le cache si disponible
-    if (missionsCache) {
-      console.log(`🔄 Utilisation du cache de secours pour les missions (${missionsCache.length} missions)`);
-      return missionsCache;
+    const cachedMissions = missionsCache.get(restaurantId);
+    if (cachedMissions) {
+      console.log(`🔄 Utilisation du cache de secours pour les missions (${cachedMissions.length} missions) du restaurant ${restaurantId}`);
+      return cachedMissions;
     }
     
     throw error;
   }
 };
 
-export const updateMission = async (id: string, updates: Partial<Mission>) => {
+export const updateMission = async (id: string, updates: Partial<Mission>, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
-    const missionRef = doc(db, 'missions', id);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), id);
     await updateDoc(missionRef, {
       ...updates,
       updatedAt: serverTimestamp()
     });
 
     // Invalider le cache après mise à jour
-    missionsCache = null;
+    clearMissionsCache(restaurantId);
     if (individualMissionCache[id]) {
       delete individualMissionCache[id];
     }
-    console.log(`🔄 Cache des missions invalidé après mise à jour de ${id}`);
+    console.log(`🔄 Cache des missions invalidé après mise à jour de ${id} dans le restaurant ${restaurantId}`);
 
     return { success: true };
   } catch (error) {
@@ -207,14 +228,14 @@ export const updateMission = async (id: string, updates: Partial<Mission>) => {
   }
 };
 
-export const deleteMission = async (id: string) => {
+export const deleteMission = async (id: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
-    console.log(`[MISSIONS] Début suppression de la mission ${id}`);
+    console.log(`[MISSIONS] Début suppression de la mission ${id} du restaurant ${restaurantId}`);
     
     const batch = writeBatch(db);
     
     // 1. Supprimer la mission principale (les sous-collections seront supprimées manuellement)
-    const missionRef = doc(db, 'missions', id);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), id);
     
     // 2. Supprimer tous les participants dans la sous-collection
     const participantsRef = collection(missionRef, 'participants');
@@ -240,10 +261,10 @@ export const deleteMission = async (id: string) => {
     // 5. Exécuter toutes les suppressions en une seule transaction
     await batch.commit();
     
-    console.log(`[MISSIONS] ✅ Mission ${id} et toutes ses sous-collections supprimées avec succès`);
+    console.log(`[MISSIONS] ✅ Mission ${id} et toutes ses sous-collections supprimées avec succès du restaurant ${restaurantId}`);
     
     // Invalider le cache après suppression
-    missionsCache = null;
+    clearMissionsCache(restaurantId);
     if (individualMissionCache[id]) {
       delete individualMissionCache[id];
     }
@@ -263,10 +284,10 @@ export const deleteMission = async (id: string) => {
 
 // ====== ASSIGNATION DE MISSIONS (SOUS-COLLECTIONS) ======
 
-export const assignMissionToUser = async (missionId: string, userId: string) => {
+export const assignMissionToUser = async (missionId: string, userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
     // Vérifier que la mission existe
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const missionDoc = await getDoc(missionRef);
     
     if (!missionDoc.exists()) {
@@ -316,7 +337,7 @@ export const assignMissionToUser = async (missionId: string, userId: string) => 
   }
 };
 
-export const getUserMissions = async (userId: string): Promise<UserMissionParticipant[]> => {
+export const getUserMissions = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<UserMissionParticipant[]> => {
   try {
     const now = Date.now();
     
@@ -326,13 +347,13 @@ export const getUserMissions = async (userId: string): Promise<UserMissionPartic
       return userMissionsCache[userId];
     }
     
-    // Récupérer toutes les missions
-    const allMissions = await getAllMissions();
+    // Récupérer toutes les missions du restaurant
+    const allMissions = await getAllMissions(restaurantId);
     const userParticipations: UserMissionParticipant[] = [];
     
     // Parcourir chaque mission pour chercher les participations de l'utilisateur
     for (const mission of allMissions) {
-      const missionRef = doc(db, 'missions', mission.id);
+      const missionRef = doc(getMissionsCollectionRef(restaurantId), mission.id);
       const participantsRef = collection(missionRef, 'participants');
       const q = query(participantsRef, where("userId", "==", userId));
       const querySnapshot = await getDocs(q);
@@ -377,10 +398,11 @@ export const updateUserMissionStatus = async (
   participantId: string,
   status: "pending" | "completed" | "failed",
   progression: number,
-  currentValue?: number
+  currentValue?: number,
+  restaurantId: string = DEFAULT_RESTAURANT_ID
 ) => {
   try {
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const participantRef = doc(missionRef, 'participants', participantId);
     const participantDoc = await getDoc(participantRef);
     
@@ -406,7 +428,7 @@ export const updateUserMissionStatus = async (
     
     // Si cette mission fait partie d'une mission collective, mettre à jour la progression collective
     if (participant.isPartOfCollective && participant.collectiveMissionId) {
-      await updateCollectiveMissionProgress(missionId, participant.collectiveMissionId);
+      await updateCollectiveMissionProgress(missionId, participant.collectiveMissionId, restaurantId);
     }
     
     return { success: true };
@@ -419,12 +441,13 @@ export const updateUserMissionStatus = async (
 export const updateUserMissionProgress = async (
   missionId: string,
   participantId: string,
-  currentValue: number
+  currentValue: number,
+  restaurantId: string = DEFAULT_RESTAURANT_ID
 ) => {
   try {
     console.log(`📊 [DEBUG] updateUserMissionProgress appelée: mission=${missionId}, participant=${participantId}, currentValue=${currentValue}`);
     
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const participantRef = doc(missionRef, 'participants', participantId);
     const participantDoc = await getDoc(participantRef);
     
@@ -444,7 +467,7 @@ export const updateUserMissionProgress = async (
     const wasAlreadyCompleted = participant.status === "completed";
     
     // Récupérer les détails de la mission pour obtenir targetValue
-    const mission = await getMission(missionId);
+    const mission = await getMission(missionId, restaurantId);
     if (!mission) {
       throw new Error("Mission non trouvée");
     }
@@ -492,7 +515,7 @@ export const updateUserMissionProgress = async (
     
     // Si cette mission fait partie d'une mission collective, mettre à jour la progression collective
     if (participant.isPartOfCollective && participant.collectiveMissionId) {
-      await updateCollectiveMissionProgress(missionId, participant.collectiveMissionId);
+      await updateCollectiveMissionProgress(missionId, participant.collectiveMissionId, restaurantId);
     }
     
     return { 
@@ -513,11 +536,12 @@ export const updateUserMissionProgress = async (
 export const createCollectiveMission = async (
   missionId: string,
   userIds: string[],
-  targetValue: number
+  targetValue: number,
+  restaurantId: string = DEFAULT_RESTAURANT_ID
 ) => {
   try {
     // Vérifier que la mission existe
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const missionDoc = await getDoc(missionRef);
     
     if (!missionDoc.exists()) {
@@ -594,10 +618,10 @@ export const createCollectiveMission = async (
   }
 };
 
-export const updateCollectiveMissionProgress = async (missionId: string, collectiveId: string) => {
+export const updateCollectiveMissionProgress = async (missionId: string, collectiveId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
     // Récupérer la mission collective
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const collectiveRef = doc(missionRef, 'collectives', collectiveId);
     const collectiveDoc = await getDoc(collectiveRef);
     
@@ -637,9 +661,9 @@ export const updateCollectiveMissionProgress = async (missionId: string, collect
   }
 };
 
-export const getCollectiveMissions = async (missionId: string): Promise<CollectiveMissionData[]> => {
+export const getCollectiveMissions = async (missionId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<CollectiveMissionData[]> => {
   try {
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const collectivesRef = collection(missionRef, 'collectives');
     const querySnapshot = await getDocs(collectivesRef);
     
@@ -653,13 +677,13 @@ export const getCollectiveMissions = async (missionId: string): Promise<Collecti
   }
 };
 
-export const getUserCollectiveMissions = async (userId: string): Promise<CollectiveMissionData[]> => {
+export const getUserCollectiveMissions = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<CollectiveMissionData[]> => {
   try {
-    const allMissions = await getAllMissions();
+    const allMissions = await getAllMissions(restaurantId);
     const userCollectives: CollectiveMissionData[] = [];
     
     for (const mission of allMissions) {
-      const missionRef = doc(db, 'missions', mission.id);
+      const missionRef = doc(getMissionsCollectionRef(restaurantId), mission.id);
       const participantsRef = collection(missionRef, 'participants');
       const q = query(
         participantsRef, 
@@ -693,16 +717,16 @@ export const getUserCollectiveMissions = async (userId: string): Promise<Collect
 
 // ====== FONCTIONS UTILITAIRES ======
 
-export const getMissionPlatsForUser = async (userId: string): Promise<string[]> => {
+export const getMissionPlatsForUser = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<string[]> => {
   try {
     // Récupérer les missions de l'utilisateur via les sous-collections
-    const userMissions = await getUserMissions(userId);
+    const userMissions = await getUserMissions(userId, restaurantId);
     const platIds: string[] = [];
     
     // Pour chaque mission de l'utilisateur, récupérer le plat associé
     for (const userMission of userMissions) {
       try {
-        const mission = await getMission(userMission.missionId!);
+        const mission = await getMission(userMission.missionId!, restaurantId);
         if (mission?.plat?.id) {
           platIds.push(mission.plat.id);
         }
@@ -723,7 +747,8 @@ export const getMissionPlatsForUser = async (userId: string): Promise<string[]> 
 
 export const updateMissionsProgressFromDishes = async (
   userId: string,
-  validatedDishes: { plat: { id?: string; name: string; price: number }; quantite: number }[]
+  validatedDishes: { plat: { id?: string; name: string; price: number }; quantite: number }[],
+  restaurantId: string = DEFAULT_RESTAURANT_ID
 ) => {
   try {
     console.log(`🍽️ [DEBUG] updateMissionsProgressFromDishes appelée pour userId: ${userId}`);
@@ -744,7 +769,7 @@ export const updateMissionsProgressFromDishes = async (
     console.log(`🍽️ [DEBUG] ${dishesWithId.length} plats avec ID valide trouvés`);
 
     // Récupérer les participations de l'utilisateur une seule fois
-    const userMissions = await getUserMissions(userId);
+    const userMissions = await getUserMissions(userId, restaurantId);
     console.log(`🍽️ [DEBUG] ${userMissions.length} missions utilisateur trouvées`);
     
     let updatedMissionsCount = 0;
@@ -767,7 +792,7 @@ export const updateMissionsProgressFromDishes = async (
       }
 
       // Récupérer les détails de la mission
-      const mission = await getMission(userMission.missionId!);
+      const mission = await getMission(userMission.missionId!, restaurantId);
       if (!mission || !mission.plat?.id) {
         console.log(`🍽️ [DEBUG] Mission ${userMission.missionId} non trouvée ou sans plat ID`);
         continue;
@@ -794,7 +819,8 @@ export const updateMissionsProgressFromDishes = async (
         const result = await updateUserMissionProgress(
           userMission.missionId!,
           userMission.id,
-          currentValue
+          currentValue,
+          restaurantId
         );
         
         console.log(`🍽️ [DEBUG] Résultat mise à jour:`, result);
@@ -827,9 +853,9 @@ export const updateMissionsProgressFromDishes = async (
 
 // ====== ANALYTICS ET REPORTING ======
 
-export const getMissionProgressAnalytics = async (userId: string) => {
+export const getMissionProgressAnalytics = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
-    const userMissions = await getUserMissions(userId);
+    const userMissions = await getUserMissions(userId, restaurantId);
     
     // Statistiques générales
     const totalMissions = userMissions.length;
@@ -845,7 +871,7 @@ export const getMissionProgressAnalytics = async (userId: string) => {
     const missionsWithDetails = await Promise.all(
       userMissions.map(async (userMission) => {
         try {
-          const mission = await getMission(userMission.missionId!);
+          const mission = await getMission(userMission.missionId!, restaurantId);
           return { userMission, mission };
         } catch (error) {
           console.warn('Error fetching mission:', error);
@@ -879,9 +905,9 @@ export const getMissionProgressAnalytics = async (userId: string) => {
   }
 };
 
-export const getMissionProgressHistory = async (missionId: string, participantId: string) => {
+export const getMissionProgressHistory = async (missionId: string, participantId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
   try {
-    const missionRef = doc(db, 'missions', missionId);
+    const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const participantRef = doc(missionRef, 'participants', participantId);
     const participantDoc = await getDoc(participantRef);
     
@@ -890,7 +916,7 @@ export const getMissionProgressHistory = async (missionId: string, participantId
     }
     
     const participant = participantDoc.data() as UserMissionParticipant;
-    const mission = await getMission(missionId);
+    const mission = await getMission(missionId, restaurantId);
     
     return {
       participant,

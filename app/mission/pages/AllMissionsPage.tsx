@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getAllMissions, assignMissionToUser, deleteMission } from '../../firebase/firebaseMissionOptimized';
+import { DEFAULT_RESTAURANT_ID } from '../../firebase/firebaseRestaurant';
 import { auth } from '../../firebase/firebaseConfig';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
@@ -47,7 +48,7 @@ const AllMissionsPage = () => {
   // Charger toutes les missions
   const loadAllMissions = React.useCallback(async () => {
     try {
-      const allMissions = await getAllMissions();
+      const allMissions = await getAllMissions(DEFAULT_RESTAURANT_ID);
       setMissions(allMissions);
       applyFilters(allMissions);
     } catch (error) {
@@ -115,7 +116,7 @@ const AllMissionsPage = () => {
       console.log('[DEBUG] ✅ deletingMissionId réglé à:', confirmDeleteMission.id);
       
       console.log('[DEBUG] 📞 Appel de deleteMission avec ID:', confirmDeleteMission.id);
-      const result = await deleteMission(confirmDeleteMission.id);
+      const result = await deleteMission(confirmDeleteMission.id, DEFAULT_RESTAURANT_ID);
       console.log('[DEBUG] ✅ deleteMission terminé avec succès. Résultat:', result);
       
       console.log('[DEBUG] 📢 Mission supprimée avec succès !');
@@ -160,7 +161,7 @@ const AllMissionsPage = () => {
     }
     
     try {
-      await assignMissionToUser(missionId, currentUser.uid);
+      await assignMissionToUser(missionId, currentUser.uid, DEFAULT_RESTAURANT_ID);
       Alert.alert('Succès', 'Vous êtes maintenant inscrit à cette mission');
       
       // Rediriger vers la page des missions de l'utilisateur

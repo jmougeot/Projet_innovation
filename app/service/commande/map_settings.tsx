@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicat
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Table, getTables, saveTable, deleteTable, updateTables, clearTablesCache } from '../../firebase/firebaseTables';
+import { Table, getTables, addTable as saveTable, deleteTable, updateTables, clearTableCache as clearTablesCache, DEFAULT_ROOM_ID } from '../../firebase/firebaseTables';
 import { getRealtimeTablesCache } from '../../firebase/firebaseRealtimeCache';
-import TableComponent, { getStatusColor, TableShapeRenderer } from '../components/Table';
+import { TableComponent, getStatusColor, TableShapeRenderer } from '../components/Table';
 import ConfirmModal from '../components/ConfirmModal';
 import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -227,7 +227,7 @@ export default function MapSettings() {
   const loadTables = useCallback(async () => {
     try {
       setLoading(true);
-      const tablesData = await getTables();
+      const tablesData = await getTables(DEFAULT_ROOM_ID);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData))); // Deep copy pour comparaison
       setHasUnsavedChanges(false);
@@ -264,10 +264,10 @@ export default function MapSettings() {
   const saveAllChanges = useCallback(async () => {
     try {
       setSaving(true);
-      await updateTables(tables);
+      await updateTables(tables, DEFAULT_ROOM_ID);
       
       // Invalider les caches après sauvegarde
-      clearTablesCache();
+      clearTablesCache(DEFAULT_ROOM_ID);
       const realtimeCache = getRealtimeTablesCache();
       realtimeCache.forceReconnect(); // Force une reconnexion pour obtenir les dernières données
       
@@ -345,10 +345,10 @@ export default function MapSettings() {
           }
         };
         
-        await saveTable(updatedTable);
+        await saveTable(updatedTable, DEFAULT_ROOM_ID);
         
         // Invalider le cache après modification
-        clearTablesCache();
+        clearTablesCache(DEFAULT_ROOM_ID);
         const realtimeCache = getRealtimeTablesCache();
         realtimeCache.forceReconnect();
         
@@ -376,10 +376,10 @@ export default function MapSettings() {
           }
         };
 
-        await saveTable(newTable);
+        await saveTable(newTable, DEFAULT_ROOM_ID);
         
         // Invalider le cache après création
-        clearTablesCache();
+        clearTablesCache(DEFAULT_ROOM_ID);
         const realtimeCache = getRealtimeTablesCache();
         realtimeCache.forceReconnect();
         
@@ -406,10 +406,10 @@ export default function MapSettings() {
 
   const removeTable = useCallback(async (id: number) => {
     try {
-      await deleteTable(id);
+      await deleteTable(id, DEFAULT_ROOM_ID);
       
       // Invalider le cache après suppression
-      clearTablesCache();
+      clearTablesCache(DEFAULT_ROOM_ID);
       const realtimeCache = getRealtimeTablesCache();
       realtimeCache.forceReconnect();
       
@@ -552,9 +552,9 @@ export default function MapSettings() {
           coordinatesComponent={<WorkspaceCoordinates tables={tables.map(table => ({ ...table, id: table.id.toString() }))} />}
           style={{ flex: 1 }}
         >
-          {tables.map((table) => (
+          {tables.map((table, index) => (
             <DraggableTable
-              key={`${table.id}-${table.position.x}-${table.position.y}`}
+              key={`table-${table.id}-${index}`}
               table={table}
               size={tableSize}
               showText={true}

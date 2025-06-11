@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
+import { DEFAULT_RESTAURANT_ID } from '../../firebase/firebaseRestaurant';
 import { auth } from '../../firebase/firebaseConfig';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
@@ -51,13 +52,13 @@ const UserMissionsPage = () => {
 
     try {
       // Récupérer les missions de l'utilisateur
-      const missions = await getUserMissions(currentUser.uid);
+      const missions = await getUserMissions(currentUser.uid, DEFAULT_RESTAURANT_ID);
       
       // Pour chaque mission, récupérer les détails complets
       const missionsWithDetails = await Promise.all(
         missions.map(async (mission) => {
           try {
-            const missionDetails = mission.missionId ? await getMission(mission.missionId) : null;
+            const missionDetails = mission.missionId ? await getMission(mission.missionId, DEFAULT_RESTAURANT_ID) : null;
             return { ...mission, missionDetails };
           } catch {
             return { ...mission, missionDetails: null };

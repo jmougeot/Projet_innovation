@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { Plat } from "./firebaseMenu";
+import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 // ====== INTERFACES OPTIMISÉES ======
 
@@ -58,6 +59,22 @@ export interface CreateOrderData {
   tableId: number;
 }
 
+// Collections - using restaurant sub-collections
+const RESTAURANTS_COLLECTION = 'restaurants';
+
+// Helper functions to get collection references
+const getCommandeRestaurantRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return doc(db, RESTAURANTS_COLLECTION, restaurantId);
+};
+
+const getActiveOrdersCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return collection(getCommandeRestaurantRef(restaurantId), 'active_orders');
+};
+
+const getCompletedOrdersCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return collection(getCommandeRestaurantRef(restaurantId), 'completed_orders');
+};
+
 // Cache pour commandes EN COURS uniquement - Performance optimisée
 let commandesEnCoursCache: CommandeData[] | null = null;
 let lastCommandesEnCoursCacheUpdate = 0;
@@ -87,27 +104,30 @@ export const getCommandesCacheInfo = () => {
 // ====== FONCTIONS PRINCIPALES OPTIMISÉES ======
 
 /**
- * 🎯 CRÉATION DE COMMANDE - Va dans collection 'commandes_en_cours'
+ * 🎯 CRÉATION DE COMMANDE - Va dans collection restaurant/active_orders
  */
-export const createCommande = async (commandeData: Omit<CommandeData, 'id'>): Promise<string> => {
+export const createCommande = async (commandeData: Omit<CommandeData, 'id'>, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<string> => {
   try {
     if (!commandeData.plats || !commandeData.tableId) {
       throw new Error("Données de commande incomplètes");
     }
 
-    const commandeToAdd = {
-      ...commandeData,
-      status: 'en_attente' as const,
-      dateCreation: serverTimestamp(),
-      timestamp: serverTimestamp()
-    };
+    // Filter out undefined values
+    const filteredCommandeData = Object.fromEntries(
+      Object.entries({
+        ...commandeData,
+        status: 'en_attente' as const,
+        dateCreation: serverTimestamp(),
+        timestamp: serverTimestamp()
+      }).filter(([_, value]) => value !== undefined)
+    );
 
-    // ✅ CRÉER dans la collection EN COURS
-    const docRef = await addDoc(collection(db, 'commandes_en_cours'), commandeToAdd);
+    // ✅ CRÉER dans la collection restaurant/active_orders
+    const docRef = await addDoc(getActiveOrdersCollectionRef(restaurantId), filteredCommandeData);
     
     // Invalider le cache après ajout
     clearCommandesCache();
-    console.log("✅ Commande créée dans commandes_en_cours, ID:", docRef.id);
+    console.log("✅ Commande créée dans structure restaurant/active_orders, ID:", docRef.id);
     return docRef.id;
   } catch (error) {
     console.error("❌ Erreur lors de la création de la commande:", error);
@@ -116,27 +136,36 @@ export const createCommande = async (commandeData: Omit<CommandeData, 'id'>): Pr
 };
 
 /**
- * 🏁 TERMINER COMMANDE - Déplace vers collection 'commandes_terminees' (ATOMIQUE)
+ * 🏁 TERMINER COMMANDE - Déplace vers collection restaurant/completed_orders (ATOMIQUE)
  */
-export const terminerCommande = async (commandeId: string, satisfaction?: number, notes?: string): Promise<void> => {
+export const terminerCommande = async (commandeId: string, satisfaction?: number, notes?: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
   try {
     console.log(`🏁 [TERMINER] Finalisation commande: ${commandeId}`);
     
     await runTransaction(db, async (transaction) => {
-      // Chercher d'abord dans la nouvelle collection
-      const commandeEnCoursRef = doc(db, 'commandes_en_cours', commandeId);
-      let commandeDoc = await transaction.get(commandeEnCoursRef);
+      // Chercher d'abord dans la nouvelle collection restaurant/active_orders
+      const activeOrderRef = doc(getActiveOrdersCollectionRef(restaurantId), commandeId);
+      let commandeDoc = await transaction.get(activeOrderRef);
       let isOldCollection = false;
+      let isLegacyCollection = false;
       
-      // Si pas trouvée, chercher dans l'ancienne collection
+      // Si pas trouvée, chercher dans l'ancienne collection commandes_en_cours
       if (!commandeDoc.exists()) {
-        console.log(`🔄 [TERMINER] Commande non trouvée dans commandes_en_cours, recherche dans commandes`);
-        const commandeAncienneRef = doc(db, 'commandes', commandeId);
-        commandeDoc = await transaction.get(commandeAncienneRef);
+        console.log(`🔄 [TERMINER] Commande non trouvée dans restaurant/active_orders, recherche dans commandes_en_cours`);
+        const commandeEnCoursRef = doc(db, 'commandes_en_cours', commandeId);
+        commandeDoc = await transaction.get(commandeEnCoursRef);
         isOldCollection = true;
         
+        // Si toujours pas trouvée, chercher dans l'ancienne collection commandes
         if (!commandeDoc.exists()) {
-          throw new Error('Commande introuvable dans les collections commandes_en_cours et commandes');
+          console.log(`🔄 [TERMINER] Commande non trouvée dans commandes_en_cours, recherche dans commandes`);
+          const commandeAncienneRef = doc(db, 'commandes', commandeId);
+          commandeDoc = await transaction.get(commandeAncienneRef);
+          isLegacyCollection = true;
+          
+          if (!commandeDoc.exists()) {
+            throw new Error('Commande introuvable dans toutes les collections');
+          }
         }
       }
       
@@ -146,8 +175,8 @@ export const terminerCommande = async (commandeId: string, satisfaction?: number
         : commandeData.dateCreation?.toMillis ? commandeData.dateCreation.toMillis() 
         : Date.now();
       
-      // Créer dans les archives avec timestamp de fin
-      const commandeTermineeRef = doc(db, 'commandes_terminees', commandeId);
+      // Créer dans les archives restaurant/completed_orders avec timestamp de fin
+      const commandeTermineeRef = doc(getCompletedOrdersCollectionRef(restaurantId), commandeId);
       // Build archive data, only include defined optional fields
       const commandeTerminee: Partial<CommandeTerminee> = {
         ...commandeData,
@@ -162,19 +191,23 @@ export const terminerCommande = async (commandeId: string, satisfaction?: number
       transaction.set(commandeTermineeRef, commandeTerminee);
       
       // Supprimer de la collection source
-      if (isOldCollection) {
+      if (isLegacyCollection) {
         const commandeAncienneRef = doc(db, 'commandes', commandeId);
         transaction.delete(commandeAncienneRef);
         console.log(`🗑️ [TERMINER] Suppression de l'ancienne collection 'commandes'`);
-      } else {
+      } else if (isOldCollection) {
+        const commandeEnCoursRef = doc(db, 'commandes_en_cours', commandeId);
         transaction.delete(commandeEnCoursRef);
         console.log(`🗑️ [TERMINER] Suppression de 'commandes_en_cours'`);
+      } else {
+        transaction.delete(activeOrderRef);
+        console.log(`🗑️ [TERMINER] Suppression de 'restaurant/active_orders'`);
       }
     });
     
     // Invalider le cache après archivage
     clearCommandesCache();
-    console.log('✅ Commande terminée et archivée:', commandeId);
+    console.log('✅ Commande terminée et archivée dans structure restaurant:', commandeId);
   } catch (error) {
     console.error('❌ Erreur lors de la finalisation:', error);
     throw error;
@@ -628,5 +661,22 @@ export default {
   
   // Diagnostics
   diagnosticCommandes,
-  diagnosticCommandesByTable
+  diagnosticCommandesByTable,
+
+  // ====== FONCTIONS DE RÉTROCOMPATIBILITÉ ======
+
+  /**
+   * Wrapper functions to maintain backward compatibility with existing code
+   * These functions use the default restaurant ID if none is provided
+   */
+
+  // Legacy wrapper for createCommande
+  createCommandeLegacy: (commandeData: Omit<CommandeData, 'id'>) => {
+    return createCommande(commandeData, DEFAULT_RESTAURANT_ID);
+  },
+
+  // Legacy wrapper for terminerCommande  
+  terminerCommandeLegacy: (commandeId: string, satisfaction?: number, notes?: string) => {
+    return terminerCommande(commandeId, satisfaction, notes, DEFAULT_RESTAURANT_ID);
+  }
 };

@@ -86,8 +86,8 @@ export const WorkspaceCoordinates: React.FC<WorkspaceCoordinatesProps> = ({ tabl
 
   return (
     <View style={workspaceStyles.coordinates}>
-      {tables.map((table) => (
-        <Text key={`coord-${table.id}`} style={workspaceStyles.coordText}>
+      {tables.map((table, index) => (
+        <Text key={`coord-${table.id}-${index}`} style={workspaceStyles.coordText}>
           {table.numero}: X: {Math.round(table.position.x)}, Y: {Math.round(table.position.y)}
         </Text>
       ))}

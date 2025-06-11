@@ -1,5 +1,6 @@
-import { collection, addDoc, getDocs } from "firebase/firestore";
+import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
+import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 export interface Plat {
     id?: string;
@@ -7,8 +8,20 @@ export interface Plat {
     category: string;
     price: number;
     description?: string;
-    mission?:boolean;
+    mission?: boolean;
 }
+
+// Collections - using restaurant sub-collections
+const RESTAURANTS_COLLECTION = 'restaurants';
+
+// Helper functions to get collection references
+const getMenuRestaurantRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return doc(db, RESTAURANTS_COLLECTION, restaurantId);
+};
+
+const getMenuCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+  return collection(getMenuRestaurantRef(restaurantId), 'menu');
+};
 
 // Cache local pour le menu - Durée longue car le menu change peu
 let menuCache: Plat[] | null = null;
@@ -34,23 +47,32 @@ export const getMenuCacheInfo = () => {
     durationFormatted: `${MENU_CACHE_DURATION / 60000}min`
   };
 };
-export async function ajout_plat(plat: Plat) {
+export async function ajout_plat(plat: Plat, restaurantId: string = DEFAULT_RESTAURANT_ID) {
   try {
-    const docRef = await addDoc(collection(db, "menu"), {
-      name: plat.name,
-      category: plat.category,
-      price: plat.price
-    });
+    // Filter out undefined values
+    const filteredPlat = Object.fromEntries(
+      Object.entries({
+        name: plat.name,
+        category: plat.category,
+        price: plat.price,
+        description: plat.description,
+        mission: plat.mission
+      }).filter(([_, value]) => value !== undefined)
+    );
+
+    const docRef = await addDoc(getMenuCollectionRef(restaurantId), filteredPlat);
     
     // Invalider le cache après ajout
     clearMenuCache();
-    console.log("✅ Plat ajouté avec succès :", docRef.id);
+    console.log("✅ Plat ajouté avec succès dans la structure restaurant :", docRef.id);
+    return docRef.id;
   } catch (error) {
     console.error("❌ Erreur lors de l'ajout du plat :", error);
+    throw error;
   }
 }
 
-export async function get_plats(useCache = true) {
+export async function get_plats(useCache = true, restaurantId: string = DEFAULT_RESTAURANT_ID) {
   try {
     const now = Date.now();
     
@@ -60,8 +82,8 @@ export async function get_plats(useCache = true) {
       return menuCache;
     }
 
-    console.log('🔄 Chargement du menu depuis Firebase...');
-    const menuSnapshot = await getDocs(collection(db, "menu"));
+    console.log('🔄 Chargement du menu depuis Firebase - structure restaurant...');
+    const menuSnapshot = await getDocs(getMenuCollectionRef(restaurantId));
     const menuItems: Plat[] = [];
     menuSnapshot.forEach((doc) => {
       menuItems.push({ id: doc.id, ...(doc.data() as Omit<Plat, 'id'>) });
@@ -90,7 +112,65 @@ export async function get_plats(useCache = true) {
   }
 }
 
+export async function updatePlat(platId: string, updates: Partial<Plat>, restaurantId: string = DEFAULT_RESTAURANT_ID) {
+  try {
+    const platRef = doc(getMenuCollectionRef(restaurantId), platId);
+    
+    // Filter out undefined values
+    const filteredUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, value]) => value !== undefined)
+    );
+    
+    await updateDoc(platRef, filteredUpdates);
+    
+    // Invalider le cache après mise à jour
+    clearMenuCache();
+    console.log(`✅ Plat ${platId} mis à jour avec succès`);
+  } catch (error) {
+    console.error("❌ Erreur lors de la mise à jour du plat :", error);
+    throw error;
+  }
+}
+
+export async function deletePlat(platId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) {
+  try {
+    const platRef = doc(getMenuCollectionRef(restaurantId), platId);
+    await deleteDoc(platRef);
+    
+    // Invalider le cache après suppression
+    clearMenuCache();
+    console.log(`✅ Plat ${platId} supprimé avec succès`);
+  } catch (error) {
+    console.error("❌ Erreur lors de la suppression du plat :", error);
+    throw error;
+  }
+}
+
+export async function getPlatById(platId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Plat | null> {
+  try {
+    const platRef = doc(getMenuCollectionRef(restaurantId), platId);
+    const snapshot = await getDoc(platRef);
+    
+    if (snapshot.exists()) {
+      return {
+        id: snapshot.id,
+        ...snapshot.data()
+      } as Plat;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération du plat :", error);
+    throw error;
+  }
+}
+
 export default {
   ajout_plat,
-  get_plats
+  get_plats,
+  updatePlat,
+  deletePlat,
+  getPlatById,
+  clearMenuCache,
+  getMenuCacheInfo
 };

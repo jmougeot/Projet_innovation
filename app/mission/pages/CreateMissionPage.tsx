@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Picker from '../../components/Picker';
 import { createMission, assignMissionToUser, createCollectiveMission } from '../../firebase/firebaseMissionOptimized';
+import { DEFAULT_RESTAURANT_ID } from '../../firebase/firebaseRestaurant';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { get_plats, Plat } from '../../firebase/firebaseMenu';
@@ -145,13 +146,13 @@ const CreateMissionPage = () => {
       console.log("Création de mission avec données:", JSON.stringify(missionData));
       
       // Créer la mission
-      const missionResult = await createMission(missionData);
+      const missionResult = await createMission(missionData, DEFAULT_RESTAURANT_ID);
       const missionId = missionResult.id;
       console.log(`Mission principale créée avec l'ID: ${missionId}`);
       
       // Si c'est une mission collective
       if (formData.isCollective) {
-        const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue);
+        const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue, DEFAULT_RESTAURANT_ID);
         console.log('Collective mission created:', collectiveResult);
       } else {
         console.log(`Création de ${formData.selectedUsers.length} missions individuelles`);
@@ -160,7 +161,7 @@ const CreateMissionPage = () => {
         for (const userId of formData.selectedUsers) {
           try {
             console.log(`Assignation de la mission ${missionId} à l'utilisateur ${userId}`);
-            const assignResult = await assignMissionToUser(missionId, userId);
+            const assignResult = await assignMissionToUser(missionId, userId, DEFAULT_RESTAURANT_ID);
             console.log("Résultat de l'assignation:", JSON.stringify(assignResult));
             
             if (assignResult && assignResult.id) {

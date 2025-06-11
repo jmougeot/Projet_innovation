@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
+import { Table, getTables, updateTableStatus, initializeDefaultTables, DEFAULT_ROOM_ID } from '@/app/firebase/firebaseTables';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
 import { 
@@ -44,8 +44,8 @@ export default function PlanDeSalle() {
     const loadTables = async () => {
       try {
         setLoading(true);
-        await initializeDefaultTables();
-        const tablesData = await getTables();
+        await initializeDefaultTables(DEFAULT_ROOM_ID);
+        const tablesData = await getTables(DEFAULT_ROOM_ID);
         setTables(tablesData);
       } catch (error) {
         console.error("Erreur lors du chargement des tables:", error);
@@ -69,7 +69,7 @@ export default function PlanDeSalle() {
   const handleTableLongPress = async (tableId: number, currentStatus: Table['status']) => {
     try {
       const nextStatus = getNextStatus(currentStatus);
-      await updateTableStatus(tableId, nextStatus);
+      await updateTableStatus(tableId, nextStatus, DEFAULT_ROOM_ID);
       
       setTables(prevTables => 
         prevTables.map(table => 

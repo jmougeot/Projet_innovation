@@ -258,7 +258,7 @@ export default function CreateRestaurant() {
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Horaires d'ouverture</Text>
+          <Text style={styles.sectionTitle}>Horaires d&apos;ouverture</Text>
           
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
