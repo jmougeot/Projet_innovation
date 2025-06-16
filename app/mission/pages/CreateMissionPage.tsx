@@ -16,7 +16,7 @@ import { createMission, assignMissionToUser, createCollectiveMission } from '../
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { get_plats, Plat } from '../../firebase/firebaseMenu';
-import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
 
 // Types
 import type { Mission } from '../types';
@@ -81,7 +81,11 @@ const CreateMissionPage = () => {
   useEffect(() => {
     const fetchPlats = async () => {
       try {
-        const platsList = await get_plats();
+        if (!selectedRestaurant) {
+          console.warn('Aucun restaurant sélectionné pour récupérer les plats');
+          return;
+        }
+        const platsList = await get_plats(true, selectedRestaurant.id);
         setPlats(platsList);
       } catch (error) {
         console.error('Erreur lors de la récupération des plats:', error);
@@ -90,7 +94,7 @@ const CreateMissionPage = () => {
     };
     
     fetchPlats();
-  }, []);
+  }, [selectedRestaurant]);
   
   // Gestion de la date
   const handleDateChange = (event: any, selectedDate?: Date) => {

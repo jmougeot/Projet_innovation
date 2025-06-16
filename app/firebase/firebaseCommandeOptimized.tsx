@@ -18,7 +18,6 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { Plat } from "./firebaseMenu";
-import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 // ====== INTERFACES OPTIMISÉES ======
 
@@ -63,15 +62,15 @@ export interface CreateOrderData {
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
-const getCommandeRestaurantRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getCommandeRestaurantRef = (restaurantId: string) => {
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
-const getActiveOrdersCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getActiveOrdersCollectionRef = (restaurantId: string) => {
   return collection(getCommandeRestaurantRef(restaurantId), 'active_orders');
 };
 
-const getCompletedOrdersCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getCompletedOrdersCollectionRef = (restaurantId: string) => {
   return collection(getCommandeRestaurantRef(restaurantId), 'completed_orders');
 };
 
@@ -106,7 +105,7 @@ export const getCommandesCacheInfo = () => {
 /**
  * 🎯 CRÉATION DE COMMANDE - Va dans collection restaurant/active_orders
  */
-export const createCommande = async (commandeData: Omit<CommandeData, 'id'>, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<string> => {
+export const createCommande = async (commandeData: Omit<CommandeData, 'id'>, restaurantId: string): Promise<string> => {
   try {
     if (!commandeData.plats || !commandeData.tableId) {
       throw new Error("Données de commande incomplètes");
@@ -138,7 +137,7 @@ export const createCommande = async (commandeData: Omit<CommandeData, 'id'>, res
 /**
  * 🏁 TERMINER COMMANDE - Déplace vers collection restaurant/completed_orders (ATOMIQUE)
  */
-export const terminerCommande = async (commandeId: string, satisfaction?: number, notes?: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const terminerCommande = async (commandeId: string, restaurantId: string, satisfaction?: number, notes?: string): Promise<void> => {
   try {
     console.log(`🏁 [TERMINER] Finalisation commande: ${commandeId}`);
     
@@ -367,7 +366,7 @@ export const getCommandeByTableId = async (tableId: number): Promise<CommandeDat
 /**
  * 💰 ENCAISSER UNE COMMANDE - Déplace vers archives
  */
-export const CommandeEncaisse = async (tableId: number): Promise<void> => {
+export const CommandeEncaisse = async (tableId: number, restaurantId: string): Promise<void> => {
   try {
     const commande = await getCommandeByTableId(tableId);
     if (!commande) {
@@ -375,7 +374,7 @@ export const CommandeEncaisse = async (tableId: number): Promise<void> => {
     }
     
     // Terminer la commande (la déplace automatiquement vers les archives)
-    await terminerCommande(commande.id);
+    await terminerCommande(commande.id, restaurantId);
     console.log(`✅ Commande table ${tableId} encaissée et archivée`);
   } catch (error) {
     console.error("❌ Erreur lors de l'encaissement:", error);
@@ -661,22 +660,5 @@ export default {
   
   // Diagnostics
   diagnosticCommandes,
-  diagnosticCommandesByTable,
-
-  // ====== FONCTIONS DE RÉTROCOMPATIBILITÉ ======
-
-  /**
-   * Wrapper functions to maintain backward compatibility with existing code
-   * These functions use the default restaurant ID if none is provided
-   */
-
-  // Legacy wrapper for createCommande
-  createCommandeLegacy: (commandeData: Omit<CommandeData, 'id'>) => {
-    return createCommande(commandeData, DEFAULT_RESTAURANT_ID);
-  },
-
-  // Legacy wrapper for terminerCommande  
-  terminerCommandeLegacy: (commandeId: string, satisfaction?: number, notes?: string) => {
-    return terminerCommande(commandeId, satisfaction, notes, DEFAULT_RESTAURANT_ID);
-  }
+  diagnosticCommandesByTable
 };

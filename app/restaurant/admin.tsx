@@ -14,16 +14,15 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
-import RestaurantProtectedRoute from '@/app/components/RestaurantProtectedRoute';
-import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
+import RestaurantProtectedRoute from './components/RestaurantProtectedRoute';
+import { useRestaurantSelection } from './RestaurantSelectionContext';
 import {
   getRestaurantUsers,
   grantRestaurantAccess,
   revokeRestaurantAccess,
   ROLE_PERMISSIONS,
   type RestaurantAccess
-} from '../firebase/restaurantAccess';
-import { runAuthenticationTestScenario } from '../firebase/testData';
+} from '../restaurant/restaurantAccess';
 
 export default function RestaurantAdminPage() {
   const router = useRouter();
@@ -111,18 +110,6 @@ export default function RestaurantAdminPage() {
     );
   };
 
-  const handleRunTestScenario = async () => {
-    try {
-      await runAuthenticationTestScenario();
-      Alert.alert(
-        'Test terminé',
-        'Le scénario de test a été exécuté. Consultez la console pour les détails.'
-      );
-    } catch (error) {
-      Alert.alert('Erreur', 'Erreur lors de l\'exécution du test');
-    }
-  };
-
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'owner': return '#D4AF37';
@@ -178,15 +165,6 @@ export default function RestaurantAdminPage() {
               <Text style={styles.restaurantName}>{selectedRestaurant?.name}</Text>
               <Text style={styles.restaurantRole}>Votre rôle: {selectedRestaurantRole}</Text>
             </View>
-          </View>
-
-          {/* Test Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🧪 Tests & Développement</Text>
-            <Pressable style={styles.testButton} onPress={handleRunTestScenario}>
-              <MaterialIcons name="science" size={24} color="white" />
-              <Text style={styles.testButtonText}>Exécuter scénario de test</Text>
-            </Pressable>
           </View>
 
           {/* Add User Section */}

@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
 
 import { 
   TableShapeRenderer, 

@@ -6,6 +6,7 @@ import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized'
 import { getAuth } from 'firebase/auth';
 import Reglage from '@/app/components/reglage';
 import { router } from 'expo-router';
+import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
 
 export interface PlatProps {
   plat: Plat;
@@ -14,17 +15,18 @@ export interface PlatProps {
 
 export const PlatItem = ({ plat, onPress }: PlatProps) => {
   const [isMission, setIsMission] = useState(false);
+  const { selectedRestaurant } = useRestaurantSelection();
 
   useEffect(() => {
     const fetchMissionPlats = async () => {
       const user = getAuth().currentUser;
-      if (user && plat.id) {
-        const missionPlatIds = await getMissionPlatsForUser(user.uid);
+      if (user && plat.id && selectedRestaurant?.id) {
+        const missionPlatIds = await getMissionPlatsForUser(user.uid, selectedRestaurant.id);
         setIsMission(missionPlatIds.includes(plat.id));
       }
     };
     fetchMissionPlats();
-  }, [plat.id]);
+  }, [plat.id, selectedRestaurant?.id]);
 
   return (
     <Pressable

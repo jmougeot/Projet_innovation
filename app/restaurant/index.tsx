@@ -10,13 +10,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import Header from '@/app/components/Header';
-import RestaurantProtectedRoute from '@/app/components/RestaurantProtectedRoute';
-import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
+import Header from '../components/Header';
+import RestaurantProtectedRoute from './components/RestaurantProtectedRoute';
+import { useRestaurantSelection, useRestaurantNavigation } from './RestaurantSelectionContext';
 import { 
   getRestaurant, 
-  initializeRestaurant,
-  DEFAULT_RESTAURANT_ID 
+  initializeRestaurant
 } from '../firebase/firebaseRestaurant';
 import type { Restaurant } from '../firebase/firebaseRestaurant';
 
@@ -25,20 +24,34 @@ export default function RestaurantIndex() {
   const [loading, setLoading] = useState(true);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const { selectedRestaurant, selectedRestaurantRole, clearRestaurantSelection } = useRestaurantSelection();
+  const { isRestaurantSelected } = useRestaurantNavigation();
 
   useEffect(() => {
+    // Si aucun restaurant n'est sélectionné, rediriger vers la sélection
+    if (!isRestaurantSelected) {
+      console.log('🔄 Aucun restaurant sélectionné, redirection vers la sélection...');
+      router.replace('/restaurant/select' as any);
+      return;
+    }
+
     if (selectedRestaurant) {
       setRestaurant(selectedRestaurant as any);
       setLoading(false);
     } else {
       checkRestaurantExists();
     }
-  }, [selectedRestaurant]);
+  }, [selectedRestaurant, isRestaurantSelected]);
 
   const checkRestaurantExists = async () => {
+    if (!selectedRestaurant) {
+      setRestaurant(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
-      const existingRestaurant = await getRestaurant(DEFAULT_RESTAURANT_ID, false);
+      const existingRestaurant = await getRestaurant(selectedRestaurant.id, false);
       setRestaurant(existingRestaurant);
     } catch (error) {
       console.error('Erreur lors de la vérification du restaurant:', error);
@@ -49,16 +62,28 @@ export default function RestaurantIndex() {
   };
 
   const handleCreateRestaurant = () => {
-    router.push('/restaurant/create');
+    router.push('/restaurant/create' as any);
   };
 
   const handleManageRestaurant = () => {
-    router.push('/restaurant/settings');
+    router.push('/restaurant/settings' as any);
   };
 
-  const handleChangeRestaurant = () => {
-    clearRestaurantSelection();
-    router.push('/restaurant/select' as any);
+  const handleChangeRestaurant = async () => {
+    Alert.alert(
+      'Changer de restaurant',
+      'Voulez-vous sélectionner un autre restaurant ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Changer',
+          onPress: async () => {
+            await clearRestaurantSelection();
+            router.replace('/restaurant/select' as any);
+          }
+        }
+      ]
+    );
   };
 
   const handleQuickSetup = async () => {
@@ -72,16 +97,8 @@ export default function RestaurantIndex() {
           {
             text: 'Créer',
             onPress: async () => {
-              try {
-                await initializeRestaurant({
-                  name: "Mon Restaurant"
-                });
-                const newRestaurant = await getRestaurant(DEFAULT_RESTAURANT_ID, false);
-                setRestaurant(newRestaurant);
-              } catch (error) {
-                console.error('Erreur lors de la création rapide:', error);
-                Alert.alert('Erreur', 'Impossible de créer le restaurant');
-              }
+              // Redirect to restaurant creation page for proper flow
+              router.push('/restaurant/create' as any);
             }
           }
         ]

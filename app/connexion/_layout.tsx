@@ -5,6 +5,7 @@ export default function RootLayout() {
     <Stack>
       <Stack.Screen name="connexion" options={{ headerShown: false }} />
       <Stack.Screen name="inscription" options={{ headerShown: false }} />
+      
     </Stack>
   );
 }

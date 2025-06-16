@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import Reglage from '@/app/components/reglage';
+import AutoRedirect from '@/app/restaurant/AutoRedirect';
 import { getServiceMenuItems } from './components/ServiceNavigation';
 
 export default function ServiceHome() {
@@ -21,14 +22,15 @@ export default function ServiceHome() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems} />
-      
-      <View style={styles.headerSquare}>
-        <Text style={styles.headerSquareText}>Espace Service</Text>
-      </View>
+    <AutoRedirect requireRestaurant={true} loadingMessage="Vérification du restaurant sélectionné...">
+      <SafeAreaView style={styles.container}>
+        <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems} />
+        
+        <View style={styles.headerSquare}>
+          <Text style={styles.headerSquareText}>Espace Service</Text>
+        </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Navigation principale */}
         <View style={styles.sectionContainer}>
           <View style={styles.categoryHeader}>
@@ -46,7 +48,7 @@ export default function ServiceHome() {
           <View style={styles.menuGrid}>
             <TouchableOpacity 
               style={styles.card}
-              onPress={() => router.push('/service/(tabs)' as any)}
+              onPress={() => router.push('/service/(tabs)/plan_de_salle' as any)}
             >
               <MaterialIcons name="table-restaurant" size={40} color="#194A8D" />
               <Text style={styles.cardTitle}>Navigation Service</Text>
@@ -85,23 +87,12 @@ export default function ServiceHome() {
           <View style={styles.menuGrid}>
             <TouchableOpacity 
               style={styles.card}
-              onPress={() => router.push('/service/(tabs)' as any)}
+              onPress={() => router.push('/service/(tabs)/kitchen' as any)}
             >
               <MaterialIcons name="restaurant-menu" size={40} color="#194A8D" />
               <Text style={styles.cardTitle}>Cuisine Service</Text>
               <Text style={styles.cardDescription}>
                 Suivi des commandes en cuisine
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/service/(tabs)/AffichageMission' as any)}
-            >
-              <MaterialIcons name="assignment" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Missions Service</Text>
-              <Text style={styles.cardDescription}>
-                Consulter et gérer les missions
               </Text>
             </TouchableOpacity>
           </View>
@@ -143,17 +134,6 @@ export default function ServiceHome() {
                 Configurer le plan de salle
               </Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/mission/pages/CreateMissionPage' as any)}
-            >
-              <MaterialIcons name="add-task" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Créer mission</Text>
-              <Text style={styles.cardDescription}>
-                Ajouter une nouvelle mission
-              </Text>
-            </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.card}
@@ -169,6 +149,7 @@ export default function ServiceHome() {
         </View>
       </ScrollView>
     </SafeAreaView>
+    </AutoRedirect>
   );
 }
 

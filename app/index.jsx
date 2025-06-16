@@ -4,6 +4,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from 'expo-font';
 import Reglage from './components/reglage';
 import Head from './components/Head';
+import RestaurantSelector from './components/RestaurantSelector';
+import RestaurantStatus from './components/RestaurantStatus';
+import RestaurantChangeAlert from './components/RestaurantChangeAlert';
 
 export default function Index() {
   const [fontsLoaded] = useFonts({
@@ -16,6 +19,9 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Restaurant Change Alert */}
+      <RestaurantChangeAlert />
+      
       {/* Use the reusable Reglage component */}
       <Reglage 
         // Optional: pass custom menu items
@@ -28,6 +34,9 @@ export default function Index() {
 
       <Head title="Le Challenge" />
 
+      {/* Restaurant Status Bar */}
+      <RestaurantStatus style={styles.restaurantStatus} />
+
       <View style={styles.contentContainer}>
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeTitle}>Bienvenue</Text>
@@ -39,6 +48,9 @@ export default function Index() {
           />
           <Text style={styles.welcomeText}>Sélectionnez une option pour continuer</Text>
         </View>
+
+        {/* Restaurant Selector */}
+        <RestaurantSelector style={styles.restaurantSelector} />
         
         <View style={styles.buttonsSection}>
           <Link href="./service" asChild>
@@ -69,7 +81,15 @@ export default function Index() {
             <Pressable style={styles.button}>
               <Text style={styles.buttonText}>Mission</Text>
             </Pressable>
+            
           </Link>
+          
+          <Link href="./restaurant/select" asChild>
+            <Pressable style={styles.button}>
+              <Text style={styles.buttonText}>selection restaurant</Text>
+            </Pressable>
+          </Link>
+
         </View>
       </View>
       
@@ -166,6 +186,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#194A8D',
     textAlign: 'center',
+  },
+  restaurantStatus: {
+    marginTop: 10,
+  },
+  restaurantSelector: {
+    marginHorizontal: 20,
+    marginVertical: 10,
   },
   buttonsSection: {
     width: '100%',

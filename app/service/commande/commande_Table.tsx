@@ -11,7 +11,7 @@ import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized'
 import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
-import { useRestaurantSelection } from '@/app/firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
@@ -225,7 +225,7 @@ export default function Commande() {
         
         try {
             if (commandeExistante) {
-                await updateCommande(Idcommande, commandesParTable, selectedRestaurant.id);
+                await updateCommande(Idcommande, commandesParTable);
             } else {
                 // ✅ CORRECTION: Capturer l'ID Firebase réel et mettre à jour l'état local
                 // Exclure l'ID temporaire avant d'envoyer à Firebase

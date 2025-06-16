@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
-import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';

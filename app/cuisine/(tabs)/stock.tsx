@@ -5,6 +5,7 @@ import { db } from '@/app/firebase/firebaseConfig';
 import { addStock } from '@/app/firebase/firebaseStock';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
+import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
 
 interface StockItem {
     id: string;
@@ -16,6 +17,7 @@ interface StockItem {
 }
 
 export default function Stock() {
+    const { selectedRestaurant } = useRestaurantSelection();
     const [stockItems, setStockItems] = useState<StockItem[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [newItem, setNewItem] = useState({
@@ -51,17 +53,22 @@ export default function Stock() {
 
     const handleAddItem = async () => {
         try {
+            if (!selectedRestaurant) {
+                Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+                return;
+            }
+
             if (!newItem.name || !newItem.quantity || !newItem.price) {
                 Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
                 return;
             }
 
-            // Call addStock with the correct object parameter
+            // Call addStock with the correct object parameter and restaurantId
             await addStock({
                 name: newItem.name,
                 quantity: Number(newItem.quantity),
                 price: Number(newItem.price)
-            });
+            }, selectedRestaurant.id);
 
             setModalVisible(false);
             setNewItem({ name: '', quantity: '', price: '', unit: '' });

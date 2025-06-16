@@ -90,7 +90,6 @@ export {
   initializeRestaurant,
   getRestaurant,
   updateRestaurant,
-  updateRestaurantAnalytics,
   updateRestaurantSettings,
   getRestaurantRooms,
   getRestaurantActiveOrders,
@@ -98,23 +97,12 @@ export {
   getRestaurantMenu,
   migrateExistingDataToRestaurant,
   syncRestaurantData,
-  clearRestaurantCache,
-  DEFAULT_RESTAURANT_ID
+  clearRestaurantCache
 } from './firebaseRestaurant';
 export type { 
   Restaurant, 
-  RestaurantAnalytics, 
   RestaurantSettings 
 } from './firebaseRestaurant';
-
-// Restaurant utilities
-export { 
-  setupRestaurant,
-  migrateAndSetupRestaurant,
-  getRestaurantStatus,
-  quickSetup,
-  validateRestaurantData
-} from './restaurantUtils';
 
 // Mission management (re-export from existing module)
 export * from './firebaseMissionOptimized';
@@ -155,7 +143,6 @@ export { default as firebaseTables } from './firebaseTables';
 export { default as firebaseUser } from './firebaseUser';
 export { default as firebaseAnalytics } from './firebaseAnalytics';
 export { default as firebaseRestaurant } from './firebaseRestaurant';
-export { default as restaurantUtils } from './restaurantUtils';
 
 // Default export to prevent Expo Router warnings
 export default function FirebaseIndex() {

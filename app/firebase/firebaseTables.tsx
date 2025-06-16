@@ -11,7 +11,6 @@ import {
   getDoc,
 } from 'firebase/firestore';
 import { getRealtimeTablesCache } from './firebaseRealtimeCache';
-import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 export interface Table {
   id: number;
@@ -42,21 +41,21 @@ let lastCacheUpdate = 0;
 const CACHE_DURATION = 300000; // 5 minutes
 
 // Helper functions to get collection references
-const getRestaurantRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getRestaurantRef = (restaurantId: string) => {
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
-const getRoomsCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getRoomsCollectionRef = (restaurantId: string) => {
   return collection(getRestaurantRef(restaurantId), 'rooms');
 };
 
-const getTablesCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID, roomId: string = DEFAULT_ROOM_ID) => {
+const getTablesCollectionRef = (restaurantId: string, roomId: string = DEFAULT_ROOM_ID) => {
   return collection(doc(getRoomsCollectionRef(restaurantId), roomId), 'tables');
 };
 
 // Room management functions
 
-export const getRoom = async (useCache = true, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Room[]> => {
+export const getRoom = async (useCache = true, restaurantId: string): Promise<Room[]> => {
   try {
     const now = Date.now();
     if (useCache && roomCache && (now - lastCacheUpdate) < CACHE_DURATION) {
@@ -106,7 +105,7 @@ export const getRoom = async (useCache = true, restaurantId: string = DEFAULT_RE
   }
 };
 
-export const addRoom = async (room: Room, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const addRoom = async (room: Room, restaurantId: string): Promise<void> => {
   try {
     const roomRef = doc(getRoomsCollectionRef(restaurantId), room.name.toLowerCase().replace(/\s+/g, ''));
     await setDoc(roomRef, room);
@@ -120,7 +119,7 @@ export const addRoom = async (room: Room, restaurantId: string = DEFAULT_RESTAUR
   }
 };
 
-export const updateRoom = async (roomId: string, room: Partial<Room>, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const updateRoom = async (roomId: string, room: Partial<Room>, restaurantId: string): Promise<void> => {
   try {
     const roomRef = doc(getRoomsCollectionRef(restaurantId), roomId);
     
@@ -140,7 +139,7 @@ export const updateRoom = async (roomId: string, room: Partial<Room>, restaurant
   }
 };
 
-export const deleteRoom = async (roomId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const deleteRoom = async (roomId: string, restaurantId: string): Promise<void> => {
   try {
     const roomRef = doc(getRoomsCollectionRef(restaurantId), roomId);
     await deleteDoc(roomRef);
@@ -156,7 +155,7 @@ export const deleteRoom = async (roomId: string, restaurantId: string = DEFAULT_
 
 // Table management functions
 
-export const getAllTables = async (roomId: string = DEFAULT_ROOM_ID, useCache = true, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Table[]> => {
+export const getAllTables = async (roomId: string = DEFAULT_ROOM_ID, useCache = true, restaurantId: string): Promise<Table[]> => {
   try {
     const now = Date.now();
     const cachedTables = tablesCache.get(roomId);
@@ -193,7 +192,7 @@ export const getAllTables = async (roomId: string = DEFAULT_ROOM_ID, useCache = 
   }
 };
 
-export const addTable = async (table: Table, roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const addTable = async (table: Table, roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   try {
     const tableRef = doc(getTablesCollectionRef(restaurantId, roomId), table.id.toString());
     await setDoc(tableRef, table);
@@ -207,7 +206,7 @@ export const addTable = async (table: Table, roomId: string = DEFAULT_ROOM_ID, r
   }
 };
 
-export const updateTable = async (tableId: number, tableData: Partial<Table>, roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const updateTable = async (tableId: number, tableData: Partial<Table>, roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   try {
     const tableRef = doc(getTablesCollectionRef(restaurantId, roomId), tableId.toString());
     
@@ -234,7 +233,7 @@ export const updateTable = async (tableId: number, tableData: Partial<Table>, ro
   }
 };
 
-export const deleteTable = async (tableId: number, roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const deleteTable = async (tableId: number, roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   try {
     const tableRef = doc(getTablesCollectionRef(restaurantId, roomId), tableId.toString());
     await deleteDoc(tableRef);
@@ -248,7 +247,7 @@ export const deleteTable = async (tableId: number, roomId: string = DEFAULT_ROOM
   }
 };
 
-export const getTableById = async (tableId: number, roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Table | null> => {
+export const getTableById = async (tableId: number, roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<Table | null> => {
   try {
     const tableRef = doc(getTablesCollectionRef(restaurantId, roomId), tableId.toString());
     const snapshot = await getDoc(tableRef);
@@ -320,20 +319,20 @@ export const getRoomsCacheInfo = () => {
 };
 
 // Legacy compatibility functions for existing code
-export const getTablesWithRealtimeUpdates = (callback: (tables: Table[]) => void, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const getTablesWithRealtimeUpdates = (callback: (tables: Table[]) => void, restaurantId: string) => {
   return getRealtimeTablesCache().subscribe(callback);
 };
 
 // Legacy compatibility aliases and missing functions
 
-export const getTables = (roomId: string = DEFAULT_ROOM_ID, useCache = true, restaurantId: string = DEFAULT_RESTAURANT_ID) => 
+export const getTables = (roomId: string = DEFAULT_ROOM_ID, useCache = true, restaurantId: string) => 
   getAllTables(roomId, useCache, restaurantId);
 
-export const saveTable = async (table: Table, roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const saveTable = async (table: Table, roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   return addTable(table, roomId, restaurantId);
 };
 
-export const updateTables = async (tables: Table[], roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const updateTables = async (tables: Table[], roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   try {
     let successCount = 0;
     let skipCount = 0;
@@ -356,17 +355,17 @@ export const updateTables = async (tables: Table[], roomId: string = DEFAULT_ROO
   }
 };
 
-export const updateTableStatus = async (tableId: number, status: Table['status'], roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const updateTableStatus = async (tableId: number, status: Table['status'], roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   return updateTable(tableId, { status }, roomId, restaurantId);
 };
 
-export const updateTablePosition = async (tableId: number, position: Table['position'], roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const updateTablePosition = async (tableId: number, position: Table['position'], roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   return updateTable(tableId, { position }, roomId, restaurantId);
 };
 
 export const clearTablesCache = clearTableCache;
 
-export const initializeDefaultTables = async (roomId: string = DEFAULT_ROOM_ID, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> => {
+export const initializeDefaultTables = async (roomId: string = DEFAULT_ROOM_ID, restaurantId: string): Promise<void> => {
   try {
     // Check if tables already exist
     const existingTables = await getAllTables(roomId, false, restaurantId);

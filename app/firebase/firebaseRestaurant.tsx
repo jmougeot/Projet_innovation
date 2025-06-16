@@ -63,7 +63,6 @@ export interface Restaurant {
 
 // ====== COLLECTION CONSTANTS ======
 const RESTAURANTS_COLLECTION = 'restaurants';
-export const DEFAULT_RESTAURANT_ID = 'main-restaurant';
 
 // ====== CACHE MANAGEMENT ======
 let restaurantCache: Restaurant | null = null;
@@ -206,7 +205,7 @@ const initializeRestaurantSubCollections = async (restaurantId: string) => {
  * 🔍 GET RESTAURANT
  */
 export const getRestaurant = async (
-  restaurantId: string = DEFAULT_RESTAURANT_ID,
+  restaurantId: string,
   useCache: boolean = true
 ): Promise<Restaurant | null> => {
   try {
@@ -262,7 +261,7 @@ export const getRestaurant = async (
  * ✏️ UPDATE RESTAURANT
  */
 export const updateRestaurant = async (
-  restaurantId: string = DEFAULT_RESTAURANT_ID,
+  restaurantId: string,
   updateData: Partial<Restaurant>
 ): Promise<void> => {
   try {
@@ -293,7 +292,7 @@ export const updateRestaurant = async (
  * ⚙️ UPDATE RESTAURANT SETTINGS
  */
 export const updateRestaurantSettings = async (
-  restaurantId: string = DEFAULT_RESTAURANT_ID,
+  restaurantId: string,
   settingsData: Partial<RestaurantSettings>
 ): Promise<void> => {
   try {
@@ -319,7 +318,7 @@ export const updateRestaurantSettings = async (
 /**
  * 🏠 GET RESTAURANT ROOMS
  */
-export const getRestaurantRooms = async (restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Room[]> => {
+export const getRestaurantRooms = async (restaurantId: string): Promise<Room[]> => {
   try {
     const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const roomsRef = collection(restaurantRef, 'rooms');
@@ -345,7 +344,7 @@ export const getRestaurantRooms = async (restaurantId: string = DEFAULT_RESTAURA
 /**
  * 📋 GET RESTAURANT ACTIVE ORDERS
  */
-export const getRestaurantActiveOrders = async (restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<CommandeData[]> => {
+export const getRestaurantActiveOrders = async (restaurantId: string): Promise<CommandeData[]> => {
   try {
     const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const ordersRef = collection(restaurantRef, 'active_orders');
@@ -369,7 +368,7 @@ export const getRestaurantActiveOrders = async (restaurantId: string = DEFAULT_R
 /**
  * 📦 GET RESTAURANT STOCK
  */
-export const getRestaurantStock = async (restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<StockData[]> => {
+export const getRestaurantStock = async (restaurantId: string): Promise<StockData[]> => {
   try {
     const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const stockRef = collection(restaurantRef, 'stock');
@@ -393,7 +392,7 @@ export const getRestaurantStock = async (restaurantId: string = DEFAULT_RESTAURA
 /**
  * 🍽️ GET RESTAURANT MENU
  */
-export const getRestaurantMenu = async (restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Plat[]> => {
+export const getRestaurantMenu = async (restaurantId: string): Promise<Plat[]> => {
   try {
     const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const menuRef = collection(restaurantRef, 'menu');
@@ -420,7 +419,7 @@ export const getRestaurantMenu = async (restaurantId: string = DEFAULT_RESTAURAN
  * 🔄 MIGRATE EXISTING DATA TO RESTAURANT STRUCTURE
  */
 export const migrateExistingDataToRestaurant = async (
-  restaurantId: string = DEFAULT_RESTAURANT_ID
+  restaurantId: string
 ): Promise<void> => {
   try {
     console.log('🔄 Début de la migration des données vers la structure Restaurant...');
@@ -498,7 +497,7 @@ export const migrateExistingDataToRestaurant = async (
  * 🔄 SYNC RESTAURANT DATA
  */
 export const syncRestaurantData = async (
-  restaurantId: string = DEFAULT_RESTAURANT_ID
+  restaurantId: string
 ): Promise<void> => {
   try {
     console.log('🔄 Synchronisation des données du restaurant...');

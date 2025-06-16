@@ -3,9 +3,11 @@ import { View, Text, FlatList, ActivityIndicator, Button, StyleSheet , Touchable
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
 import { Plat, get_plats, ajout_plat } from '@/app/firebase/firebaseMenu';
+import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
 
 
 export default function Menu() {
+  const { selectedRestaurant } = useRestaurantSelection();
   const [plats, setPlats] = useState<Plat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +23,11 @@ export default function Menu() {
     setLoading(true);
     setError(null);
     try {
-      const menuItems = await get_plats();
+      if (!selectedRestaurant) {
+        setError("Aucun restaurant sélectionné");
+        return;
+      }
+      const menuItems = await get_plats(true, selectedRestaurant.id);
       setPlats(menuItems);
     } catch (err) {
       console.error('Erreur lors de la récupération des plats:', err);
@@ -36,6 +42,11 @@ export default function Menu() {
 
   const handleAddPlat = async () => {
     try {
+      if (!selectedRestaurant) {
+        Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+        return;
+      }
+
       if (!newPlat.name || !newPlat.category || !newPlat.price) {
         Alert.alert('Erreur', 'Veuillez remplir tous les champs');
         return;
@@ -45,7 +56,7 @@ export default function Menu() {
         name: newPlat.name,
         category: newPlat.category,
         price: Number(newPlat.price)
-      });
+      }, selectedRestaurant.id);
 
       setModalVisible(false);
       setNewPlat({ name: '', category: '', price: '' });

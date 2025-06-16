@@ -14,13 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
-import { createInitialRestaurantAccess } from '../firebase/restaurantAccess';
+import { useRestaurantSelection } from './RestaurantSelectionContext';
+import { createInitialRestaurantAccess } from '../restaurant/restaurantAccess';
 import {
   initializeRestaurant,
-  migrateExistingDataToRestaurant,
-  DEFAULT_RESTAURANT_ID
-} from '../firebase/firebaseRestaurant';
+  migrateExistingDataToRestaurant,} from '../firebase/firebaseRestaurant';
 import type { Restaurant, RestaurantSettings } from '../firebase/firebaseRestaurant';
 
 interface RestaurantFormData {
@@ -160,7 +158,7 @@ export default function CreateRestaurant() {
             [
               {
                 text: 'OK',
-                onPress: () => router.replace('/restaurant/select')
+                onPress: () => router.replace('/restaurant/select' as any)
               }
             ]
           );
@@ -172,7 +170,7 @@ export default function CreateRestaurant() {
             [
               {
                 text: 'OK',
-                onPress: () => router.replace('/restaurant/select')
+                onPress: () => router.replace('/restaurant/select' as any)
               }
             ]
           );
@@ -184,7 +182,7 @@ export default function CreateRestaurant() {
           [
             {
               text: 'OK',
-              onPress: () => router.replace('/restaurant/select')
+              onPress: () => router.replace('/restaurant/select' as any)
             }
           ]
         );
@@ -211,7 +209,7 @@ export default function CreateRestaurant() {
     },
     {
       label: 'Accueil',
-      onPress: () => router.push('/service')
+      onPress: () => router.push('../service' as any)
     },
     {
       label: 'Profil',

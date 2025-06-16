@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '../RestaurantSelectionContext';
 import Header from '@/app/components/Header';
 
 interface RestaurantProtectedRouteProps {
@@ -61,7 +61,7 @@ export default function RestaurantProtectedRoute({
           </Text>
           <Pressable
             style={styles.actionButton}
-            onPress={() => router.push('/connexion')}
+            onPress={() => router.push('/connexion' as any)}
           >
             <LinearGradient
               colors={['#D4AF37', '#B8941F']}

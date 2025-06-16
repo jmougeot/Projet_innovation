@@ -1,6 +1,5 @@
 import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
-import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 export interface Plat {
     id?: string;
@@ -15,11 +14,11 @@ export interface Plat {
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
-const getMenuRestaurantRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getMenuRestaurantRef = (restaurantId: string) => {
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
-const getMenuCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getMenuCollectionRef = (restaurantId: string) => {
   return collection(getMenuRestaurantRef(restaurantId), 'menu');
 };
 
@@ -47,7 +46,7 @@ export const getMenuCacheInfo = () => {
     durationFormatted: `${MENU_CACHE_DURATION / 60000}min`
   };
 };
-export async function ajout_plat(plat: Plat, restaurantId: string = DEFAULT_RESTAURANT_ID) {
+export async function ajout_plat(plat: Plat, restaurantId: string) {
   try {
     // Filter out undefined values
     const filteredPlat = Object.fromEntries(
@@ -72,7 +71,7 @@ export async function ajout_plat(plat: Plat, restaurantId: string = DEFAULT_REST
   }
 }
 
-export async function get_plats(useCache = true, restaurantId: string = DEFAULT_RESTAURANT_ID) {
+export async function get_plats(useCache = true, restaurantId: string) {
   try {
     const now = Date.now();
     
@@ -112,7 +111,7 @@ export async function get_plats(useCache = true, restaurantId: string = DEFAULT_
   }
 }
 
-export async function updatePlat(platId: string, updates: Partial<Plat>, restaurantId: string = DEFAULT_RESTAURANT_ID) {
+export async function updatePlat(platId: string, updates: Partial<Plat>, restaurantId: string) {
   try {
     const platRef = doc(getMenuCollectionRef(restaurantId), platId);
     
@@ -132,7 +131,7 @@ export async function updatePlat(platId: string, updates: Partial<Plat>, restaur
   }
 }
 
-export async function deletePlat(platId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) {
+export async function deletePlat(platId: string, restaurantId: string) {
   try {
     const platRef = doc(getMenuCollectionRef(restaurantId), platId);
     await deleteDoc(platRef);
@@ -146,7 +145,7 @@ export async function deletePlat(platId: string, restaurantId: string = DEFAULT_
   }
 }
 
-export async function getPlatById(platId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Plat | null> {
+export async function getPlatById(platId: string, restaurantId: string): Promise<Plat | null> {
   try {
     const platRef = doc(getMenuCollectionRef(restaurantId), platId);
     const snapshot = await getDoc(platRef);

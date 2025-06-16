@@ -11,7 +11,7 @@ import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
 import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
-import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
 
 // Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
 const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
@@ -467,7 +467,7 @@ export default function MapSettings() {
         if (router.canGoBack()) {
           router.back();
         } else {
-          router.replace('/service');
+          router.replace('../service');
         }
       }
     },

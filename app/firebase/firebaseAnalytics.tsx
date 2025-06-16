@@ -7,7 +7,6 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { CommandeData } from "./firebaseCommandeOptimized";
-import { DEFAULT_RESTAURANT_ID } from "./firebaseRestaurant";
 
 // ---- CACHE CONFIGURATION ----
 const ANALYTICS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes en millisecondes
@@ -23,11 +22,11 @@ let lastAnalyticsCacheUpdate = 0;
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
-const getRestaurantRefForAnalytics = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getRestaurantRefForAnalytics = (restaurantId: string) => {
   return `${RESTAURANTS_COLLECTION}/${restaurantId}`;
 };
 
-const getCommandesCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID, collectionName: string) => {
+const getCommandesCollectionRef = (restaurantId: string, collectionName: string) => {
   return collection(db, `${getRestaurantRefForAnalytics(restaurantId)}/${collectionName}`);
 };
 
@@ -35,7 +34,7 @@ const getCommandesCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID,
 /**
  * Helper function to fetch orders from both active and completed collections
  */
-async function fetchAllOrders(restaurantId: string = DEFAULT_RESTAURANT_ID, filter?: AnalyticsFilter) {
+async function fetchAllOrders(restaurantId: string, filter?: AnalyticsFilter) {
   const allOrders: CommandeData[] = [];
   
   // Fetch from both collections
@@ -108,7 +107,7 @@ export const clearAnalyticsCache = (restaurantId?: string) => {
   lastAnalyticsCacheUpdate = 0;
 };
 
-export const getAnalyticsCacheInfo = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const getAnalyticsCacheInfo = (restaurantId: string) => {
   const now = Date.now();
   const cacheAge = now - lastAnalyticsCacheUpdate;
   const isValid = cacheAge < ANALYTICS_CACHE_DURATION;
@@ -156,11 +155,11 @@ export interface AnalyticsFilter {
 
 /**
  * Calculate total revenue from all orders
- * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID to analyze
  * @param filter - Optional filter for specific time period or status
  * @returns Promise<number>
  */
-export async function calculateRevenue(restaurantId: string = DEFAULT_RESTAURANT_ID, filter?: AnalyticsFilter): Promise<number> {
+export async function calculateRevenue(restaurantId: string, filter?: AnalyticsFilter): Promise<number> {
   try {
     const now = Date.now();
     const filterKey = createFilterKey(filter);
@@ -206,11 +205,11 @@ export async function calculateRevenue(restaurantId: string = DEFAULT_RESTAURANT
 
 /**
  * Get comprehensive revenue analytics
- * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID to analyze
  * @param filter - Optional filter for specific time period or status
  * @returns Promise<RevenueData>
  */
-export async function getRevenueAnalytics(restaurantId: string = DEFAULT_RESTAURANT_ID, filter?: AnalyticsFilter): Promise<RevenueData> {
+export async function getRevenueAnalytics(restaurantId: string, filter?: AnalyticsFilter): Promise<RevenueData> {
   try {
     const now = Date.now();
     const filterKey = createFilterKey(filter);
@@ -269,10 +268,10 @@ export async function getRevenueAnalytics(restaurantId: string = DEFAULT_RESTAUR
  * Get daily revenue for a specific period
  * @param startDate - Start date for the period
  * @param endDate - End date for the period
- * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID to analyze
  * @returns Promise<Array<{date: string, revenue: number}>>
  */
-export async function getDailyRevenue(startDate: Date, endDate: Date, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<{date: string, revenue: number}[]> {
+export async function getDailyRevenue(startDate: Date, endDate: Date, restaurantId: string): Promise<{date: string, revenue: number}[]> {
   try {
     const now = Date.now();
     const dateKey = `${startDate.toISOString()}_${endDate.toISOString()}`;
@@ -336,10 +335,10 @@ export async function getDailyRevenue(startDate: Date, endDate: Date, restaurant
 /**
  * Get top performing menu items by revenue
  * @param limitCount - Number of top items to return (default: 10)
- * @param restaurantId - Restaurant ID to analyze (defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID to analyze
  * @returns Promise<Array<{platName: string, totalRevenue: number, quantity: number}>>
  */
-export async function getTopMenuItems(limitCount: number = 10, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<{platName: string, totalRevenue: number, quantity: number}[]> {
+export async function getTopMenuItems(limitCount: number = 10, restaurantId: string): Promise<{platName: string, totalRevenue: number, quantity: number}[]> {
   try {
     const now = Date.now();
     const cacheKey = `limit_${limitCount}`;

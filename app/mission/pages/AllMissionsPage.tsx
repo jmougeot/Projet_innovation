@@ -11,14 +11,14 @@ import {
 import { router } from 'expo-router';
 import { getAllMissions, assignMissionToUser, deleteMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
-import { useRestaurantSelection } from '../../firebase/RestaurantSelectionContext';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { MissionCard, MissionSearch, MissionFilters, ConfirmDeleteModal } from '../components';
 import { filterMissions, sortMissions } from '../utils';
-
+import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
 
 const AllMissionsPage = () => {
+  const { selectedRestaurant } = useRestaurantSelection();
   const [missions, setMissions] = useState<Mission[]>([]);
   const [filteredMissions, setFilteredMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,7 +32,6 @@ const AllMissionsPage = () => {
   
   
   const currentUser = auth.currentUser;
-  const { selectedRestaurant } = useRestaurantSelection();
   
   // Appliquer les filtres
   const applyFilters = React.useCallback((missionsToFilter: Mission[] = missions) => {

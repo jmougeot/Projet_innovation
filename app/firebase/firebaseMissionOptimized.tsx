@@ -18,7 +18,6 @@ import {
 
 // Import function to update user points and level
 import { updatePointsAndLevel } from './firebaseUser';
-import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 // Types importés des interfaces
 import type { Mission } from '../mission/types';
@@ -34,11 +33,11 @@ const MISSIONS_CACHE_DURATION = 60000; // 1 minute
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
-const getRestaurantRefForMissions = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getRestaurantRefForMissions = (restaurantId: string) => {
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
-const getMissionsCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getMissionsCollectionRef = (restaurantId: string) => {
   return collection(getRestaurantRefForMissions(restaurantId), 'missions');
 };
 
@@ -84,7 +83,7 @@ export const clearMissionsCache = (restaurantId?: string) => {
   lastMissionsCacheUpdate = 0;
 };
 
-export const getMissionsCacheInfo = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const getMissionsCacheInfo = (restaurantId: string) => {
   const now = Date.now();
   const cachedMissions = missionsCache.get(restaurantId);
   const timeLeft = cachedMissions ? Math.max(0, MISSIONS_CACHE_DURATION - (now - lastMissionsCacheUpdate)) : 0;
@@ -102,7 +101,7 @@ export const getMissionsCacheInfo = (restaurantId: string = DEFAULT_RESTAURANT_I
 
 // ====== MISSIONS DE BASE ======
 
-export const createMission = async (mission: Omit<Mission, 'id'>, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const createMission = async (mission: Omit<Mission, 'id'>, restaurantId: string) => {
   try {
     const missionsRef = getMissionsCollectionRef(restaurantId);
     const docRef = await addDoc(missionsRef, {
@@ -122,7 +121,7 @@ export const createMission = async (mission: Omit<Mission, 'id'>, restaurantId: 
   }
 };
 
-export const getMission = async (id: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Mission | null> => {
+export const getMission = async (id: string, restaurantId: string): Promise<Mission | null> => {
   try {
     const now = Date.now();
     
@@ -162,7 +161,7 @@ export const getMission = async (id: string, restaurantId: string = DEFAULT_REST
   }
 };
 
-export const getAllMissions = async (restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<Mission[]> => {
+export const getAllMissions = async (restaurantId: string): Promise<Mission[]> => {
   try {
     const now = Date.now();
     
@@ -206,7 +205,7 @@ export const getAllMissions = async (restaurantId: string = DEFAULT_RESTAURANT_I
   }
 };
 
-export const updateMission = async (id: string, updates: Partial<Mission>, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const updateMission = async (id: string, updates: Partial<Mission>, restaurantId: string) => {
   try {
     const missionRef = doc(getMissionsCollectionRef(restaurantId), id);
     await updateDoc(missionRef, {
@@ -228,7 +227,7 @@ export const updateMission = async (id: string, updates: Partial<Mission>, resta
   }
 };
 
-export const deleteMission = async (id: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const deleteMission = async (id: string, restaurantId: string) => {
   try {
     console.log(`[MISSIONS] Début suppression de la mission ${id} du restaurant ${restaurantId}`);
     
@@ -284,7 +283,7 @@ export const deleteMission = async (id: string, restaurantId: string = DEFAULT_R
 
 // ====== ASSIGNATION DE MISSIONS (SOUS-COLLECTIONS) ======
 
-export const assignMissionToUser = async (missionId: string, userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const assignMissionToUser = async (missionId: string, userId: string, restaurantId: string) => {
   try {
     // Vérifier que la mission existe
     const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
@@ -337,7 +336,7 @@ export const assignMissionToUser = async (missionId: string, userId: string, res
   }
 };
 
-export const getUserMissions = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<UserMissionParticipant[]> => {
+export const getUserMissions = async (userId: string, restaurantId: string): Promise<UserMissionParticipant[]> => {
   try {
     const now = Date.now();
     
@@ -398,8 +397,8 @@ export const updateUserMissionStatus = async (
   participantId: string,
   status: "pending" | "completed" | "failed",
   progression: number,
-  currentValue?: number,
-  restaurantId: string = DEFAULT_RESTAURANT_ID
+  restaurantId: string,
+  currentValue?: number
 ) => {
   try {
     const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
@@ -442,7 +441,7 @@ export const updateUserMissionProgress = async (
   missionId: string,
   participantId: string,
   currentValue: number,
-  restaurantId: string = DEFAULT_RESTAURANT_ID
+  restaurantId: string
 ) => {
   try {
     console.log(`📊 [DEBUG] updateUserMissionProgress appelée: mission=${missionId}, participant=${participantId}, currentValue=${currentValue}`);
@@ -537,7 +536,7 @@ export const createCollectiveMission = async (
   missionId: string,
   userIds: string[],
   targetValue: number,
-  restaurantId: string = DEFAULT_RESTAURANT_ID
+  restaurantId: string
 ) => {
   try {
     // Vérifier que la mission existe
@@ -618,7 +617,7 @@ export const createCollectiveMission = async (
   }
 };
 
-export const updateCollectiveMissionProgress = async (missionId: string, collectiveId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const updateCollectiveMissionProgress = async (missionId: string, collectiveId: string, restaurantId: string) => {
   try {
     // Récupérer la mission collective
     const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
@@ -661,7 +660,7 @@ export const updateCollectiveMissionProgress = async (missionId: string, collect
   }
 };
 
-export const getCollectiveMissions = async (missionId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<CollectiveMissionData[]> => {
+export const getCollectiveMissions = async (missionId: string, restaurantId: string): Promise<CollectiveMissionData[]> => {
   try {
     const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const collectivesRef = collection(missionRef, 'collectives');
@@ -677,7 +676,7 @@ export const getCollectiveMissions = async (missionId: string, restaurantId: str
   }
 };
 
-export const getUserCollectiveMissions = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<CollectiveMissionData[]> => {
+export const getUserCollectiveMissions = async (userId: string, restaurantId: string): Promise<CollectiveMissionData[]> => {
   try {
     const allMissions = await getAllMissions(restaurantId);
     const userCollectives: CollectiveMissionData[] = [];
@@ -717,7 +716,7 @@ export const getUserCollectiveMissions = async (userId: string, restaurantId: st
 
 // ====== FONCTIONS UTILITAIRES ======
 
-export const getMissionPlatsForUser = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<string[]> => {
+export const getMissionPlatsForUser = async (userId: string, restaurantId: string): Promise<string[]> => {
   try {
     // Récupérer les missions de l'utilisateur via les sous-collections
     const userMissions = await getUserMissions(userId, restaurantId);
@@ -748,7 +747,7 @@ export const getMissionPlatsForUser = async (userId: string, restaurantId: strin
 export const updateMissionsProgressFromDishes = async (
   userId: string,
   validatedDishes: { plat: { id?: string; name: string; price: number }; quantite: number }[],
-  restaurantId: string = DEFAULT_RESTAURANT_ID
+  restaurantId: string
 ) => {
   try {
     console.log(`🍽️ [DEBUG] updateMissionsProgressFromDishes appelée pour userId: ${userId}`);
@@ -853,7 +852,7 @@ export const updateMissionsProgressFromDishes = async (
 
 // ====== ANALYTICS ET REPORTING ======
 
-export const getMissionProgressAnalytics = async (userId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const getMissionProgressAnalytics = async (userId: string, restaurantId: string) => {
   try {
     const userMissions = await getUserMissions(userId, restaurantId);
     
@@ -905,7 +904,7 @@ export const getMissionProgressAnalytics = async (userId: string, restaurantId: 
   }
 };
 
-export const getMissionProgressHistory = async (missionId: string, participantId: string, restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+export const getMissionProgressHistory = async (missionId: string, participantId: string, restaurantId: string) => {
   try {
     const missionRef = doc(getMissionsCollectionRef(restaurantId), missionId);
     const participantRef = doc(missionRef, 'participants', participantId);

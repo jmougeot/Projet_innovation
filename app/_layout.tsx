@@ -1,6 +1,7 @@
 import { Stack } from "expo-router";
 import './firebase/firebaseConfig'; // Initialiser Firebase au démarrage
-import { RestaurantSelectionProvider } from './firebase/RestaurantSelectionContext';
+import { RestaurantSelectionProvider } from './restaurant/RestaurantSelectionContext';
+import RestaurantChangeNotification from './restaurant/components/RestaurantChangeNotification';
 
 export default function RootLayout() {
   return (
@@ -15,6 +16,7 @@ export default function RootLayout() {
         <Stack.Screen name="Profil" options={{ headerShown: false }}/>
         <Stack.Screen name="restaurant" options={{ headerShown: false }}/>
       </Stack>
+      <RestaurantChangeNotification />
     </RestaurantSelectionProvider>
   );
 }

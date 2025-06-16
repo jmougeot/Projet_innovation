@@ -12,8 +12,7 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
-import { setupTestRestaurantAccess } from '../firebase/testData';
+import { useRestaurantSelection } from '../restaurant/RestaurantSelectionContext';
 
 export default function RestaurantLoginPage() {
   const router = useRouter();
@@ -34,8 +33,7 @@ export default function RestaurantLoginPage() {
 
     try {
       setLoading(true);
-      await setupTestRestaurantAccess();
-      await refreshRestaurants();
+       await refreshRestaurants();
       
       Alert.alert(
         'Configuration terminée',
@@ -72,7 +70,7 @@ export default function RestaurantLoginPage() {
             </Text>
             <Pressable 
               style={styles.actionButton}
-              onPress={() => router.push('/connexion')}
+              onPress={() => router.push('./connexion' as any)}
             >
               <LinearGradient
                 colors={['#194A8D', '#0F3A6B']}
@@ -154,7 +152,7 @@ export default function RestaurantLoginPage() {
             </Pressable>
           )}
 
-          <Pressable style={styles.secondaryButton} onPress={() => router.push('/service')}>
+          <Pressable style={styles.secondaryButton} onPress={() => router.push('../service' as any)}>
             <Text style={styles.secondaryButtonText}>Retour au service</Text>
           </Pressable>
         </View>

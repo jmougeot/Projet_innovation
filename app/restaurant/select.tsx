@@ -13,31 +13,33 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from '../firebase/RestaurantSelectionContext';
+import { useRestaurantSelection, useRestaurantNavigation } from './RestaurantSelectionContext';
 
 export default function RestaurantSelectPage() {
   const router = useRouter();
-  const {
-    user,
-    availableRestaurants,
-    restaurantsLoading,
+  const {user,availableRestaurants,restaurantsLoading,
     selectionLoading,
     selectRestaurant,
     refreshRestaurants,
   } = useRestaurantSelection();
 
+  const { isRestaurantSelected } = useRestaurantNavigation();
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Si l'utilisateur n'est pas connecté, rediriger vers la connexion
-    if (!user) {
-      router.replace('/connexion');
+    // Si un restaurant est déjà sélectionné, rediriger automatiquement
+    if (isRestaurantSelected) {
+      console.log('🔄 Restaurant déjà sélectionné, redirection...');
+      router.replace('/restaurant' as any);
       return;
     }
-
+    if (!user) {
+      router.replace('../connexion' as any);
+      return;
+    }
     // Rafraîchir la liste des restaurants
     refreshRestaurants();
-  }, [user]);
+  }, [user, isRestaurantSelected]);
 
   const handleSelectRestaurant = async (restaurantId: string) => {
     try {
@@ -45,7 +47,7 @@ export default function RestaurantSelectPage() {
       await selectRestaurant(restaurantId);
       
       // Rediriger vers la page principale du restaurant
-      router.replace('/restaurant');
+      router.replace('/restaurant' as any);
     } catch (error) {
       console.error('Erreur lors de la sélection du restaurant:', error);
       Alert.alert(
@@ -58,7 +60,7 @@ export default function RestaurantSelectPage() {
   };
 
   const handleCreateRestaurant = () => {
-    router.push('/restaurant/create');
+    router.push('/restaurant/create' as any);
   };
 
   const handleLogout = () => {
@@ -72,7 +74,7 @@ export default function RestaurantSelectPage() {
           style: 'destructive',
           onPress: () => {
             // Ici vous pouvez ajouter la logique de déconnexion
-            router.replace('/connexion');
+            router.replace('/connexion' as any);
           }
         }
       ]
@@ -146,11 +148,11 @@ export default function RestaurantSelectPage() {
                         <View 
                           style={[
                             styles.statusDot,
-                            { backgroundColor: restaurant.status === 'active' ? '#4CAF50' : '#FF9800' }
+                            { backgroundColor: restaurant.is_active ? '#4CAF50' : '#FF9800' }
                           ]} 
                         />
                         <Text style={styles.statusText}>
-                          {restaurant.status === 'active' ? 'Actif' : 'Inactif'}
+                          {restaurant.is_active ? 'Actif' : 'Inactif'}
                         </Text>
                       </View>
                     </View>

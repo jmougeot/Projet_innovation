@@ -13,13 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
+import { useRestaurantSelection } from './RestaurantSelectionContext';
 import {
   getRestaurant,
   updateRestaurant,
   migrateExistingDataToRestaurant,
   syncRestaurantData,
-  clearRestaurantCache,
-  DEFAULT_RESTAURANT_ID
+  clearRestaurantCache
 } from '../firebase/firebaseRestaurant';
 import type { Restaurant, RestaurantSettings } from '../firebase/firebaseRestaurant';
 
@@ -39,6 +39,7 @@ interface SettingsFormData {
 
 export default function RestaurantSettingsPage() {
   const router = useRouter();
+  const { selectedRestaurant } = useRestaurantSelection();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -59,12 +60,18 @@ export default function RestaurantSettingsPage() {
 
   useEffect(() => {
     loadRestaurant();
-  }, []);
+  }, [selectedRestaurant]);
 
   const loadRestaurant = async () => {
+    if (!selectedRestaurant) {
+      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+      router.push('/restaurant/select' as any);
+      return;
+    }
+
     try {
       setLoading(true);
-      const restaurantData = await getRestaurant(DEFAULT_RESTAURANT_ID, false);
+      const restaurantData = await getRestaurant(selectedRestaurant.id, false);
       
       if (restaurantData) {
         setRestaurant(restaurantData);
@@ -132,6 +139,11 @@ export default function RestaurantSettingsPage() {
   const handleSaveSettings = async () => {
     if (!validateForm()) return;
 
+    if (!selectedRestaurant) {
+      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -158,7 +170,7 @@ export default function RestaurantSettingsPage() {
         settings: restaurantSettings,
       };
 
-      await updateRestaurant(DEFAULT_RESTAURANT_ID, restaurantData);
+      await updateRestaurant(selectedRestaurant.id, restaurantData);
       
       // Reload restaurant data
       await loadRestaurant();
@@ -169,47 +181,6 @@ export default function RestaurantSettingsPage() {
       Alert.alert('Erreur', 'Une erreur s\'est produite lors de la sauvegarde');
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleMigrateData = async () => {
-    Alert.alert(
-      'Migration des données',
-      'Cette opération va migrer vos données existantes (tables, menu, stock, commandes) vers la structure restaurant. Continuer ?',
-      [
-        {
-          text: 'Annuler',
-          style: 'cancel'
-        },
-        {
-          text: 'Migrer',
-          onPress: async () => {
-            try {
-              setSyncing(true);
-              await migrateExistingDataToRestaurant(DEFAULT_RESTAURANT_ID);
-              Alert.alert('Succès', 'Migration terminée avec succès !');
-            } catch (error) {
-              console.error('Erreur lors de la migration:', error);
-              Alert.alert('Erreur', 'Une erreur s\'est produite lors de la migration');
-            } finally {
-              setSyncing(false);
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleSyncData = async () => {
-    try {
-      setSyncing(true);
-      await syncRestaurantData(DEFAULT_RESTAURANT_ID);
-      Alert.alert('Succès', 'Synchronisation terminée !');
-    } catch (error) {
-      console.error('Erreur lors de la synchronisation:', error);
-      Alert.alert('Erreur', 'Une erreur s\'est produite lors de la synchronisation');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -225,7 +196,7 @@ export default function RestaurantSettingsPage() {
     },
     {
       label: 'Accueil',
-      onPress: () => router.push('/service')
+      onPress: () => router.push('../service' as any)
     },
     {
       label: 'Profil',
@@ -434,48 +405,6 @@ export default function RestaurantSettingsPage() {
           </Pressable>
 
           <Text style={styles.sectionTitle}>Gestion des données</Text>
-
-          <View style={styles.actionCard}>
-            <View style={styles.actionHeader}>
-              <MaterialIcons name="sync" size={24} color="#194A8D" />
-              <Text style={styles.actionTitle}>Migration des données</Text>
-            </View>
-            <Text style={styles.actionDescription}>
-              Migrer vos données existantes vers la structure restaurant
-            </Text>
-            <Pressable 
-              style={[styles.actionButton, syncing && styles.actionButtonDisabled]} 
-              onPress={handleMigrateData}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <ActivityIndicator size="small" color="#194A8D" />
-              ) : (
-                <Text style={styles.actionButtonText}>Migrer les données</Text>
-              )}
-            </Pressable>
-          </View>
-
-          <View style={styles.actionCard}>
-            <View style={styles.actionHeader}>
-              <MaterialIcons name="refresh" size={24} color="#194A8D" />
-              <Text style={styles.actionTitle}>Synchronisation</Text>
-            </View>
-            <Text style={styles.actionDescription}>
-              Synchroniser les données entre l&apos;ancienne et la nouvelle structure
-            </Text>
-            <Pressable 
-              style={[styles.actionButton, syncing && styles.actionButtonDisabled]} 
-              onPress={handleSyncData}
-              disabled={syncing}
-            >
-              {syncing ? (
-                <ActivityIndicator size="small" color="#194A8D" />
-              ) : (
-                <Text style={styles.actionButtonText}>Synchroniser</Text>
-              )}
-            </Pressable>
-          </View>
 
           <View style={styles.actionCard}>
             <View style={styles.actionHeader}>

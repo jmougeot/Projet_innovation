@@ -1,6 +1,5 @@
 import { collection, addDoc, doc, getDoc, updateDoc, getDocs, deleteDoc } from "firebase/firestore";
 import { db } from "./firebaseConfig";
-import { DEFAULT_RESTAURANT_ID } from './firebaseRestaurant';
 
 // Interface for Stock data
 export interface StockData {
@@ -24,11 +23,11 @@ export interface AddStockData {
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
-const getStockRestaurantRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getStockRestaurantRef = (restaurantId: string) => {
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
-const getStockCollectionRef = (restaurantId: string = DEFAULT_RESTAURANT_ID) => {
+const getStockCollectionRef = (restaurantId: string) => {
   return collection(getStockRestaurantRef(restaurantId), 'stock');
 };
 
@@ -60,10 +59,10 @@ export const getStockCacheInfo = () => {
 /**
  * Add a new stock item
  * @param stockData - Stock data to add
- * @param restaurantId - Restaurant ID (optional, defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID
  * @returns Promise<string> - The stock item ID
  */
-export async function addStock(stockData: AddStockData, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<string> {
+export async function addStock(stockData: AddStockData, restaurantId: string): Promise<string> {
   try {
     const stockToAdd = {
       ...stockData,
@@ -91,10 +90,10 @@ export async function addStock(stockData: AddStockData, restaurantId: string = D
 /**
  * Get stock item by ID
  * @param id - The ID of the stock item
- * @param restaurantId - Restaurant ID (optional, defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID
  * @returns Promise<StockData | null>
  */
-export async function getStock(id: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<StockData | null> {
+export async function getStock(id: string, restaurantId: string): Promise<StockData | null> {
   try {
     const docRef = doc(getStockCollectionRef(restaurantId), id);
     const docSnap = await getDoc(docRef);
@@ -116,10 +115,10 @@ export async function getStock(id: string, restaurantId: string = DEFAULT_RESTAU
 /**
  * Get all stock items
  * @param useCache - Whether to use cache (default: true)
- * @param restaurantId - Restaurant ID (optional, defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID
  * @returns Promise<StockData[]>
  */
-export async function getAllStock(useCache = true, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<StockData[]> {
+export async function getAllStock(useCache = true, restaurantId: string): Promise<StockData[]> {
   try {
     const now = Date.now();
     
@@ -163,10 +162,10 @@ export async function getAllStock(useCache = true, restaurantId: string = DEFAUL
  * Update a stock item
  * @param id - The ID of the stock item to update
  * @param data - Partial stock data to update
- * @param restaurantId - Restaurant ID (optional, defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID
  * @returns Promise<void>
  */
-export async function updateStock(id: string, data: Partial<StockData>, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> {
+export async function updateStock(id: string, data: Partial<StockData>, restaurantId: string): Promise<void> {
   try {
     const docRef = doc(getStockCollectionRef(restaurantId), id);
     
@@ -198,10 +197,10 @@ export async function updateStock(id: string, data: Partial<StockData>, restaura
 /**
  * Delete a stock item
  * @param id - The ID of the stock item to delete
- * @param restaurantId - Restaurant ID (optional, defaults to DEFAULT_RESTAURANT_ID)
+ * @param restaurantId - Restaurant ID
  * @returns Promise<void>
  */
-export async function deleteStock(id: string, restaurantId: string = DEFAULT_RESTAURANT_ID): Promise<void> {
+export async function deleteStock(id: string, restaurantId: string): Promise<void> {
   try {
     const docRef = doc(getStockCollectionRef(restaurantId), id);
     

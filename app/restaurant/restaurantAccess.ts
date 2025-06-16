@@ -1,15 +1,13 @@
 import { 
   collection, 
   doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
+  setDoc,   getDocs, 
   query, 
   where, 
   deleteDoc,
   addDoc 
 } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { db } from '../firebase/firebaseConfig';
 
 // Types pour les accès restaurant
 export interface RestaurantAccess {

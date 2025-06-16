@@ -6,7 +6,7 @@ import {CommandeData, PlatQuantite, getCommandeByTableId, terminerCommande, diag
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
-import { useRestaurantSelection } from '@/app/firebase/RestaurantSelectionContext';
+import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
 import Head from '@/app/components/Head';
 import Reglage from '@/app/components/reglage';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
@@ -198,7 +198,13 @@ function Encaissement() {
             }
              
             console.log(`💰 [ENCAISSEMENT] Finalisation commande ID: ${commandeIdToUse} pour table ${tableId}`);
-            await terminerCommande(commandeIdToUse);
+            
+            if (!selectedRestaurant?.id) {
+                alert('Erreur: Aucun restaurant sélectionné.');
+                return;
+            }
+            
+            await terminerCommande(commandeIdToUse, selectedRestaurant.id);
             
             // Afficher le message de succès avec les informations sur les missions
             alert(`Encaissement réussi !${missionMessage}`);
