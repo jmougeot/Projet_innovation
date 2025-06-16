@@ -2,10 +2,12 @@ import {
   collection, 
   doc, 
   getDoc, 
+  setDoc,
   updateDoc, 
   getDocs 
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
+import { User } from "firebase/auth";
 
 // Interface for User data
 export interface UserData {
@@ -18,6 +20,7 @@ export interface UserData {
   lastName?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  Restaurant?: string[];
 }
 
 // Interface for point update operations
@@ -238,6 +241,175 @@ export async function getAllUsers(): Promise<UserData[]> {
   }
 }
 
+/**
+ * Find a user by email address
+ * @param email - The email address to search for
+ * @returns Promise<UserData | null> - The user data if found, null otherwise
+ */
+export async function getUserByEmail(email: string): Promise<UserData | null> {
+  try {
+    console.log(`🔍 Recherche de l'utilisateur avec l'email: ${email}`);
+    
+    // Get all users and search for the email
+    // Note: In a production app, you might want to use a query index for better performance
+    const usersCollectionRef = collection(db, "users");
+    const usersSnapshot = await getDocs(usersCollectionRef);
+    
+    for (const doc of usersSnapshot.docs) {
+      const userData = doc.data() as UserData;
+      if (userData.email === email) {
+        console.log(`✅ Utilisateur trouvé avec l'email ${email}: ${doc.id}`);
+        return { ...userData, id: doc.id };
+      }
+    }
+    
+    console.log(`❌ Aucun utilisateur trouvé avec l'email: ${email}`);
+    return null;
+  } catch (error) {
+    console.error("❌ Erreur lors de la recherche de l'utilisateur par email:", error);
+    throw error;
+  }
+}
+
+/**
+ * Add restaurant ID to a user's Restaurant array
+ * @param userId - The ID of the user
+ * @param restaurantId - The ID of the restaurant to add
+ * @returns Promise<void>
+ */
+export async function addRestaurantToUserArray(userId: string, restaurantId: string): Promise<void> {
+  try {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      console.log(`⚠️ Utilisateur avec l'ID ${userId} non trouvé, création d'un enregistrement de base...`);
+      
+      // Create a basic user record with the restaurant
+      const basicUserData: Partial<UserData> = {
+        id: userId,
+        email: '', // Will be updated later if needed
+        role: 'user', // Default role
+        Restaurant: [restaurantId],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      await setDoc(userRef, basicUserData);
+      console.log(`✅ Enregistrement utilisateur de base créé pour ${userId} avec restaurant ${restaurantId}`);
+      return;
+    }
+
+    const userData = userDoc.data() as UserData;
+    const currentRestaurants = userData.Restaurant || [];
+    
+    // Add restaurant if not already in the array
+    if (!currentRestaurants.includes(restaurantId)) {
+      const updatedRestaurants = [...currentRestaurants, restaurantId];
+      
+      await updateDoc(userRef, {
+        Restaurant: updatedRestaurants,
+        updatedAt: new Date(),
+      });
+
+      // Invalider le cache après la mise à jour
+      if (usersCache[userId]) {
+        delete usersCache[userId];
+      }
+      allUsersCache = null;
+      console.log(`🔄 Cache utilisateur invalidé pour ${userId}`);
+
+      console.log(`✅ Restaurant ${restaurantId} ajouté avec succès à l'utilisateur ${userId}`);
+    } else {
+      console.log(`ℹ️ Restaurant ${restaurantId} déjà associé à l'utilisateur ${userId}`);
+    }
+  } catch (error) {
+    console.error("❌ Erreur lors de l'ajout du restaurant à l'utilisateur:", error);
+    throw error;
+  }
+}
+
+/**
+ * Remove restaurant ID from a user's Restaurant array
+ * @param userId - The ID of the user
+ * @param restaurantId - The ID of the restaurant to remove
+ * @returns Promise<void>
+ */
+export async function removeRestaurantFromUserArray(userId: string, restaurantId: string): Promise<void> {
+  try {
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      console.log(`⚠️ Utilisateur avec l'ID ${userId} non trouvé`);
+      return;
+    }
+
+    const userData = userDoc.data() as UserData;
+    const currentRestaurants = userData.Restaurant || [];
+    
+    // Remove restaurant from the array
+    const updatedRestaurants = currentRestaurants.filter(id => id !== restaurantId);
+    
+    await updateDoc(userRef, {
+      Restaurant: updatedRestaurants,
+      updatedAt: new Date(),
+    });
+
+    // Invalider le cache après la mise à jour
+    if (usersCache[userId]) {
+      delete usersCache[userId];
+    }
+    allUsersCache = null;
+    console.log(`🔄 Cache utilisateur invalidé pour ${userId}`);
+
+    console.log(`✅ Restaurant ${restaurantId} retiré avec succès de l'utilisateur ${userId}`);
+  } catch (error) {
+    console.error("❌ Erreur lors de la suppression du restaurant de l'utilisateur:", error);
+    throw error;
+  }
+}
+
+/**
+ * Get all restaurant IDs associated with a user
+ * @param userId - The ID of the user
+ * @returns Promise<string[] | undefined> - Array of restaurant IDs, or undefined if user not found
+ */
+export async function getAllRestaurantToUser(userId: string): Promise<string[] | undefined> {
+  try {
+    console.log(`🔍 Récupération des restaurants pour l'utilisateur: ${userId}`);
+    
+    const userRef = doc(db, "users", userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      console.log(`⚠️ Utilisateur avec l'ID ${userId} non trouvé`);
+      return undefined;
+    }
+    
+    const userData = userDoc.data() as UserData;
+    if (!userData.Restaurant) {
+      console.log(`ℹ️ Aucun restaurant associé à l'utilisateur ${userId}`);
+      return [];
+    }
+    
+    // Dédupliquer les IDs de restaurants
+    const restaurantIds = userData.Restaurant as string[];
+    const uniqueRestaurantIds = [...new Set(restaurantIds)];
+    
+    if (restaurantIds.length !== uniqueRestaurantIds.length) {
+      console.log(`🔄 Doublons détectés et supprimés: ${restaurantIds.length} → ${uniqueRestaurantIds.length}`);
+    }
+    
+    console.log(`✅ Restaurants uniques trouvés pour l'utilisateur ${userId}:`, uniqueRestaurantIds);
+    return uniqueRestaurantIds;
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération des restaurants de l'utilisateur:", error);
+    throw error;
+  }
+}
+
+
 // Export all functions
 export default {
   updatePoints,
@@ -247,4 +419,8 @@ export default {
   getAllUsers,
   clearUsersCache,
   getUsersCacheInfo,
+  getUserByEmail,
+  addRestaurantToUserArray,
+  removeRestaurantFromUserArray,
+  getAllRestaurantToUser,
 };

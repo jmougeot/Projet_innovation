@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../../restaurant/SelectionContext';
 
 import { 
   TableShapeRenderer, 
@@ -17,7 +17,7 @@ import { WorkspaceContainer, useWorkspaceSize } from '../components/Workspace';
 
 export default function PlanDeSalle() {
   const router = useRouter();
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
   const [viewMode, setViewMode] = useState<'plan' | 'liste'>('plan');
   const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -45,7 +45,7 @@ export default function PlanDeSalle() {
   // Charger les tables au démarrage
   useEffect(() => {
     const loadTables = async () => {
-      if (!selectedRestaurant) {
+      if (!currentRestaurant) {
         console.warn('Aucun restaurant sélectionné');
         setLoading(false);
         return;
@@ -53,8 +53,8 @@ export default function PlanDeSalle() {
 
       try {
         setLoading(true);
-        await initializeDefaultTables('default-room', selectedRestaurant.id);
-        const tablesData = await getTables('default-room', true, selectedRestaurant.id);
+        await initializeDefaultTables('default-room', currentRestaurant.id);
+        const tablesData = await getTables('default-room', true, currentRestaurant.id);
         setTables(tablesData);
       } catch (error) {
         console.error("Erreur lors du chargement des tables:", error);
@@ -65,7 +65,7 @@ export default function PlanDeSalle() {
     };
     
     loadTables();
-  }, [selectedRestaurant]);
+  }, [currentRestaurant]);
 
   const handleTablePress = (tableId: number, tablenumber: string) => {
     router.push({
@@ -76,14 +76,14 @@ export default function PlanDeSalle() {
 
   // Changer le statut de la table (appui long)
   const handleTableLongPress = async (tableId: number, currentStatus: Table['status']) => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       alert("Aucun restaurant sélectionné");
       return;
     }
 
     try {
       const nextStatus = getNextStatus(currentStatus);
-      await updateTableStatus(tableId, nextStatus, 'default-room', selectedRestaurant.id);
+      await updateTableStatus(tableId, nextStatus, 'default-room', currentRestaurant.id);
       
       setTables(prevTables => 
         prevTables.map(table => 

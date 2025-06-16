@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { useRestaurantSelection } from '../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../restaurant/SelectionContext';
 
 interface RestaurantStatusProps {
   style?: any;
@@ -9,7 +9,7 @@ interface RestaurantStatusProps {
 }
 
 export default function RestaurantStatus({ style, showChangeButton = true }: RestaurantStatusProps) {
-  const { selectedRestaurant, user, restaurantsLoading } = useRestaurantSelection();
+  const { currentRestaurant, user, isLoading } = useRestaurant();
 
   const handleNavigateToSelector = () => {
     router.push('/');
@@ -19,7 +19,7 @@ export default function RestaurantStatus({ style, showChangeButton = true }: Res
     return null;
   }
 
-  if (restaurantsLoading) {
+  if (isLoading) {
     return (
       <View style={[styles.container, style]}>
         <Text style={styles.loadingText}>Chargement...</Text>
@@ -32,12 +32,12 @@ export default function RestaurantStatus({ style, showChangeButton = true }: Res
       <View style={styles.statusContainer}>
         <View style={[
           styles.statusIndicator, 
-          selectedRestaurant ? styles.connected : styles.disconnected
+          currentRestaurant ? styles.connected : styles.disconnected
         ]} />
         <View style={styles.textContainer}>
           <Text style={styles.label}>Restaurant:</Text>
           <Text style={styles.restaurantName}>
-            {selectedRestaurant ? selectedRestaurant.name : 'Non sélectionné'}
+            {currentRestaurant ? currentRestaurant.name : 'Non sélectionné'}
           </Text>
         </View>
       </View>

@@ -12,38 +12,28 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '../components/Header';
 import RestaurantProtectedRoute from './components/RestaurantProtectedRoute';
-import { useRestaurantSelection, useRestaurantNavigation } from './RestaurantSelectionContext';
-import { 
-  getRestaurant, 
-  initializeRestaurant
-} from '../firebase/firebaseRestaurant';
-import type { Restaurant } from '../firebase/firebaseRestaurant';
+import { useRestaurant } from './SelectionContext';
+import { getRestaurant, Restaurant} from '../firebase/firebaseRestaurant';
 
 export default function RestaurantIndex() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const { selectedRestaurant, selectedRestaurantRole, clearRestaurantSelection } = useRestaurantSelection();
-  const { isRestaurantSelected } = useRestaurantNavigation();
+  const { currentRestaurant, setCurrentRestaurant } = useRestaurant();
 
   useEffect(() => {
-    // Si aucun restaurant n'est sélectionné, rediriger vers la sélection
-    if (!isRestaurantSelected) {
-      console.log('🔄 Aucun restaurant sélectionné, redirection vers la sélection...');
-      router.replace('/restaurant/select' as any);
-      return;
-    }
-
-    if (selectedRestaurant) {
-      setRestaurant(selectedRestaurant as any);
+    // Only check restaurant exists if we have a current restaurant
+    if (currentRestaurant) {
+      setRestaurant(currentRestaurant as any);
       setLoading(false);
     } else {
-      checkRestaurantExists();
+      // Let RestaurantProtectedRoute handle the redirection
+      setLoading(false);
     }
-  }, [selectedRestaurant, isRestaurantSelected]);
+  }, [currentRestaurant]);
 
   const checkRestaurantExists = async () => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       setRestaurant(null);
       setLoading(false);
       return;
@@ -51,7 +41,7 @@ export default function RestaurantIndex() {
 
     try {
       setLoading(true);
-      const existingRestaurant = await getRestaurant(selectedRestaurant.id, false);
+      const existingRestaurant = await getRestaurant(currentRestaurant.id, false);
       setRestaurant(existingRestaurant);
     } catch (error) {
       console.error('Erreur lors de la vérification du restaurant:', error);
@@ -78,7 +68,7 @@ export default function RestaurantIndex() {
         {
           text: 'Changer',
           onPress: async () => {
-            await clearRestaurantSelection();
+            await setCurrentRestaurant(null);
             router.replace('/restaurant/select' as any);
           }
         }
@@ -134,7 +124,7 @@ export default function RestaurantIndex() {
     return (
       <SafeAreaView style={styles.container}>
         <Header 
-          title={selectedRestaurant ? selectedRestaurant.name : "Mon Restaurant"} 
+          title={currentRestaurant ? currentRestaurant.name : "Mon Restaurant"} 
           showBackButton={true}
           backgroundColor="#194A8D"
           textColor="#FFFFFF"
@@ -152,10 +142,10 @@ export default function RestaurantIndex() {
   }
 
   return (
-    <RestaurantProtectedRoute requiredRoles={['owner', 'manager', 'admin']}>
+    <RestaurantProtectedRoute>
       <SafeAreaView style={styles.container}>
         <Header 
-          title={selectedRestaurant ? selectedRestaurant.name : "Mon Restaurant"} 
+          title={currentRestaurant ? currentRestaurant.name : "Mon Restaurant"} 
           showBackButton={true}
           backgroundColor="#194A8D"
           textColor="#FFFFFF"
@@ -179,32 +169,6 @@ export default function RestaurantIndex() {
                 <MaterialIcons name="restaurant" size={48} color="#194A8D" />
                 <Text style={styles.restaurantName}>{restaurant.name}</Text>
                 <Text style={styles.restaurantSubtitle}>Restaurant configuré</Text>
-                {selectedRestaurantRole && (
-                  <Text style={styles.roleText}>Rôle: {selectedRestaurantRole}</Text>
-                )}
-              </View>
-
-              <View style={styles.restaurantInfo}>
-                <View style={styles.infoRow}>
-                  <MaterialIcons name="access-time" size={20} color="#666" />
-                  <Text style={styles.infoText}>
-                    Ouvert: {restaurant.settings.business_hours.open_time} - {restaurant.settings.business_hours.close_time}
-                  </Text>
-                </View>
-                
-                <View style={styles.infoRow}>
-                  <MaterialIcons name="table-restaurant" size={20} color="#666" />
-                  <Text style={styles.infoText}>
-                    Capacité cuisine: {restaurant.settings.kitchen_capacity} commandes
-                  </Text>
-                </View>
-                
-                <View style={styles.infoRow}>
-                  <MaterialIcons name="euro" size={20} color="#666" />
-                  <Text style={styles.infoText}>
-                    Devise: {restaurant.settings.currency} | TVA: {(restaurant.settings.tax_rate * 100).toFixed(0)}%
-                  </Text>
-                </View>
               </View>
 
               <View style={styles.actionButtons}>
@@ -212,14 +176,12 @@ export default function RestaurantIndex() {
                   <MaterialIcons name="settings" size={24} color="#fff" />
                   <Text style={styles.primaryButtonText}>Gérer le restaurant</Text>
                 </Pressable>
+            
+                <Pressable style={styles.adminButton} onPress={() => router.push('/restaurant/admin' as any)}>
+                  <MaterialIcons name="admin-panel-settings" size={24} color="#E53E3E" />
+                  <Text style={styles.adminButtonText}>Administration</Text>
+                </Pressable>
                 
-                {/* Bouton Administration pour owners et admins */}
-                {(selectedRestaurantRole === 'owner' || selectedRestaurantRole === 'admin') && (
-                  <Pressable style={styles.adminButton} onPress={() => router.push('/restaurant/admin' as any)}>
-                    <MaterialIcons name="admin-panel-settings" size={24} color="#E53E3E" />
-                    <Text style={styles.adminButtonText}>Administration</Text>
-                  </Pressable>
-                )}
               </View>
             </View>
           ) : (

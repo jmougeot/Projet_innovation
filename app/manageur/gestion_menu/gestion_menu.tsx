@@ -3,11 +3,11 @@ import { View, Text, FlatList, ActivityIndicator, Button, StyleSheet , Touchable
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
 import { Plat, get_plats, ajout_plat } from '@/app/firebase/firebaseMenu';
-import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '@/app/restaurant/SelectionContext';
 
 
 export default function Menu() {
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
   const [plats, setPlats] = useState<Plat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,11 +23,11 @@ export default function Menu() {
     setLoading(true);
     setError(null);
     try {
-      if (!selectedRestaurant) {
+      if (!currentRestaurant) {
         setError("Aucun restaurant sélectionné");
         return;
       }
-      const menuItems = await get_plats(true, selectedRestaurant.id);
+      const menuItems = await get_plats(true, currentRestaurant.id);
       setPlats(menuItems);
     } catch (err) {
       console.error('Erreur lors de la récupération des plats:', err);
@@ -42,7 +42,7 @@ export default function Menu() {
 
   const handleAddPlat = async () => {
     try {
-      if (!selectedRestaurant) {
+      if (!currentRestaurant) {
         Alert.alert('Erreur', 'Aucun restaurant sélectionné');
         return;
       }
@@ -56,7 +56,7 @@ export default function Menu() {
         name: newPlat.name,
         category: newPlat.category,
         price: Number(newPlat.price)
-      }, selectedRestaurant.id);
+      }, currentRestaurant.id);
 
       setModalVisible(false);
       setNewPlat({ name: '', category: '', price: '' });

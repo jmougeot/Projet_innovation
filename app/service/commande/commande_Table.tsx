@@ -11,12 +11,12 @@ import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized'
 import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
-import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '@/app/restaurant/SelectionContext';
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
     const { tablenumber} = useLocalSearchParams();
-    const { selectedRestaurant } = useRestaurantSelection();
+    const { currentRestaurant } = useRestaurant();
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
@@ -46,13 +46,13 @@ export default function Commande() {
 // Chargement des plats depuis Firebase
     useEffect(() => {
         const fetchPlats = async () => {
-            if (!selectedRestaurant) {
+            if (!currentRestaurant) {
                 console.warn('Aucun restaurant sélectionné pour charger les plats');
                 return;
             }
             
             try {
-                const platsData = await get_plats(true, selectedRestaurant.id);
+                const platsData = await get_plats(true, currentRestaurant.id);
                 setListPlats(platsData);
             } catch (error) {
                 console.error('Erreur lors du chargement des plats:', error);
@@ -60,15 +60,15 @@ export default function Commande() {
             }
         };
         fetchPlats();
-    }, [selectedRestaurant]);
+    }, [currentRestaurant]);
 
 // Chargement des plats avec missions pour l'utilisateur actuel
     useEffect(() => {
         const fetchMissionPlats = async () => {
-            if (!currentUserId || !selectedRestaurant) return;
+            if (!currentUserId || !currentRestaurant) return;
             
             try {
-                const platIds = await getMissionPlatsForUser(currentUserId, selectedRestaurant.id);
+                const platIds = await getMissionPlatsForUser(currentUserId, currentRestaurant.id);
                 console.log("Plats avec missions:", platIds); // Ajout de log pour déboguer
                 setMissionPlatsIds(platIds);
             } catch (error) {
@@ -77,7 +77,7 @@ export default function Commande() {
         };
         
         fetchMissionPlats();
-    }, [currentUserId, selectedRestaurant]);
+    }, [currentUserId, currentRestaurant]);
 
 // Chargement de la commande existante pour la table
     useEffect(() => {
@@ -218,7 +218,7 @@ export default function Commande() {
             return;
         }
 
-        if (!selectedRestaurant) {
+        if (!currentRestaurant) {
             Alert.alert('Erreur', 'Aucun restaurant sélectionné');
             return;
         }
@@ -230,7 +230,7 @@ export default function Commande() {
                 // ✅ CORRECTION: Capturer l'ID Firebase réel et mettre à jour l'état local
                 // Exclure l'ID temporaire avant d'envoyer à Firebase
                 const { id, ...commandeDataSansId } = commandesParTable;
-                const firebaseCommandeId = await createCommande(commandeDataSansId, selectedRestaurant.id);
+                const firebaseCommandeId = await createCommande(commandeDataSansId, currentRestaurant.id);
                 console.log(`🔄 [SYNC] ID local remplacé: ${Idcommande} → ${firebaseCommandeId}`);
                 setIdcommande(firebaseCommandeId);
                 setCommandeExistante(true);

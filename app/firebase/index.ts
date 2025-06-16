@@ -91,12 +91,6 @@ export {
   getRestaurant,
   updateRestaurant,
   updateRestaurantSettings,
-  getRestaurantRooms,
-  getRestaurantActiveOrders,
-  getRestaurantStock,
-  getRestaurantMenu,
-  migrateExistingDataToRestaurant,
-  syncRestaurantData,
   clearRestaurantCache
 } from './firebaseRestaurant';
 export type { 

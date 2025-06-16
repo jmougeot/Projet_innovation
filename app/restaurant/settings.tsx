@@ -13,12 +13,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from './RestaurantSelectionContext';
+import { useRestaurant } from './SelectionContext';
 import {
   getRestaurant,
   updateRestaurant,
-  migrateExistingDataToRestaurant,
-  syncRestaurantData,
   clearRestaurantCache
 } from '../firebase/firebaseRestaurant';
 import type { Restaurant, RestaurantSettings } from '../firebase/firebaseRestaurant';
@@ -39,7 +37,7 @@ interface SettingsFormData {
 
 export default function RestaurantSettingsPage() {
   const router = useRouter();
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -60,10 +58,10 @@ export default function RestaurantSettingsPage() {
 
   useEffect(() => {
     loadRestaurant();
-  }, [selectedRestaurant]);
+  }, [currentRestaurant]);
 
   const loadRestaurant = async () => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       router.push('/restaurant/select' as any);
       return;
@@ -71,8 +69,8 @@ export default function RestaurantSettingsPage() {
 
     try {
       setLoading(true);
-      const restaurantData = await getRestaurant(selectedRestaurant.id, false);
-      
+      const restaurantData = await getRestaurant(currentRestaurant.id, false);
+
       if (restaurantData) {
         setRestaurant(restaurantData);
         setFormData({
@@ -139,7 +137,7 @@ export default function RestaurantSettingsPage() {
   const handleSaveSettings = async () => {
     if (!validateForm()) return;
 
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       return;
     }
@@ -170,8 +168,8 @@ export default function RestaurantSettingsPage() {
         settings: restaurantSettings,
       };
 
-      await updateRestaurant(selectedRestaurant.id, restaurantData);
-      
+      await updateRestaurant(currentRestaurant.id, restaurantData);
+
       // Reload restaurant data
       await loadRestaurant();
       

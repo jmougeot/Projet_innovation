@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useRestaurantNavigation } from './RestaurantSelectionContext';
+import { useRestaurant } from './SelectionContext';
 
 interface AutoRedirectProps {
   children?: React.ReactNode;
@@ -22,18 +22,25 @@ export default function AutoRedirect({
   requireRestaurant = false
 }: AutoRedirectProps) {
   const router = useRouter();
-  const { isLoading, shouldRedirect, redirectTarget, isRestaurantSelected } = useRestaurantNavigation();
+  const { isLoading, isUserConnected, isConnectedToRestaurant } = useRestaurant();
 
   useEffect(() => {
-    if (shouldRedirect && redirectTarget) {
-      console.log('🔄 Redirection automatique vers:', redirectTarget);
-      router.replace(redirectTarget as any);
+    if (!isLoading) {
+      if (!isUserConnected) {
+        // Rediriger vers la connexion si pas connecté
+        console.log('🔄 Redirection vers connexion');
+        router.replace('/connexion' as any);
+      } else if (requireRestaurant && !isConnectedToRestaurant) {
+        // Rediriger vers la sélection si restaurant requis mais pas sélectionné
+        console.log('🔄 Redirection vers sélection restaurant');
+        router.replace('/restaurant/select' as any);
+      }
     }
-  }, [shouldRedirect, redirectTarget, router]);
+  }, [isLoading, isUserConnected, isConnectedToRestaurant, requireRestaurant, router]);
 
   // Si requireRestaurant est true, vérifier qu'un restaurant est sélectionné
-  const needsRestaurant = requireRestaurant && !isRestaurantSelected;
-  const shouldShowLoading = isLoading || shouldRedirect || needsRestaurant;
+  const needsRestaurant = requireRestaurant && !isConnectedToRestaurant;
+  const shouldShowLoading = isLoading || needsRestaurant;
 
   if (shouldShowLoading) {
     if (!showLoading) return null;
@@ -44,11 +51,9 @@ export default function AutoRedirect({
         <Text style={styles.loadingText}>
           {needsRestaurant ? "Vérification du restaurant..." : loadingMessage}
         </Text>
-        {shouldRedirect && (
-          <Text style={styles.redirectText}>
-            Redirection en cours...
-          </Text>
-        )}
+        <Text style={styles.redirectText}>
+          Redirection en cours...
+        </Text>
       </View>
     );
   }

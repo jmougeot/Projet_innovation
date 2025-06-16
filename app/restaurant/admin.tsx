@@ -8,44 +8,34 @@ import {
   ScrollView,
   Alert,
   TextInput,
-} from 'react-native';
+}  from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
 import RestaurantProtectedRoute from './components/RestaurantProtectedRoute';
-import { useRestaurantSelection } from './RestaurantSelectionContext';
-import {
-  getRestaurantUsers,
-  grantRestaurantAccess,
-  revokeRestaurantAccess,
-  ROLE_PERMISSIONS,
-  type RestaurantAccess
-} from '../restaurant/restaurantAccess';
+import { useRestaurant } from './SelectionContext';
+import { getUserMembers, addUserMember, updateUserMember, deleteUserMember, type UserMember } from '../firebase/firebaseRestaurant';
 
 export default function RestaurantAdminPage() {
-  const router = useRouter();
-  const { selectedRestaurant, selectedRestaurantRole } = useRestaurantSelection();
-  
+  const { currentRestaurant } = useRestaurant();
   const [loading, setLoading] = useState(true);
-  const [users, setUsers] = useState<RestaurantAccess[]>([]);
+  const [users, setUsers] = useState<UserMember[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [selectedRole, setSelectedRole] = useState<RestaurantAccess['role']>('staff');
+  const [selectedRole, setSelectedRole] = useState<UserMember['role']>('waiter');
   const [addingUser, setAddingUser] = useState(false);
 
   useEffect(() => {
-    if (selectedRestaurant) {
+    if (currentRestaurant) {
       loadRestaurantUsers();
     }
-  }, [selectedRestaurant]);
+  }, [currentRestaurant]);
 
   const loadRestaurantUsers = async () => {
-    if (!selectedRestaurant) return;
-    
+    if (!currentRestaurant) return;
+
     try {
       setLoading(true);
-      const restaurantUsers = await getRestaurantUsers(selectedRestaurant.id);
+      const restaurantUsers = await getUserMembers(currentRestaurant.id);
       setUsers(restaurantUsers);
     } catch (error) {
       console.error('Erreur lors du chargement des utilisateurs:', error);
@@ -56,7 +46,7 @@ export default function RestaurantAdminPage() {
   };
 
   const handleAddUser = async () => {
-    if (!newUserEmail.trim() || !selectedRestaurant) {
+    if (!newUserEmail.trim() || !currentRestaurant) {
       Alert.alert('Erreur', 'Veuillez saisir un email valide');
       return;
     }
@@ -64,18 +54,16 @@ export default function RestaurantAdminPage() {
     try {
       setAddingUser(true);
       
-      // TODO: Dans une vraie app, rechercher l'utilisateur par email
-      // Ici on utilise l'email comme userId pour la démo
-      await grantRestaurantAccess(
-        newUserEmail, // En réalité, ce serait l'UID Firebase
-        selectedRestaurant.id,
-        selectedRole,
-        'current-user-id' // TODO: utiliser l'ID de l'utilisateur actuel
-      );
+      // Ajouter un nouveau membre avec l'email fourni
+      await addUserMember(currentRestaurant.id, {
+        name: newUserEmail.split('@')[0], // Utiliser la partie avant @ comme nom
+        email: newUserEmail,
+        role: selectedRole
+      });
 
       setNewUserEmail('');
       await loadRestaurantUsers();
-      Alert.alert('Succès', 'Accès accordé avec succès');
+      Alert.alert('Succès', 'Membre ajouté avec succès');
     } catch (error) {
       console.error('Erreur lors de l\'ajout de l\'utilisateur:', error);
       Alert.alert('Erreur', 'Impossible d\'ajouter l\'utilisateur');
@@ -85,7 +73,7 @@ export default function RestaurantAdminPage() {
   };
 
   const handleRevokeAccess = async (userId: string) => {
-    if (!selectedRestaurant) return;
+    if (!currentRestaurant) return;
 
     Alert.alert(
       'Confirmer',
@@ -97,7 +85,7 @@ export default function RestaurantAdminPage() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await revokeRestaurantAccess(userId, selectedRestaurant.id);
+              await deleteUserMember(currentRestaurant.id, userId);
               await loadRestaurantUsers();
               Alert.alert('Succès', 'Accès révoqué');
             } catch (error) {
@@ -110,23 +98,23 @@ export default function RestaurantAdminPage() {
     );
   };
 
-  const getRoleColor = (role: string) => {
+  const getRoleColor = (role: UserMember['role']) => {
     switch (role) {
-      case 'owner': return '#D4AF37';
-      case 'admin': return '#E53E3E';
       case 'manager': return '#3182CE';
-      case 'staff': return '#38A169';
+      case 'waiter': return '#38A169';
+      case 'chef': return '#E53E3E';
+      case 'cleaner': return '#9F7AEA';
       default: return '#666';
     }
   };
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role: UserMember['role']) => {
     switch (role) {
-      case 'owner': return 'star';
-      case 'admin': return 'admin-panel-settings';
       case 'manager': return 'manage-accounts';
-      case 'staff': return 'person';
-      default: return 'help';
+      case 'waiter': return 'room-service';
+      case 'chef': return 'restaurant';
+      case 'cleaner': return 'cleaning-services';
+      default: return 'person';
     }
   };
 
@@ -148,7 +136,7 @@ export default function RestaurantAdminPage() {
   }
 
   return (
-    <RestaurantProtectedRoute requiredRoles={['owner', 'admin']}>
+    <RestaurantProtectedRoute>
       <SafeAreaView style={styles.container}>
         <Header 
           title="Administration" 
@@ -162,8 +150,7 @@ export default function RestaurantAdminPage() {
           <View style={styles.restaurantInfo}>
             <MaterialIcons name="restaurant" size={32} color="#194A8D" />
             <View style={styles.restaurantDetails}>
-              <Text style={styles.restaurantName}>{selectedRestaurant?.name}</Text>
-              <Text style={styles.restaurantRole}>Votre rôle: {selectedRestaurantRole}</Text>
+              <Text style={styles.restaurantName}>{currentRestaurant?.name}</Text>
             </View>
           </View>
 
@@ -184,7 +171,7 @@ export default function RestaurantAdminPage() {
               <View style={styles.roleSelector}>
                 <Text style={styles.roleLabel}>Rôle:</Text>
                 <View style={styles.roleButtons}>
-                  {(['staff', 'manager', 'admin'] as const).map((role) => (
+                  {(['manager', 'waiter', 'chef', 'cleaner'] as const).map((role) => (
                     <Pressable
                       key={role}
                       style={[
@@ -197,7 +184,10 @@ export default function RestaurantAdminPage() {
                         styles.roleButtonText,
                         selectedRole === role && styles.roleButtonTextSelected
                       ]}>
-                        {role}
+                        {role === 'waiter' ? 'serveur' : 
+                         role === 'chef' ? 'cuisinier' : 
+                         role === 'cleaner' ? 'nettoyage' : 
+                         role === 'manager' ? 'manager' : role}
                       </Text>
                     </Pressable>
                   ))}
@@ -238,25 +228,26 @@ export default function RestaurantAdminPage() {
                     </View>
                     
                     <View style={styles.userInfo}>
-                      <Text style={styles.userName}>{user.userId}</Text>
+                      <Text style={styles.userName}>{user.name}</Text>
+                      <Text style={styles.userEmail}>{user.email}</Text>
                       <View style={styles.userMeta}>
                         <View style={[styles.roleBadge, { backgroundColor: getRoleColor(user.role) }]}>
-                          <Text style={styles.roleBadgeText}>{user.role}</Text>
+                          <Text style={styles.roleBadgeText}>
+                            {user.role === 'waiter' ? 'serveur' : 
+                             user.role === 'chef' ? 'cuisinier' : 
+                             user.role === 'cleaner' ? 'nettoyage' : 
+                             user.role === 'manager' ? 'manager' : user.role}
+                          </Text>
                         </View>
-                        <Text style={styles.userDate}>
-                          Ajouté le {new Date(user.grantedAt?.toDate?.() || user.grantedAt).toLocaleDateString()}
-                        </Text>
                       </View>
                     </View>
 
-                    {user.role !== 'owner' && (
-                      <Pressable 
-                        style={styles.revokeButton}
-                        onPress={() => handleRevokeAccess(user.userId)}
-                      >
-                        <MaterialIcons name="remove-circle" size={20} color="#E53E3E" />
-                      </Pressable>
-                    )}
+                    <Pressable 
+                      style={styles.revokeButton}
+                      onPress={() => handleRevokeAccess(user.id)}
+                    >
+                      <MaterialIcons name="remove-circle" size={20} color="#E53E3E" />
+                    </Pressable>
                   </View>
                 ))}
               </View>
@@ -441,6 +432,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 4,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
   },
   userMeta: {

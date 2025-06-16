@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Pressable } from 'react-native';
-import { useRestaurantSelection } from '../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../restaurant/SelectionContext';
 
 export default function RestaurantChangeAlert() {
   const [alertVisible, setAlertVisible] = useState(false);
   const [previousRestaurant, setPreviousRestaurant] = useState<string | null>(null);
   const [fadeAnim] = useState(new Animated.Value(0));
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
 
   useEffect(() => {
-    if (selectedRestaurant && previousRestaurant && selectedRestaurant.id !== previousRestaurant) {
+    if (currentRestaurant && previousRestaurant && currentRestaurant.id !== previousRestaurant) {
       // Restaurant has changed, show alert
       setAlertVisible(true);
       
@@ -28,10 +28,10 @@ export default function RestaurantChangeAlert() {
       return () => clearTimeout(timer);
     }
     
-    if (selectedRestaurant) {
-      setPreviousRestaurant(selectedRestaurant.id);
+    if (currentRestaurant) {
+      setPreviousRestaurant(currentRestaurant.id);
     }
-  }, [selectedRestaurant]);
+  }, [currentRestaurant]);
 
   const hideAlert = () => {
     Animated.timing(fadeAnim, {
@@ -43,7 +43,7 @@ export default function RestaurantChangeAlert() {
     });
   };
 
-  if (!alertVisible || !selectedRestaurant) {
+  if (!alertVisible || !currentRestaurant) {
     return null;
   }
 
@@ -57,7 +57,7 @@ export default function RestaurantChangeAlert() {
       <View style={styles.alertContent}>
         <Text style={styles.alertTitle}>Restaurant changé</Text>
         <Text style={styles.alertText}>
-          Vous êtes maintenant connecté à: {selectedRestaurant.name}
+          Vous êtes maintenant connecté à: {currentRestaurant.name}
         </Text>
         <Pressable style={styles.dismissButton} onPress={hideAlert}>
           <Text style={styles.dismissText}>OK</Text>

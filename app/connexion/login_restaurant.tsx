@@ -12,17 +12,15 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from '../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../restaurant/SelectionContext';
 
 export default function RestaurantLoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { user, availableRestaurants, refreshRestaurants } = useRestaurantSelection();
+  const { user } = useRestaurant();
 
   useEffect(() => {
-    if (user) {
-      refreshRestaurants();
-    }
+    // Pas besoin de rafraîchir avec le nouveau contexte
   }, [user]);
 
   const handleSetupTestAccess = async () => {
@@ -33,7 +31,6 @@ export default function RestaurantLoginPage() {
 
     try {
       setLoading(true);
-       await refreshRestaurants();
       
       Alert.alert(
         'Configuration terminée',
@@ -102,55 +99,44 @@ export default function RestaurantLoginPage() {
         <View style={styles.statusCard}>
           <Text style={styles.statusTitle}>État des accès</Text>
           
-          {availableRestaurants.length > 0 ? (
-            <View style={styles.statusSuccess}>
-              <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
-              <Text style={styles.statusText}>
-                Vous avez accès à {availableRestaurants.length} restaurant(s)
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.statusWarning}>
-              <MaterialIcons name="warning" size={24} color="#FF9800" />
-              <Text style={styles.statusText}>
-                Aucun accès restaurant configuré
-              </Text>
-            </View>
-          )}
+          <View style={styles.statusSuccess}>
+            <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
+            <Text style={styles.statusText}>
+              Accès restaurant configuré
+            </Text>
+          </View>
         </View>
 
         <View style={styles.actions}>
-          {availableRestaurants.length > 0 ? (
-            <Pressable style={styles.primaryButton} onPress={handleGoToSelection}>
-              <LinearGradient
-                colors={['#194A8D', '#0F3A6B']}
-                style={styles.buttonGradient}
-              >
-                <MaterialIcons name="restaurant" size={24} color="white" />
-                <Text style={styles.buttonText}>Accéder aux restaurants</Text>
-              </LinearGradient>
-            </Pressable>
-          ) : (
-            <Pressable 
-              style={[styles.primaryButton, loading && styles.buttonDisabled]} 
-              onPress={handleSetupTestAccess}
-              disabled={loading}
+          <Pressable style={styles.primaryButton} onPress={handleGoToSelection}>
+            <LinearGradient
+              colors={['#194A8D', '#0F3A6B']}
+              style={styles.buttonGradient}
             >
-              <LinearGradient
-                colors={['#D4AF37', '#B8941F']}
-                style={styles.buttonGradient}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <>
-                    <MaterialIcons name="build" size={24} color="white" />
-                    <Text style={styles.buttonText}>Configurer accès de test</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </Pressable>
-          )}
+              <MaterialIcons name="restaurant" size={24} color="white" />
+              <Text style={styles.buttonText}>Accéder aux restaurants</Text>
+            </LinearGradient>
+          </Pressable>
+          
+          <Pressable 
+            style={[styles.primaryButton, loading && styles.buttonDisabled]} 
+            onPress={handleSetupTestAccess}
+            disabled={loading}
+          >
+            <LinearGradient
+              colors={['#D4AF37', '#B8941F']}
+              style={styles.buttonGradient}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <MaterialIcons name="build" size={24} color="white" />
+                  <Text style={styles.buttonText}>Configurer accès de test</Text>
+                </>
+              )}
+            </LinearGradient>
+          </Pressable>
 
           <Pressable style={styles.secondaryButton} onPress={() => router.push('../service' as any)}>
             <Text style={styles.secondaryButtonText}>Retour au service</Text>

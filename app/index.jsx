@@ -46,12 +46,8 @@ export default function Index() {
             end={{ x: 1, y: 0.5 }}
             style={styles.separator}
           />
-          <Text style={styles.welcomeText}>Sélectionnez une option pour continuer</Text>
         </View>
-
-        {/* Restaurant Selector */}
-        <RestaurantSelector style={styles.restaurantSelector} />
-        
+                
         <View style={styles.buttonsSection}>
           <Link href="./service" asChild>
             <Pressable style={styles.button}>

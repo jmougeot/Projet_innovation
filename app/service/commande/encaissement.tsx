@@ -6,14 +6,14 @@ import {CommandeData, PlatQuantite, getCommandeByTableId, terminerCommande, diag
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
-import { useRestaurantSelection } from '@/app/restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '@/app/restaurant/SelectionContext';
 import Head from '@/app/components/Head';
 import Reglage from '@/app/components/reglage';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
 
 function Encaissement() {
     const { tableId } = useLocalSearchParams();
-    const { selectedRestaurant } = useRestaurantSelection();
+    const { currentRestaurant } = useRestaurant();
     const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
@@ -152,14 +152,14 @@ function Encaissement() {
             let missionMessage = '';
             if (commandesParTable && commandesParTable.plats.length > 0) {
                 try {
-                    if (!selectedRestaurant) {
+                    if (!currentRestaurant) {
                         console.warn('💰 [ENCAISSEMENT WARNING] Aucun restaurant sélectionné, mise à jour des missions ignorée');
                         missionMessage = `\n⚠️ Aucun restaurant sélectionné, missions non mises à jour.`;
                     } else {
-                        console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId} et restaurant: ${selectedRestaurant.id}`);
+                        console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId} et restaurant: ${currentRestaurant.id}`);
                         console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, commandesParTable.plats.map(p => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
                         
-                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats, selectedRestaurant.id);
+                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats, currentRestaurant.id);
                         
                         console.log(`💰 [ENCAISSEMENT DEBUG] Résultat mise à jour missions:`, missionUpdateResult);
                         
@@ -199,12 +199,12 @@ function Encaissement() {
              
             console.log(`💰 [ENCAISSEMENT] Finalisation commande ID: ${commandeIdToUse} pour table ${tableId}`);
             
-            if (!selectedRestaurant?.id) {
+            if (!currentRestaurant?.id) {
                 alert('Erreur: Aucun restaurant sélectionné.');
                 return;
             }
             
-            await terminerCommande(commandeIdToUse, selectedRestaurant.id);
+            await terminerCommande(commandeIdToUse, currentRestaurant.id);
             
             // Afficher le message de succès avec les informations sur les missions
             alert(`Encaissement réussi !${missionMessage}`);

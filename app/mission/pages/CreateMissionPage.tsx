@@ -16,7 +16,7 @@ import { createMission, assignMissionToUser, createCollectiveMission } from '../
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { get_plats, Plat } from '../../firebase/firebaseMenu';
-import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../../restaurant/SelectionContext';
 
 // Types
 import type { Mission } from '../types';
@@ -28,7 +28,7 @@ interface User {
 }
 
 const CreateMissionPage = () => {
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
 
   // État initial du formulaire
   const [formData, setFormData] = useState({
@@ -81,11 +81,11 @@ const CreateMissionPage = () => {
   useEffect(() => {
     const fetchPlats = async () => {
       try {
-        if (!selectedRestaurant) {
+        if (!currentRestaurant) {
           console.warn('Aucun restaurant sélectionné pour récupérer les plats');
           return;
         }
-        const platsList = await get_plats(true, selectedRestaurant.id);
+        const platsList = await get_plats(true, currentRestaurant.id);
         setPlats(platsList);
       } catch (error) {
         console.error('Erreur lors de la récupération des plats:', error);
@@ -94,7 +94,7 @@ const CreateMissionPage = () => {
     };
     
     fetchPlats();
-  }, [selectedRestaurant]);
+  }, [currentRestaurant]);
   
   // Gestion de la date
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -150,20 +150,20 @@ const CreateMissionPage = () => {
       
       console.log("Création de mission avec données:", JSON.stringify(missionData));
       
-      if (!selectedRestaurant) {
+      if (!currentRestaurant) {
         Alert.alert('Erreur', 'Aucun restaurant sélectionné');
         setIsLoading(false);
         return;
       }
       
       // Créer la mission
-      const missionResult = await createMission(missionData, selectedRestaurant.id);
+      const missionResult = await createMission(missionData, currentRestaurant.id);
       const missionId = missionResult.id;
       console.log(`Mission principale créée avec l'ID: ${missionId}`);
       
       // Si c'est une mission collective
       if (formData.isCollective) {
-        const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue, selectedRestaurant.id);
+        const collectiveResult = await createCollectiveMission(missionId, formData.selectedUsers, formData.targetValue, currentRestaurant.id);
         console.log('Collective mission created:', collectiveResult);
       } else {
         console.log(`Création de ${formData.selectedUsers.length} missions individuelles`);
@@ -172,7 +172,7 @@ const CreateMissionPage = () => {
         for (const userId of formData.selectedUsers) {
           try {
             console.log(`Assignation de la mission ${missionId} à l'utilisateur ${userId}`);
-            const assignResult = await assignMissionToUser(missionId, userId, selectedRestaurant.id);
+            const assignResult = await assignMissionToUser(missionId, userId, currentRestaurant.id);
             console.log("Résultat de l'assignation:", JSON.stringify(assignResult));
             
             if (assignResult && assignResult.id) {

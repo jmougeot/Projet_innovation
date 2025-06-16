@@ -116,8 +116,28 @@ export async function signInUser(loginData: UserLoginData): Promise<User> {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log(`Utilisateur connecté avec succès: ${email}`);
     return userCredential.user;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur lors de la connexion:", error);
+    
+    // Gestion spécifique des erreurs réseau
+    if (error?.code === 'auth/network-request-failed') {
+      console.error("🔴 Erreur réseau: Vérifiez votre connexion internet et les paramètres du simulateur");
+      throw new Error("Erreur de connexion réseau. Vérifiez votre connexion internet et redémarrez le simulateur.");
+    }
+    
+    // Gestion des erreurs liées à la protection d'énumération d'emails
+    if (error?.code === 'auth/user-not-found' || error?.code === 'auth/wrong-password') {
+      // Avec la protection d'énumération activée, ces erreurs peuvent être masquées
+      console.warn("⚠️ Erreur d'authentification (protection d'énumération activée)");
+      throw new Error("Email ou mot de passe incorrect.");
+    }
+    
+    // Gestion des erreurs de quota/limite de taux
+    if (error?.code === 'auth/too-many-requests') {
+      console.error("🔴 Trop de tentatives de connexion");
+      throw new Error("Trop de tentatives de connexion. Veuillez réessayer plus tard.");
+    }
+    
     throw error;
   }
 }

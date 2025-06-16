@@ -2,6 +2,11 @@
  * Type definitions for restaurant selection context
  */
 
+export interface UserRestaurantAccess {
+  restaurantId: string;
+  role: 'owner' | 'manager' | 'staff' | 'admin';
+}
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -12,13 +17,7 @@ export interface Restaurant {
   status: 'active' | 'inactive';
   createdAt: any;
   managerId?: string;
-  staffIds?: string[];
-}
-
-export interface UserRestaurantAccess {
-  restaurantId: string;
-  role: 'owner' | 'manager' | 'staff' | 'admin';
-  permissions: string[];
+  staffIds?: UserRestaurantAccess[];
 }
 
 export interface RestaurantSelectionContextType {

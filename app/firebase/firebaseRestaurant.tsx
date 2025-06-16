@@ -12,14 +12,11 @@ import {
   writeBatch, 
   serverTimestamp,
   Timestamp,
-  limit
+  limit,
+  deleteDoc
 } from 'firebase/firestore';
 
-// Import types from other modules
-import type { Room } from './firebaseTables';
-import type { CommandeData, CommandeTerminee } from './firebaseCommandeOptimized';
-import type { StockData } from './firebaseStock';
-import type { Plat } from './firebaseMenu';
+import { getUserByEmail, addRestaurantToUserArray, removeRestaurantFromUserArray } from './firebaseUser'
 
 // ====== RESTAURANT INTERFACES ======
 
@@ -37,6 +34,14 @@ export interface RestaurantSettings {
   default_room_name: string;
 }
 
+export interface UserMember {
+  id: string;
+  name: string;
+  role: 'manager' | 'waiter' | 'chef' | 'cleaner';
+  email: string;
+  phone?: string;
+}
+
 export interface Restaurant {
   id: string;
   name: string;
@@ -47,32 +52,26 @@ export interface Restaurant {
   created_at: Timestamp;
   updated_at: Timestamp;
   settings: RestaurantSettings;
-
-  
-  // Sub-collections references (data will be stored in sub-collections)
-  rooms: Room[];
-  active_orders: CommandeData[];
-  completed_orders: CommandeTerminee[];
-  stock: StockData[];
-  menu: Plat[];
-  
-  // Status
   is_active: boolean;
   last_sync: Timestamp;
+  user?: UserMember[];
 }
 
 // ====== COLLECTION CONSTANTS ======
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // ====== CACHE MANAGEMENT ======
-let restaurantCache: Restaurant | null = null;
-let lastRestaurantCacheUpdate = 0;
+let restaurantCache: { [restaurantId: string]: { data: Restaurant; timestamp: number } } = {};
 const RESTAURANT_CACHE_DURATION = 300000; // 5 minutes
 
-export const clearRestaurantCache = () => {
-  restaurantCache = null;
-  lastRestaurantCacheUpdate = 0;
-  console.log('🗑️ Cache du restaurant vidé');
+export const clearRestaurantCache = (restaurantId?: string) => {
+  if (restaurantId) {
+    delete restaurantCache[restaurantId];
+    console.log(`🗑️ Cache du restaurant ${restaurantId} vidé`);
+  } else {
+    restaurantCache = {};
+    console.log('🗑️ Cache de tous les restaurants vidé');
+  }
 };
 
 // ====== HELPER FUNCTIONS ======
@@ -90,6 +89,224 @@ const getDefaultRestaurantSettings = (): RestaurantSettings => ({
   service_charge: 0.0, // Pas de service par défaut
   default_room_name: "Salle principale"
 });
+
+
+// ====== STAFF MANAGEMENT ======
+
+export const addUserMember = async (
+  restaurantId: string,
+  userData: Omit<UserMember, 'id'>
+): Promise<string> => {
+  try {
+    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
+    const userRef = collection(restaurantRef, 'user');
+    
+    // Generate unique ID for new user member
+    const newUserRef = doc(userRef);
+    const userId = newUserRef.id;
+    
+    const newUser: UserMember = {
+      id: userId,
+      ...userData
+    };
+    
+    await setDoc(newUserRef, newUser);
+    
+    // Also add the restaurant to the user's account (if the user exists in the users collection)
+    try {
+      const existingUser = await getUserByEmail(userData.email);
+      if (existingUser) {
+        console.log(`🔗 Ajout du restaurant ${restaurantId} à l'utilisateur ${existingUser.id}`);
+        await addRestaurantToUserArray(existingUser.id, restaurantId);
+      } else {
+        console.log(`ℹ️ Utilisateur avec l'email ${userData.email} non trouvé dans la collection users`);
+      }
+    } catch (userError) {
+      console.warn('⚠️ Erreur lors de la mise à jour du compte utilisateur (non critique):', userError);
+      // Don't throw here - the user member was created successfully in the restaurant
+    }
+    
+    console.log(`✅ Membre du personnel ajouté avec l'ID: ${userId}`);
+    return userId;
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'ajout du membre du personnel:', error);
+    throw error;
+  }
+};
+
+export const addUserMemberWithUserId = async (
+  restaurantId: string,
+  userData: Omit<UserMember, 'id'>,
+  userId?: string
+): Promise<string> => {
+  try {
+    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
+    const userRef = collection(restaurantRef, 'user');
+    
+    // Generate unique ID for new user member
+    const newUserRef = doc(userRef);
+    const memberId = newUserRef.id;
+    
+    const newUser: UserMember = {
+      id: memberId,
+      ...userData
+    };
+    
+    await setDoc(newUserRef, newUser);
+    
+    // Also add the restaurant to the user's account (if userId is provided)
+    if (userId) {
+      try {
+        console.log(`🔗 Ajout du restaurant ${restaurantId} à l'utilisateur ${userId}`);
+        await addRestaurantToUserArray(userId, restaurantId);
+      } catch (userError) {
+        console.warn('⚠️ Erreur lors de la mise à jour du compte utilisateur (non critique):', userError);
+        // Don't throw here - the user member was created successfully in the restaurant
+      }
+    } else {
+      // Fallback to email search if no userId provided
+      try {
+        const existingUser = await getUserByEmail(userData.email);
+        if (existingUser) {
+          console.log(`🔗 Ajout du restaurant ${restaurantId} à l'utilisateur ${existingUser.id}`);
+          await addRestaurantToUserArray(existingUser.id, restaurantId);
+        } else {
+          console.log(`ℹ️ Utilisateur avec l'email ${userData.email} non trouvé dans la collection users`);
+        }
+      } catch (userError) {
+        console.warn('⚠️ Erreur lors de la mise à jour du compte utilisateur (non critique):', userError);
+        // Don't throw here - the user member was created successfully in the restaurant
+      }
+    }
+    
+    console.log(`✅ Membre du personnel ajouté avec l'ID: ${memberId}`);
+    return memberId;
+  } catch (error) {
+    console.error('❌ Erreur lors de l\'ajout du membre du personnel:', error);
+    throw error;
+  }
+};
+
+export const updateUserMember = async (
+  restaurantId: string,
+  userId: string,
+  updateData: Partial<UserMember>
+): Promise<void> => {
+  try {
+    const userRef = doc(db, RESTAURANTS_COLLECTION, restaurantId, 'user', userId);
+    
+    // Filter out undefined values to avoid Firebase errors
+    const filteredUpdateData = Object.fromEntries(
+      Object.entries(updateData).filter(([_, value]) => value !== undefined)
+    );
+    
+    await updateDoc(userRef, filteredUpdateData);
+    
+    console.log(`✅ Membre du personnel mis à jour avec l'ID: ${userId}`);
+  } catch (error) {
+    console.error('❌ Erreur lors de la mise à jour du membre du personnel:', error);
+    throw error;
+  }
+};
+
+export const getUserMembers = async (restaurantId: string): Promise<UserMember[]> => {
+  try {
+    const userRef = collection(doc(db, RESTAURANTS_COLLECTION, restaurantId), 'user');
+    const userSnapshot = await getDocs(userRef);
+    
+    const userList: UserMember[] = [];
+    userSnapshot.forEach(doc => {
+      userList.push({ id: doc.id, ...doc.data() } as UserMember);
+    });
+    
+    console.log(`✅ ${userList.length} membres du personnel récupérés`);
+    return userList;
+  } catch (error) {
+    console.error('❌ Erreur lors de la récupération des membres du personnel:', error);
+    throw error;
+  }
+};
+
+export const getUserMemberById = async (
+  restaurantId: string,
+  userId: string
+): Promise<UserMember | null> => {
+  try {
+    const userRef = doc(db, RESTAURANTS_COLLECTION, restaurantId, 'user', userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      console.log(`❌ Membre du personnel non trouvé avec l'ID: ${userId}`);
+      return null;
+    }
+    
+    const userData = { id: userDoc.id, ...userDoc.data() } as UserMember;
+    console.log(`✅ Membre du personnel récupéré avec l'ID: ${userId}`);
+    return userData;
+  } catch (error) {
+    console.error('❌ Erreur lors de la récupération du membre du personnel:', error);
+    throw error;
+  }
+}
+
+export const getUserMembersRole = async (
+  restaurantId: string,
+  userId: string
+): Promise<string | null> => {
+  try {
+    const userRef = doc(db, RESTAURANTS_COLLECTION, restaurantId, 'user', userId);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      console.log(`❌ Membre du personnel non trouvé avec l'ID: ${userId}`);
+      return null;
+    }
+    
+    const userData = userDoc.data() as UserMember;
+    console.log(`✅ Rôle du membre du personnel récupéré: ${userData.role}`);
+    return userData.role;
+  } catch (error) {
+    console.error('❌ Erreur lors de la récupération du rôle du membre du personnel:', error);
+    throw error;
+  }
+}
+
+export const deleteUserMember = async (
+  restaurantId: string,
+  userId: string
+): Promise<void> => {
+  try {
+    const userRef = doc(db, RESTAURANTS_COLLECTION, restaurantId, 'user', userId);
+    
+    // Get the user data before deleting to access the email
+    const userDoc = await getDoc(userRef);
+    const userData = userDoc.exists() ? userDoc.data() as UserMember : null;
+    
+    // Delete the user member from the restaurant
+    await deleteDoc(userRef);
+    
+    // Also remove the restaurant from the user's account (if the user exists in the users collection)
+    if (userData?.email) {
+      try {
+        const existingUser = await getUserByEmail(userData.email);
+        if (existingUser) {
+          console.log(`🔗 Suppression du restaurant ${restaurantId} de l'utilisateur ${existingUser.id}`);
+          await removeRestaurantFromUserArray(existingUser.id, restaurantId);
+        } else {
+          console.log(`ℹ️ Utilisateur avec l'email ${userData.email} non trouvé dans la collection users`);
+        }
+      } catch (userError) {
+        console.warn('⚠️ Erreur lors de la mise à jour du compte utilisateur (non critique):', userError);
+        // Don't throw here - the user member was deleted successfully from the restaurant
+      }
+    }
+    
+    console.log(`✅ Membre du personnel supprimé avec l'ID: ${userId}`);
+  } catch (error) {
+    console.error('❌ Erreur lors de la suppression du membre du personnel:', error);
+    throw error;
+  }
+};
 
 
 // ====== MAIN RESTAURANT FUNCTIONS ======
@@ -134,11 +351,6 @@ export const initializeRestaurant = async (
       created_at: serverTimestamp() as Timestamp,
       updated_at: serverTimestamp() as Timestamp,
       settings: { ...getDefaultRestaurantSettings(), ...restaurantData.settings },
-      rooms: [],
-      active_orders: [],
-      completed_orders: [],
-      stock: [],
-      menu: [],
       is_active: true,
       last_sync: serverTimestamp() as Timestamp
     };
@@ -204,53 +416,52 @@ const initializeRestaurantSubCollections = async (restaurantId: string) => {
 /**
  * 🔍 GET RESTAURANT
  */
-export const getRestaurant = async (
-  restaurantId: string,
-  useCache: boolean = true
+export const getRestaurant = async ( restaurantId: string, useCache: boolean = true
 ): Promise<Restaurant | null> => {
   try {
     const now = Date.now();
     
-    // Use cache if available and recent
-    if (useCache && restaurantCache && (now - lastRestaurantCacheUpdate) < RESTAURANT_CACHE_DURATION) {
-      console.log('📱 Restaurant chargé depuis le cache local');
-      return restaurantCache;
+    // Check cache for this specific restaurant
+    if (useCache && restaurantCache[restaurantId]) {
+      const cachedEntry = restaurantCache[restaurantId];
+      if ((now - cachedEntry.timestamp) < RESTAURANT_CACHE_DURATION) {
+        console.log(`📱 Restaurant ${restaurantId} chargé depuis le cache local`);
+        return cachedEntry.data;
+      } else {
+        // Cache expired, remove it
+        delete restaurantCache[restaurantId];
+      }
     }
 
-    console.log('🔄 Chargement du restaurant depuis Firebase...');
+    console.log(`🔄 Chargement du restaurant ${restaurantId} depuis Firebase...`);
     const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
     const restaurantDoc = await getDoc(restaurantRef);
     
     if (!restaurantDoc.exists()) {
-      console.log('❌ Restaurant non trouvé, initialisation...');
-      await initializeRestaurant();
-      return await getRestaurant(restaurantId, false); // Retry without cache
+      console.log('❌ Restaurant non trouvé avec l\'ID:', restaurantId);
+      throw new Error(`Restaurant avec l'ID ${restaurantId} non trouvé`);
     }
 
     const restaurantData = { 
       id: restaurantDoc.id, 
       ...restaurantDoc.data() 
     } as Restaurant;
+
+    // Update cache for this specific restaurant
+    restaurantCache[restaurantId] = {
+      data: restaurantData,
+      timestamp: now
+    };
     
-    // Load sub-collections data
-    restaurantData.rooms = await getRestaurantRooms(restaurantId);
-    restaurantData.active_orders = await getRestaurantActiveOrders(restaurantId);
-    restaurantData.stock = await getRestaurantStock(restaurantId);
-    restaurantData.menu = await getRestaurantMenu(restaurantId);
-    
-    // Update cache
-    restaurantCache = restaurantData;
-    lastRestaurantCacheUpdate = now;
-    
-    console.log(`✅ Restaurant chargé et mis en cache`);
+    console.log(`✅ Restaurant ${restaurantId} chargé et mis en cache`);
     return restaurantData;
   } catch (error) {
     console.error('❌ Erreur lors du chargement du restaurant:', error);
     
-    // Return cache if available on error
-    if (restaurantCache) {
-      console.log('🔄 Utilisation du cache de secours');
-      return restaurantCache;
+    // Fallback to cache if available, even if expired
+    if (restaurantCache[restaurantId]) {
+      console.log('🔄 Utilisation du cache expiré comme fallback');
+      return restaurantCache[restaurantId].data;
     }
     
     throw error;
@@ -313,205 +524,7 @@ export const updateRestaurantSettings = async (
   }
 };
 
-// ====== SUB-COLLECTIONS FUNCTIONS ======
 
-/**
- * 🏠 GET RESTAURANT ROOMS
- */
-export const getRestaurantRooms = async (restaurantId: string): Promise<Room[]> => {
-  try {
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
-    const roomsRef = collection(restaurantRef, 'rooms');
-    const querySnapshot = await getDocs(roomsRef);
-    
-    const rooms: Room[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      // Create a proper Room object with required properties
-      rooms.push({ 
-        name: data.name || "Salle sans nom",
-        listTable: data.listTable || []
-      } as Room);
-    });
-    
-    return rooms;
-  } catch (error) {
-    console.error('❌ Erreur lors du chargement des salles:', error);
-    return [];
-  }
-};
-
-/**
- * 📋 GET RESTAURANT ACTIVE ORDERS
- */
-export const getRestaurantActiveOrders = async (restaurantId: string): Promise<CommandeData[]> => {
-  try {
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
-    const ordersRef = collection(restaurantRef, 'active_orders');
-    const querySnapshot = await getDocs(query(ordersRef, orderBy('timestamp', 'desc')));
-    
-    const orders: CommandeData[] = [];
-    querySnapshot.forEach((doc) => {
-      orders.push({ 
-        id: doc.id, 
-        ...doc.data() 
-      } as CommandeData);
-    });
-    
-    return orders;
-  } catch (error) {
-    console.error('❌ Erreur lors du chargement des commandes actives:', error);
-    return [];
-  }
-};
-
-/**
- * 📦 GET RESTAURANT STOCK
- */
-export const getRestaurantStock = async (restaurantId: string): Promise<StockData[]> => {
-  try {
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
-    const stockRef = collection(restaurantRef, 'stock');
-    const querySnapshot = await getDocs(stockRef);
-    
-    const stock: StockData[] = [];
-    querySnapshot.forEach((doc) => {
-      stock.push({ 
-        id: doc.id, 
-        ...doc.data() 
-      } as StockData);
-    });
-    
-    return stock;
-  } catch (error) {
-    console.error('❌ Erreur lors du chargement du stock:', error);
-    return [];
-  }
-};
-
-/**
- * 🍽️ GET RESTAURANT MENU
- */
-export const getRestaurantMenu = async (restaurantId: string): Promise<Plat[]> => {
-  try {
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
-    const menuRef = collection(restaurantRef, 'menu');
-    const querySnapshot = await getDocs(menuRef);
-    
-    const menu: Plat[] = [];
-    querySnapshot.forEach((doc) => {
-      menu.push({ 
-        id: doc.id, 
-        ...doc.data() 
-      } as Plat);
-    });
-    
-    return menu;
-  } catch (error) {
-    console.error('❌ Erreur lors du chargement du menu:', error);
-    return [];
-  }
-};
-
-// ====== DATA MIGRATION FUNCTIONS ======
-
-/**
- * 🔄 MIGRATE EXISTING DATA TO RESTAURANT STRUCTURE
- */
-export const migrateExistingDataToRestaurant = async (
-  restaurantId: string
-): Promise<void> => {
-  try {
-    console.log('🔄 Début de la migration des données vers la structure Restaurant...');
-    
-    const batch = writeBatch(db);
-    const restaurantRef = doc(db, RESTAURANTS_COLLECTION, restaurantId);
-    
-    // Ensure restaurant exists
-    await initializeRestaurant();
-    
-    // Migrate tables
-    console.log('🔄 Migration des tables...');
-    const tablesSnapshot = await getDocs(collection(db, 'tables'));
-    const tablesRef = collection(restaurantRef, 'tables');
-    tablesSnapshot.forEach((docSnapshot) => {
-      const newTableRef = doc(tablesRef);
-      batch.set(newTableRef, docSnapshot.data());
-    });
-    
-    // Migrate menu
-    console.log('🔄 Migration du menu...');
-    const menuSnapshot = await getDocs(collection(db, 'menu'));
-    const menuRef = collection(restaurantRef, 'menu');
-    menuSnapshot.forEach((docSnapshot) => {
-      const newMenuItemRef = doc(menuRef);
-      batch.set(newMenuItemRef, docSnapshot.data());
-    });
-    
-    // Migrate stock
-    console.log('🔄 Migration du stock...');
-    const stockSnapshot = await getDocs(collection(db, 'stock'));
-    const stockRef = collection(restaurantRef, 'stock');
-    stockSnapshot.forEach((docSnapshot) => {
-      const newStockItemRef = doc(stockRef);
-      batch.set(newStockItemRef, docSnapshot.data());
-    });
-    
-    // Migrate active orders
-    console.log('🔄 Migration des commandes en cours...');
-    const activeOrdersSnapshot = await getDocs(collection(db, 'commandes_en_cours'));
-    const activeOrdersRef = collection(restaurantRef, 'active_orders');
-    activeOrdersSnapshot.forEach((docSnapshot) => {
-      const newOrderRef = doc(activeOrdersRef);
-      batch.set(newOrderRef, docSnapshot.data());
-    });
-    
-    // Migrate completed orders (limit to last 1000 for performance)
-    console.log('🔄 Migration des commandes terminées...');
-    const completedOrdersSnapshot = await getDocs(
-      query(collection(db, 'commandes_terminees'), orderBy('dateTerminee', 'desc'), limit(1000))
-    );
-    const completedOrdersRef = collection(restaurantRef, 'completed_orders');
-    completedOrdersSnapshot.forEach((docSnapshot) => {
-      const newOrderRef = doc(completedOrdersRef);
-      batch.set(newOrderRef, docSnapshot.data());
-    });
-    
-    await batch.commit();
-    
-    // Update restaurant metadata
-    await updateDoc(restaurantRef, {
-      last_sync: serverTimestamp(),
-      updated_at: serverTimestamp()
-    });
-    
-    clearRestaurantCache();
-    console.log('✅ Migration des données terminée avec succès');
-  } catch (error) {
-    console.error('❌ Erreur lors de la migration des données:', error);
-    throw error;
-  }
-};
-
-/**
- * 🔄 SYNC RESTAURANT DATA
- */
-export const syncRestaurantData = async (
-  restaurantId: string
-): Promise<void> => {
-  try {
-    console.log('🔄 Synchronisation des données du restaurant...');
-    
-    // This function can be called periodically to sync data between
-    // old collection structure and new restaurant structure
-    await migrateExistingDataToRestaurant(restaurantId);
-    
-    console.log('✅ Synchronisation terminée');
-  } catch (error) {
-    console.error('❌ Erreur lors de la synchronisation:', error);
-    throw error;
-  }
-};
 
 // ====== EXPORTS ======
 
@@ -521,17 +534,7 @@ export default {
   getRestaurant,
   updateRestaurant,
   updateRestaurantSettings,
-  
-  // Sub-collections
-  getRestaurantRooms,
-  getRestaurantActiveOrders,
-  getRestaurantStock,
-  getRestaurantMenu,
-  
-  // Migration
-  migrateExistingDataToRestaurant,
-  syncRestaurantData,
-  
+
   // Cache management
   clearRestaurantCache
 };

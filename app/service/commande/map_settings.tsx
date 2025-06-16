@@ -11,7 +11,7 @@ import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
 import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
-import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../../restaurant/SelectionContext';
 
 // Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
 const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
@@ -198,7 +198,7 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
 // Composant principal MapSettings
 export default function MapSettings() {
   const router = useRouter();
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
   // État local pour les tables
   const [tables, setTables] = useState<Table[]>([]);
   const [originalTables, setOriginalTables] = useState<Table[]>([]);
@@ -227,7 +227,7 @@ export default function MapSettings() {
 
   // Chargement des tables depuis Firebase
   const loadTables = useCallback(async () => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       console.warn('Aucun restaurant sélectionné');
       setLoading(false);
       return;
@@ -235,7 +235,7 @@ export default function MapSettings() {
 
     try {
       setLoading(true);
-      const tablesData = await getTables(DEFAULT_ROOM_ID, true, selectedRestaurant.id);
+      const tablesData = await getTables(DEFAULT_ROOM_ID, true, currentRestaurant.id);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData))); // Deep copy pour comparaison
       setHasUnsavedChanges(false);
@@ -245,7 +245,7 @@ export default function MapSettings() {
     } finally {
       setLoading(false);
     }
-  }, [selectedRestaurant]);
+  }, [currentRestaurant]);
 
   // Fonction pour comparer les tables et détecter les changements
   const checkForUnsavedChanges = useCallback((currentTables: Table[]) => {
@@ -270,14 +270,14 @@ export default function MapSettings() {
 
   // Sauvegarde manuelle de toutes les modifications
   const saveAllChanges = useCallback(async () => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       return;
     }
 
     try {
       setSaving(true);
-      await updateTables(tables, DEFAULT_ROOM_ID, selectedRestaurant.id);
+      await updateTables(tables, DEFAULT_ROOM_ID, currentRestaurant.id);
       
       // Invalider les caches après sauvegarde
       clearTablesCache(DEFAULT_ROOM_ID);
@@ -293,7 +293,7 @@ export default function MapSettings() {
     } finally {
       setSaving(false);
     }
-  }, [tables, selectedRestaurant]);
+  }, [tables, currentRestaurant]);
 
   // Annuler toutes les modifications non sauvegardées
   const discardChanges = useCallback(() => {
@@ -344,7 +344,7 @@ export default function MapSettings() {
   }, []);
 
   const handleSaveTable = useCallback(async (tableData: Omit<Table, 'id' | 'status'>) => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       return;
     }
@@ -363,7 +363,7 @@ export default function MapSettings() {
           }
         };
         
-        await saveTable(updatedTable, DEFAULT_ROOM_ID, selectedRestaurant.id);
+        await saveTable(updatedTable, DEFAULT_ROOM_ID, currentRestaurant.id);
         
         // Invalider le cache après modification
         clearTablesCache(DEFAULT_ROOM_ID);
@@ -394,7 +394,7 @@ export default function MapSettings() {
           }
         };
 
-        await saveTable(newTable, DEFAULT_ROOM_ID, selectedRestaurant.id);
+        await saveTable(newTable, DEFAULT_ROOM_ID, currentRestaurant.id);
         
         // Invalider le cache après création
         clearTablesCache(DEFAULT_ROOM_ID);
@@ -423,13 +423,13 @@ export default function MapSettings() {
   }, []);
 
   const removeTable = useCallback(async (id: number) => {
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       return;
     }
 
     try {
-      await deleteTable(id, DEFAULT_ROOM_ID, selectedRestaurant.id);
+      await deleteTable(id, DEFAULT_ROOM_ID, currentRestaurant.id);
       
       // Invalider le cache après suppression
       clearTablesCache(DEFAULT_ROOM_ID);
@@ -444,7 +444,7 @@ export default function MapSettings() {
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
     }
-  }, [checkForUnsavedChanges, selectedRestaurant]);
+  }, [checkForUnsavedChanges, currentRestaurant]);
 
   const handleDeleteTable = useCallback((table: Table) => {
     removeTable(table.id);

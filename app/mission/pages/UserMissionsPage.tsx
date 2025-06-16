@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
-import { useRestaurantSelection } from '../../restaurant/RestaurantSelectionContext';
+import { useRestaurant } from '../../restaurant/SelectionContext';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,7 +37,7 @@ const UserMissionsPage = () => {
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const currentUser = auth.currentUser;
-  const { selectedRestaurant } = useRestaurantSelection();
+  const { currentRestaurant } = useRestaurant();
 
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
@@ -51,7 +51,7 @@ const UserMissionsPage = () => {
       return;
     }
 
-    if (!selectedRestaurant) {
+    if (!currentRestaurant) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       setLoading(false);
       return;
@@ -59,13 +59,13 @@ const UserMissionsPage = () => {
 
     try {
       // Récupérer les missions de l'utilisateur
-      const missions = await getUserMissions(currentUser.uid, selectedRestaurant.id);
+      const missions = await getUserMissions(currentUser.uid, currentRestaurant.id);
       
       // Pour chaque mission, récupérer les détails complets
       const missionsWithDetails = await Promise.all(
         missions.map(async (mission) => {
           try {
-            const missionDetails = mission.missionId ? await getMission(mission.missionId, selectedRestaurant.id) : null;
+            const missionDetails = mission.missionId ? await getMission(mission.missionId, currentRestaurant.id) : null;
             return { ...mission, missionDetails };
           } catch {
             return { ...mission, missionDetails: null };
@@ -83,7 +83,7 @@ const UserMissionsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, selectedRestaurant]);
+  }, [currentUser, currentRestaurant]);
 
   useEffect(() => {
     loadUserMissions();

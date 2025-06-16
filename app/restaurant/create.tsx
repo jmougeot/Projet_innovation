@@ -14,11 +14,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
-import { useRestaurantSelection } from './RestaurantSelectionContext';
-import { createInitialRestaurantAccess } from '../restaurant/restaurantAccess';
-import {
-  initializeRestaurant,
-  migrateExistingDataToRestaurant,} from '../firebase/firebaseRestaurant';
+import { useRestaurant } from './SelectionContext';
+import { initializeRestaurant, addUserMember, addUserMemberWithUserId } from '../firebase/firebaseRestaurant';
 import type { Restaurant, RestaurantSettings } from '../firebase/firebaseRestaurant';
 
 interface RestaurantFormData {
@@ -39,7 +36,7 @@ interface RestaurantFormData {
 export default function CreateRestaurant() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { user, refreshRestaurants } = useRestaurantSelection();
+  const { user } = useRestaurant();
   const [formData, setFormData] = useState<RestaurantFormData>({
     name: '',
     address: '',
@@ -104,7 +101,6 @@ export default function CreateRestaurant() {
 
     try {
       setLoading(true);
-
       console.log('Starting restaurant creation for user:', user.uid);
 
       const restaurantSettings: RestaurantSettings = {
@@ -135,58 +131,19 @@ export default function CreateRestaurant() {
       const restaurantId = await initializeRestaurant(restaurantData);
       console.log('Restaurant created with ID:', restaurantId);
 
-      // Create access record for the creator as owner
-      console.log('Creating access record for owner...');
-      await createInitialRestaurantAccess(user.uid, restaurantId);
-      console.log('Access record created successfully');
+      // Create access record for the creator as manager
+      console.log('Creating initial user member for manager...');
+      await addUserMemberWithUserId(restaurantId, {
+        name: user.displayName || user.email?.split('@')[0] || 'Manager',
+        email: user.email || '',
+        role: 'manager'
+      }, user.uid);
+      console.log('Initial user member created successfully');
 
-      // Refresh the restaurants list
-      console.log('Refreshing restaurants list...');
-      await refreshRestaurants();
-      console.log('Restaurants list refreshed');
+      // Navigate to restaurant selection
+      console.log('Navigating to restaurant selection...');
+      router.replace('/restaurant/select');
 
-      // Migrate existing data if requested
-      if (formData.migrateExistingData) {
-        try {
-          console.log('Starting data migration...');
-          await migrateExistingDataToRestaurant(restaurantId);
-          console.log('Data migration completed successfully');
-          
-          Alert.alert(
-            'Succès',
-            'Restaurant créé avec succès ! Vos données existantes ont été migrées vers la nouvelle structure.',
-            [
-              {
-                text: 'OK',
-                onPress: () => router.replace('/restaurant/select' as any)
-              }
-            ]
-          );
-        } catch (migrationError) {
-          console.error('Erreur lors de la migration:', migrationError);
-          Alert.alert(
-            'Restaurant créé',
-            'Le restaurant a été créé, mais une erreur s\'est produite lors de la migration des données. Vous pouvez réessayer depuis les paramètres.',
-            [
-              {
-                text: 'OK',
-                onPress: () => router.replace('/restaurant/select' as any)
-              }
-            ]
-          );
-        }
-      } else {
-        Alert.alert(
-          'Succès',
-          'Restaurant créé avec succès !',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/restaurant/select' as any)
-            }
-          ]
-        );
-      }
     } catch (error) {
       console.error('Erreur lors de la création du restaurant:', error);
       
@@ -367,35 +324,6 @@ export default function CreateRestaurant() {
                 keyboardType="numeric"
               />
             </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Frais de service (%)</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.serviceCharge}
-              onChangeText={(value) => handleInputChange('serviceCharge', value)}
-              placeholder="0"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-            />
-          </View>
-
-          <Text style={styles.sectionTitle}>Migration des données</Text>
-
-          <View style={styles.switchGroup}>
-            <View style={styles.switchContent}>
-              <Text style={styles.switchLabel}>Migrer les données existantes</Text>
-              <Text style={styles.switchDescription}>
-                Transférer automatiquement vos tables, menu, stock et commandes existants vers la nouvelle structure restaurant
-              </Text>
-            </View>
-            <Switch
-              value={formData.migrateExistingData}
-              onValueChange={(value) => handleInputChange('migrateExistingData', value)}
-              trackColor={{ false: '#E9ECEF', true: '#194A8D' }}
-              thumbColor={formData.migrateExistingData ? '#fff' : '#f4f3f4'}
-            />
           </View>
 
           <Pressable 
