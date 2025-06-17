@@ -12,6 +12,3 @@ export {
 // Components
 export { default as AutoRedirect } from './AutoRedirect';
 export { default as RestaurantProtectedRoute } from './components/RestaurantProtectedRoute';
-
-// Utilities
-export { debugRestaurantPersistence } from './restaurantPersistenceDebug';

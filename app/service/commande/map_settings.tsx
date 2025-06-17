@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicator, TextInput, Modal } from "react-native";
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Table, getTables, addTable as saveTable, deleteTable, updateTables, clearTableCache as clearTablesCache, DEFAULT_ROOM_ID } from '../../firebase/firebaseTables';
+import { Table, getTables, addTable as saveTable, deleteTable, updateTables, clearTableCache as clearTablesCache, getRoom, addRoom, updateRoom, deleteRoom, Room } from '../../firebase/firebaseTables';
 import { getRealtimeTablesCache } from '../../firebase/firebaseRealtimeCache';
 import { TableComponent, getStatusColor, TableShapeRenderer } from '../components/Table';
 import ConfirmModal from '../components/ConfirmModal';
@@ -206,6 +206,14 @@ export default function MapSettings() {
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
+  // États pour la gestion des rooms
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [currentRoomId, setCurrentRoomId] = useState<string>('');
+  const [showRoomModal, setShowRoomModal] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomDescription, setNewRoomDescription] = useState('');
+  const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+  
   // États pour le modal de création/édition de table
   const [showTableModal, setShowTableModal] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
@@ -225,8 +233,8 @@ export default function MapSettings() {
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
-  // Chargement des tables depuis Firebase
-  const loadTables = useCallback(async () => {
+  // Chargement des rooms et tables depuis Firebase
+  const loadRoomsAndTables = useCallback(async () => {
     if (!currentRestaurant) {
       console.warn('Aucun restaurant sélectionné');
       setLoading(false);
@@ -235,13 +243,44 @@ export default function MapSettings() {
 
     try {
       setLoading(true);
-      const tablesData = await getTables(DEFAULT_ROOM_ID, true, currentRestaurant.id);
+      
+      // Charger les rooms
+      const roomsData = await getRoom(true, currentRestaurant.id);
+      setRooms(roomsData);
+      
+      // Si aucune room n'existe, montrer l'interface de création
+      if (roomsData.length === 0) {
+        console.log('Aucune salle trouvée, interface de création activée');
+        setTables([]);
+        setOriginalTables([]);
+        setCurrentRoomId('');
+        setHasUnsavedChanges(false);
+        setLoading(false);
+        return;
+      }
+      
+      // Utiliser la première room disponible
+      const firstRoomId = roomsData[0]?.id;
+      if (!firstRoomId) {
+        console.error('Room ID manquant pour la première salle');
+        setCurrentRoomId('');
+        setTables([]);
+        setOriginalTables([]);
+        setLoading(false);
+        return;
+      }
+      
+      setCurrentRoomId(firstRoomId);
+      
+      // Charger les tables pour la room actuelle
+      const tablesData = await getTables(firstRoomId, true, currentRestaurant.id);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData))); // Deep copy pour comparaison
       setHasUnsavedChanges(false);
+      
     } catch (error) {
-      console.error('Erreur lors du chargement des tables:', error);
-      Alert.alert('Erreur', 'Impossible de charger les tables');
+      console.error('Erreur lors du chargement des rooms/tables:', error);
+      Alert.alert('Erreur', 'Impossible de charger les salles et tables');
     } finally {
       setLoading(false);
     }
@@ -270,17 +309,17 @@ export default function MapSettings() {
 
   // Sauvegarde manuelle de toutes les modifications
   const saveAllChanges = useCallback(async () => {
-    if (!currentRestaurant) {
-      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+    if (!currentRestaurant || !currentRoomId) {
+      Alert.alert('Erreur', 'Aucun restaurant ou salle sélectionné');
       return;
     }
 
     try {
       setSaving(true);
-      await updateTables(tables, DEFAULT_ROOM_ID, currentRestaurant.id);
+      await updateTables(tables, currentRoomId, currentRestaurant.id);
       
       // Invalider les caches après sauvegarde
-      clearTablesCache(DEFAULT_ROOM_ID);
+      clearTablesCache(currentRoomId);
       const realtimeCache = getRealtimeTablesCache();
       realtimeCache.forceReconnect(); // Force une reconnexion pour obtenir les dernières données
       
@@ -293,7 +332,7 @@ export default function MapSettings() {
     } finally {
       setSaving(false);
     }
-  }, [tables, currentRestaurant]);
+  }, [tables, currentRestaurant, currentRoomId]);
 
   // Annuler toutes les modifications non sauvegardées
   const discardChanges = useCallback(() => {
@@ -344,8 +383,8 @@ export default function MapSettings() {
   }, []);
 
   const handleSaveTable = useCallback(async (tableData: Omit<Table, 'id' | 'status'>) => {
-    if (!currentRestaurant) {
-      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+    if (!currentRestaurant || !currentRoomId) {
+      Alert.alert('Erreur', 'Aucun restaurant ou salle sélectionné');
       return;
     }
 
@@ -363,10 +402,10 @@ export default function MapSettings() {
           }
         };
         
-        await saveTable(updatedTable, DEFAULT_ROOM_ID, currentRestaurant.id);
+        await saveTable(updatedTable, currentRoomId, currentRestaurant.id);
         
         // Invalider le cache après modification
-        clearTablesCache(DEFAULT_ROOM_ID);
+        clearTablesCache(currentRoomId);
         const realtimeCache = getRealtimeTablesCache();
         realtimeCache.forceReconnect();
         
@@ -394,10 +433,10 @@ export default function MapSettings() {
           }
         };
 
-        await saveTable(newTable, DEFAULT_ROOM_ID, currentRestaurant.id);
+        await saveTable(newTable, currentRoomId, currentRestaurant.id);
         
         // Invalider le cache après création
-        clearTablesCache(DEFAULT_ROOM_ID);
+        clearTablesCache(currentRoomId);
         const realtimeCache = getRealtimeTablesCache();
         realtimeCache.forceReconnect();
         
@@ -423,16 +462,16 @@ export default function MapSettings() {
   }, []);
 
   const removeTable = useCallback(async (id: number) => {
-    if (!currentRestaurant) {
-      Alert.alert('Erreur', 'Aucun restaurant sélectionné');
+    if (!currentRestaurant || !currentRoomId) {
+      Alert.alert('Erreur', 'Aucun restaurant ou salle sélectionné');
       return;
     }
 
     try {
-      await deleteTable(id, DEFAULT_ROOM_ID, currentRestaurant.id);
+      await deleteTable(id, currentRoomId, currentRestaurant.id);
       
       // Invalider le cache après suppression
-      clearTablesCache(DEFAULT_ROOM_ID);
+      clearTablesCache(currentRoomId);
       const realtimeCache = getRealtimeTablesCache();
       realtimeCache.forceReconnect();
       
@@ -444,15 +483,178 @@ export default function MapSettings() {
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
     }
-  }, [checkForUnsavedChanges, currentRestaurant]);
+  }, [checkForUnsavedChanges, currentRestaurant, currentRoomId]);
 
   const handleDeleteTable = useCallback((table: Table) => {
     removeTable(table.id);
   }, [removeTable]);
 
+  // Fonctions de gestion des salles
+  const handleCreateRoom = useCallback(async () => {
+    if (!currentRestaurant || !newRoomName.trim()) {
+      Alert.alert('Erreur', 'Veuillez saisir un nom de salle valide');
+      return;
+    }
+
+    try {
+      const newRoom: Room = {
+        name: newRoomName.trim()
+      };
+
+      // Ajouter la description seulement si elle n'est pas vide
+      if (newRoomDescription.trim()) {
+        newRoom.description = newRoomDescription.trim();
+      }
+
+      await addRoom(newRoom, currentRestaurant.id);
+      
+      // Recharger les rooms
+      const updatedRooms = await getRoom(false, currentRestaurant.id);
+      setRooms(updatedRooms);
+      
+      // Si c'est la première salle créée, la sélectionner automatiquement
+      if (updatedRooms.length === 1) {
+        const newRoomId = updatedRooms[0]?.id;
+        if (newRoomId) {
+          setCurrentRoomId(newRoomId);
+          // Charger les tables pour cette nouvelle salle (sera vide)
+          const tablesData = await getTables(newRoomId, true, currentRestaurant.id);
+          setTables(tablesData);
+          setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
+          setHasUnsavedChanges(false);
+        }
+      }
+      
+      // Réinitialiser le formulaire
+      setNewRoomName('');
+      setNewRoomDescription('');
+      setShowRoomModal(false);
+      setEditingRoom(null);
+      
+      Alert.alert('Succès', `Salle "${newRoom.name}" créée avec succès`);
+    } catch (error) {
+      console.error('Erreur lors de la création de la salle:', error);
+      Alert.alert('Erreur', 'Impossible de créer la salle');
+    }
+  }, [currentRestaurant, newRoomName, newRoomDescription]);
+
+  const handleEditRoom = useCallback((room: Room) => {
+    setEditingRoom(room);
+    setNewRoomName(room.name);
+    setNewRoomDescription(room.description || '');
+    setShowRoomModal(true);
+  }, []);
+
+  const handleUpdateRoom = useCallback(async () => {
+    if (!currentRestaurant || !editingRoom || !newRoomName.trim()) {
+      Alert.alert('Erreur', 'Données invalides pour la modification');
+      return;
+    }
+
+    try {
+      const updatedRoom: Partial<Room> = {
+        name: newRoomName.trim()
+      };
+
+      // Ajouter la description seulement si elle n'est pas vide
+      if (newRoomDescription.trim()) {
+        updatedRoom.description = newRoomDescription.trim();
+      }
+
+      await updateRoom(editingRoom.id!, updatedRoom, currentRestaurant.id);
+      
+      // Recharger les rooms
+      const updatedRooms = await getRoom(false, currentRestaurant.id);
+      setRooms(updatedRooms);
+      
+      // Réinitialiser le formulaire
+      setNewRoomName('');
+      setNewRoomDescription('');
+      setShowRoomModal(false);
+      setEditingRoom(null);
+      
+      Alert.alert('Succès', 'Salle modifiée avec succès');
+    } catch (error) {
+      console.error('Erreur lors de la modification de la salle:', error);
+      Alert.alert('Erreur', 'Impossible de modifier la salle');
+    }
+  }, [currentRestaurant, editingRoom, newRoomName, newRoomDescription]);
+
+  const handleDeleteRoom = useCallback(async (room: Room) => {
+    if (!currentRestaurant || !room.id) {
+      Alert.alert('Erreur', 'Données invalides pour la suppression');
+      return;
+    }
+
+    Alert.alert(
+      'Confirmer la suppression',
+      `Êtes-vous sûr de vouloir supprimer la salle "${room.name}" ?\n\nToutes les tables de cette salle seront également supprimées.`,
+      [
+        {
+          text: 'Annuler',
+          style: 'cancel'
+        },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteRoom(room.id!, currentRestaurant.id);
+              
+              // Recharger les rooms
+              const updatedRooms = await getRoom(false, currentRestaurant.id);
+              setRooms(updatedRooms);
+              
+              // Si la salle supprimée était la salle courante, sélectionner une autre ou vider
+              if (currentRoomId === room.id) {
+                if (updatedRooms.length > 0) {
+                  const newCurrentRoomId = updatedRooms[0].id!;
+                  setCurrentRoomId(newCurrentRoomId);
+                  const tablesData = await getTables(newCurrentRoomId, true, currentRestaurant.id);
+                  setTables(tablesData);
+                  setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
+                } else {
+                  setCurrentRoomId('');
+                  setTables([]);
+                  setOriginalTables([]);
+                }
+                setHasUnsavedChanges(false);
+              }
+              
+              Alert.alert('Succès', 'Salle supprimée avec succès');
+            } catch (error) {
+              console.error('Erreur lors de la suppression de la salle:', error);
+              Alert.alert('Erreur', 'Impossible de supprimer la salle');
+            }
+          }
+        }
+      ]
+    );
+  }, [currentRestaurant, currentRoomId]);
+
+  const handleChangeRoom = useCallback(async (roomId: string) => {
+    if (!currentRestaurant || roomId === currentRoomId) return;
+
+    try {
+      setLoading(true);
+      setCurrentRoomId(roomId);
+      
+      // Charger les tables pour la nouvelle salle
+      const tablesData = await getTables(roomId, true, currentRestaurant.id);
+      setTables(tablesData);
+      setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Erreur lors du changement de salle:', error);
+      Alert.alert('Erreur', 'Impossible de charger les tables de cette salle');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentRestaurant, currentRoomId]);
+
   useEffect(() => {
-    loadTables();
-  }, [loadTables]);
+    loadRoomsAndTables();
+  }, [loadRoomsAndTables]);
 
   // Debug effect pour surveiller hasUnsavedChanges
   useEffect(() => {
@@ -509,52 +711,134 @@ export default function MapSettings() {
     );
   }
 
-  // Composant pour les contrôles (boutons)
-  const renderControls = () => (
-    <View style={styles.controls}>
-      {hasUnsavedChanges && (
-        <Pressable 
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
-          onPress={saveAllChanges}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#194A8D" />
-          ) : (
-            <>
-              <MaterialIcons name="save" size={20} color="#194A8D" />
-              <Text style={styles.saveButtonText}>Sauvegarder</Text>
-            </>
+  // Composant pour la gestion des salles
+  const renderRoomManagement = () => {
+    if (rooms.length === 0) {
+      // Aucune salle n'existe - Interface de création
+      return (
+        <View style={styles.noRoomContainer}>
+          <MaterialIcons name="meeting-room" size={60} color="#194A8D" />
+          <Text style={styles.noRoomTitle}>Aucune salle configurée</Text>
+          <Text style={styles.noRoomText}>
+            Vous devez d'abord créer une salle pour pouvoir ajouter des tables.
+          </Text>
+          <Pressable style={styles.createRoomButton} onPress={() => setShowRoomModal(true)}>
+            <MaterialIcons name="add" size={20} color="#fff" />
+            <Text style={styles.createRoomButtonText}>Créer ma première salle</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    // Des salles existent - Sélecteur de salle
+    return (
+      <View style={styles.roomSelector}>
+        <Text style={styles.roomSelectorLabel}>Salle actuelle :</Text>
+        <View style={styles.roomSelectorRow}>
+          <View style={styles.roomDropdownContainer}>
+            {rooms.map((room) => (
+              <Pressable
+                key={room.id}
+                style={[
+                  styles.roomOption,
+                  currentRoomId === room.id && styles.roomOptionActive
+                ]}
+                onPress={() => handleChangeRoom(room.id!)}
+              >
+                <MaterialIcons 
+                  name="meeting-room" 
+                  size={16} 
+                  color={currentRoomId === room.id ? "#fff" : "#194A8D"} 
+                />
+                <Text style={[
+                  styles.roomOptionText,
+                  currentRoomId === room.id && styles.roomOptionTextActive
+                ]}>
+                  {room.name}
+                </Text>
+                {room.description && (
+                  <Text style={[
+                    styles.roomOptionDescription,
+                    currentRoomId === room.id && styles.roomOptionDescriptionActive
+                  ]}>
+                    {room.description}
+                  </Text>
+                )}
+              </Pressable>
+            ))}
+          </View>
+          <Pressable style={styles.addRoomButton} onPress={() => setShowRoomModal(true)}>
+            <MaterialIcons name="add" size={20} color="#194A8D" />
+          </Pressable>
+          {rooms.length > 0 && (
+            <Pressable 
+              style={styles.editRoomButton} 
+              onPress={() => {
+                const currentRoom = rooms.find(r => r.id === currentRoomId);
+                if (currentRoom) handleEditRoom(currentRoom);
+              }}
+            >
+              <MaterialIcons name="edit" size={20} color="#194A8D" />
+            </Pressable>
           )}
+        </View>
+      </View>
+    );
+  };
+
+  // Composant pour les contrôles (boutons)
+  const renderControls = () => {
+    // Si aucune salle n'existe, ne pas afficher les contrôles de table
+    if (rooms.length === 0 || !currentRoomId) {
+      return null;
+    }
+
+    return (
+      <View style={styles.controls}>
+        {hasUnsavedChanges && (
+          <Pressable 
+            style={[styles.saveButton, saving && styles.saveButtonDisabled]} 
+            onPress={saveAllChanges}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color="#194A8D" />
+            ) : (
+              <>
+                <MaterialIcons name="save" size={20} color="#194A8D" />
+                <Text style={styles.saveButtonText}>Sauvegarder</Text>
+              </>
+            )}
+          </Pressable>
+        )}
+        
+        {hasUnsavedChanges && (
+          <Pressable 
+            style={styles.discardButton} 
+            onPress={() => {
+              console.log('🟡 Discard button pressed!');
+              discardChanges();
+            }}
+            disabled={saving}
+          >
+            <MaterialIcons name="undo" size={20} color="#fff" />
+            <Text style={styles.discardButtonText}>Annuler</Text>
+          </Pressable>
+        )}
+        
+        <Pressable style={styles.addButton} onPress={addNewTable}>
+          <Text style={styles.addButtonText}>+ Nouvelle table</Text>
         </Pressable>
-      )}
-      
-      {hasUnsavedChanges && (
+        
         <Pressable 
-          style={styles.discardButton} 
-          onPress={() => {
-            console.log('🟡 Discard button pressed!');
-            discardChanges();
-          }}
-          disabled={saving}
+          style={[styles.addButton, styles.removeButton]} 
+          onPress={() => tables.length > 0 && removeTable(tables[tables.length - 1].id)}
         >
-          <MaterialIcons name="undo" size={20} color="#fff" />
-          <Text style={styles.discardButtonText}>Annuler</Text>
+          <Text style={[styles.addButtonText, styles.removeButtonText]}>- Supprimer dernière</Text>
         </Pressable>
-      )}
-      
-      <Pressable style={styles.addButton} onPress={addNewTable}>
-        <Text style={styles.addButtonText}>+ Nouvelle table</Text>
-      </Pressable>
-      
-      <Pressable 
-        style={[styles.addButton, styles.removeButton]} 
-        onPress={() => tables.length > 0 && removeTable(tables[tables.length - 1].id)}
-      >
-        <Text style={[styles.addButtonText, styles.removeButtonText]}>- Supprimer dernière</Text>
-      </Pressable>
-    </View>
-  );
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -570,28 +854,35 @@ export default function MapSettings() {
       />
       
       <View style={styles.contentWrapper}>
-        <WorkspaceContainer
-          hasUnsavedChanges={hasUnsavedChanges}
-          coordinatesComponent={<WorkspaceCoordinates tables={tables.map(table => ({ ...table, id: table.id.toString() }))} />}
-          style={{ flex: 1 }}
-        >
-          {tables.map((table, index) => (
-            <DraggableTable
-              key={`table-${table.id}-${index}`}
-              table={table}
-              size={tableSize}
-              showText={true}
-              textColor="#194A8D"
-              onPositionChange={handlePositionChange}
-              onEditTable={handleEditTable}
-              onDeleteTable={handleDeleteTable}
-              workspaceWidth={workspaceWidth}
-              workspaceHeight={workspaceHeight}
-            />
-          ))}
-        </WorkspaceContainer>
+        {renderRoomManagement()}
+        
+        {/* Workspace et tables - seulement si une salle est sélectionnée */}
+        {rooms.length > 0 && currentRoomId && (
+          <>
+            <WorkspaceContainer
+              hasUnsavedChanges={hasUnsavedChanges}
+              coordinatesComponent={<WorkspaceCoordinates tables={tables.map(table => ({ ...table, id: table.id.toString() }))} />}
+              style={{ flex: 1 }}
+            >
+              {tables.map((table, index) => (
+                <DraggableTable
+                  key={`table-${table.id}-${index}`}
+                  table={table}
+                  size={tableSize}
+                  showText={true}
+                  textColor="#194A8D"
+                  onPositionChange={handlePositionChange}
+                  onEditTable={handleEditTable}
+                  onDeleteTable={handleDeleteTable}
+                  workspaceWidth={workspaceWidth}
+                  workspaceHeight={workspaceHeight}
+                />
+              ))}
+            </WorkspaceContainer>
 
-        {renderControls()}
+            {renderControls()}
+          </>
+        )}
         
         {/* Modal de création/édition de table */}
         <TableComponent
@@ -605,6 +896,59 @@ export default function MapSettings() {
           isEditing={!!editingTable}
           tableStatus={editingTable?.status || 'libre'}
         />
+
+        {/* Modal de création/édition de salle */}
+        <Modal visible={showRoomModal} transparent animationType="slide">
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>
+                {editingRoom ? 'Modifier la salle' : 'Créer une nouvelle salle'}
+              </Text>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Nom de la salle"
+                value={newRoomName}
+                onChangeText={setNewRoomName}
+                maxLength={50}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Description (optionnel)"
+                value={newRoomDescription}
+                onChangeText={setNewRoomDescription}
+                maxLength={200}
+                multiline
+                numberOfLines={3}
+              />
+              
+              <View style={styles.modalButtons}>
+                <Pressable 
+                  style={[styles.button, styles.cancelButton]} 
+                  onPress={() => {
+                    setShowRoomModal(false);
+                    setEditingRoom(null);
+                    setNewRoomName('');
+                    setNewRoomDescription('');
+                  }}
+                >
+                  <Text style={styles.buttonText}>Annuler</Text>
+                </Pressable>
+                
+                <Pressable 
+                  style={[styles.button, { backgroundColor: '#194A8D' }]} 
+                  onPress={editingRoom ? handleUpdateRoom : handleCreateRoom}
+                  disabled={!newRoomName.trim()}
+                >
+                  <Text style={styles.buttonText}>
+                    {editingRoom ? 'Modifier' : 'Créer'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
         
         {/* Modal de confirmation d'annulation */}
         <ConfirmModal
@@ -616,6 +960,51 @@ export default function MapSettings() {
           onCancel={() => setShowDiscardModal(false)}
           onConfirm={confirmDiscardChanges}
         />
+        
+        {/* Modal de création/édition de salle */}
+        <Modal
+          visible={showRoomModal}
+          animationType="slide"
+          transparent={true}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>{editingRoom ? 'Modifier la Salle' : 'Nouvelle Salle'}</Text>
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Nom de la salle"
+                value={newRoomName}
+                onChangeText={setNewRoomName}
+              />
+              
+              <TextInput
+                style={styles.input}
+                placeholder="Description (facultatif)"
+                value={newRoomDescription}
+                onChangeText={setNewRoomDescription}
+                multiline
+                numberOfLines={3}
+              />
+              
+              <View style={styles.modalButtons}>
+                <Pressable 
+                  style={[styles.button, styles.cancelButton]} 
+                  onPress={() => setShowRoomModal(false)}
+                >
+                  <Text style={styles.buttonText}>Annuler</Text>
+                </Pressable>
+                
+                <Pressable 
+                  style={[styles.button, styles.saveButton]} 
+                  onPress={editingRoom ? handleUpdateRoom : handleCreateRoom}
+                >
+                  <Text style={styles.buttonText}>{editingRoom ? 'Sauvegarder' : 'Créer'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -768,6 +1157,168 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
     marginLeft: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#194A8D',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#194A8D',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+    fontSize: 16,
+    color: '#194A8D',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 5,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  // Styles pour l'interface de gestion des salles
+  noRoomContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+  },
+  noRoomTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#194A8D',
+    marginVertical: 20,
+    textAlign: 'center',
+  },
+  noRoomText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 30,
+    lineHeight: 22,
+  },
+  createRoomButton: {
+    backgroundColor: '#194A8D',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  createRoomButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  roomSelector: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+  },
+  roomSelectorLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#194A8D',
+    marginBottom: 10,
+  },
+  roomSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  roomDropdownContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  roomOption: {
+    backgroundColor: '#F3EFEF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  roomOptionActive: {
+    backgroundColor: '#194A8D',
+    borderColor: '#194A8D',
+  },
+  roomOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#194A8D',
+    marginLeft: 8,
+    flex: 1,
+  },
+  roomOptionTextActive: {
+    color: '#fff',
+  },
+  roomOptionDescription: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 24,
+    fontStyle: 'italic',
+  },
+  roomOptionDescriptionActive: {
+    color: '#CAE1EF',
+  },
+  addRoomButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 25,
+    marginRight: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editRoomButton: {
+    backgroundColor: '#FF9800',
+    padding: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
 

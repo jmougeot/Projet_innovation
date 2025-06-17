@@ -71,8 +71,7 @@ export {
   updateTables, 
   updateTablePosition, 
   updateTableStatus, 
-  deleteTable, 
-  initializeDefaultTables 
+  deleteTable,  
 } from './firebaseTables';
 export type { Table } from './firebaseTables';
 

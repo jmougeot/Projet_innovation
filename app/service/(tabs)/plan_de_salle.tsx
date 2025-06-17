@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Table, getTables, updateTableStatus, initializeDefaultTables } from '@/app/firebase/firebaseTables';
+import { Table, getTables, updateTableStatus, getRoom, Room } from '@/app/firebase/firebaseTables';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
 import { useRestaurant } from '../../restaurant/SelectionContext';
@@ -14,13 +14,17 @@ import {
   getNextStatus
 } from '../components/Table';
 import { WorkspaceContainer, useWorkspaceSize } from '../components/Workspace';
+import { RoomSelector } from '../components/RoomSelector';
 
 export default function PlanDeSalle() {
   const router = useRouter();
   const { currentRestaurant } = useRestaurant();
   const [viewMode, setViewMode] = useState<'plan' | 'liste'>('plan');
   const [tables, setTables] = useState<Table[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [currentRoomId, setCurrentRoomId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingRoomChange, setLoadingRoomChange] = useState<string>('');
 
   // Utilisation du hook pour les dimensions adaptatives
   const { size: workspaceSize } = useWorkspaceSize();
@@ -42,9 +46,9 @@ export default function PlanDeSalle() {
     return position.x <= 1 && position.y <= 1 && position.x >= 0 && position.y >= 0;
   };
 
-  // Charger les tables au démarrage
+  // Charger les rooms et tables au démarrage
   useEffect(() => {
-    const loadTables = async () => {
+    const loadRoomsAndTables = async () => {
       if (!currentRestaurant) {
         console.warn('Aucun restaurant sélectionné');
         setLoading(false);
@@ -53,19 +57,50 @@ export default function PlanDeSalle() {
 
       try {
         setLoading(true);
-        await initializeDefaultTables('default-room', currentRestaurant.id);
-        const tablesData = await getTables('default-room', true, currentRestaurant.id);
+        
+        // Charger les rooms d'abord
+        const roomsData = await getRoom(true, currentRestaurant.id);
+        setRooms(roomsData);
+        
+        // Si aucune room n'existe, rediriger vers map_settings pour la création
+        if (roomsData.length === 0) {
+          console.log('Aucune salle trouvée, redirection vers map_settings pour configuration');
+          Alert.alert(
+            'Configuration requise',
+            'Aucune salle n\'est configurée pour ce restaurant. Vous allez être redirigé vers la page de configuration.',
+            [
+              {
+                text: 'OK',
+                onPress: () => router.replace('/service/commande/map_settings')
+              }
+            ]
+          );
+          return;
+        }
+        
+        // Utiliser la première room disponible
+        const firstRoomId = roomsData[0]?.id;
+        if (!firstRoomId) {
+          console.error('Room ID manquant pour la première salle');
+          router.replace('/service/commande/map_settings');
+          return;
+        }
+        
+        setCurrentRoomId(firstRoomId);
+        const tablesData = await getTables(firstRoomId, true, currentRestaurant.id);
         setTables(tablesData);
+        
       } catch (error) {
-        console.error("Erreur lors du chargement des tables:", error);
-        alert("Erreur lors du chargement des tables");
+        console.error("Erreur lors du chargement des rooms/tables:", error);
+        // En cas d'erreur, rediriger aussi vers map_settings
+        router.replace('/service/commande/map_settings');
       } finally {
         setLoading(false);
       }
     };
     
-    loadTables();
-  }, [currentRestaurant]);
+    loadRoomsAndTables();
+  }, [currentRestaurant, router]);
 
   const handleTablePress = (tableId: number, tablenumber: string) => {
     router.push({
@@ -76,14 +111,14 @@ export default function PlanDeSalle() {
 
   // Changer le statut de la table (appui long)
   const handleTableLongPress = async (tableId: number, currentStatus: Table['status']) => {
-    if (!currentRestaurant) {
-      alert("Aucun restaurant sélectionné");
+    if (!currentRestaurant || !currentRoomId) {
+      alert("Aucun restaurant ou salle sélectionné");
       return;
     }
 
     try {
       const nextStatus = getNextStatus(currentStatus);
-      await updateTableStatus(tableId, nextStatus, 'default-room', currentRestaurant.id);
+      await updateTableStatus(tableId, nextStatus, currentRoomId, currentRestaurant.id);
       
       setTables(prevTables => 
         prevTables.map(table => 
@@ -95,6 +130,25 @@ export default function PlanDeSalle() {
       alert("Erreur lors de la modification du statut");
     }
   };
+
+  // Fonction pour changer de salle
+  const handleChangeRoom = useCallback(async (roomId: string) => {
+    if (!currentRestaurant || roomId === currentRoomId) return;
+
+    try {
+      setLoadingRoomChange(roomId);
+      setCurrentRoomId(roomId);
+      
+      // Charger les tables pour la nouvelle salle
+      const tablesData = await getTables(roomId, true, currentRestaurant.id);
+      setTables(tablesData);
+    } catch (error) {
+      console.error('Erreur lors du changement de salle:', error);
+      Alert.alert('Erreur', 'Impossible de charger les tables de cette salle');
+    } finally {
+      setLoadingRoomChange('');
+    }
+  }, [currentRestaurant, currentRoomId]);
 
   // Trier les tables par numéro pour la vue liste
   const sortedTables = [...tables].sort((a, b) => {
@@ -184,7 +238,9 @@ export default function PlanDeSalle() {
   const renderToggleButton = (mode: 'plan' | 'liste', text: string) => (
     <Pressable
       style={[styles.toggleButton, viewMode === mode && styles.activeToggle]}
-      onPress={() => setViewMode(mode)}
+      onPress={() => {
+        setViewMode(mode);
+      }}
     >
       <Text style={styles.toggleButtonText}>{text}</Text>
     </Pressable>
@@ -227,32 +283,26 @@ export default function PlanDeSalle() {
       <View style={styles.contentWrapper}>
         <View style={styles.toggleContainer}>
           {renderToggleButton('plan', 'Vue Plan')}
+          <RoomSelector
+            rooms={rooms}
+            currentRoomId={currentRoomId}
+            currentRestaurant={currentRestaurant}
+            loadingRoomChange={loadingRoomChange}
+            onRoomSelect={handleChangeRoom}
+          />
           {renderToggleButton('liste', 'Liste des Tables')}
         </View>
 
-        <View style={styles.legende}>
-          <View style={styles.legendeItem}>
-            <View style={[styles.legendeCarre, { backgroundColor: '#4CAF50' }]} />
-            <Text style={styles.legendeText}>Libre</Text>
-          </View>
-          <View style={styles.legendeItem}>
-            <View style={[styles.legendeCarre, { backgroundColor: '#CAE1EF' }]} />
-            <Text style={styles.legendeText}>Réservée</Text>
-          </View>
-          <View style={styles.legendeItem}>
-            <View style={[styles.legendeCarre, { backgroundColor: '#EFBC51' }]} />
-            <Text style={styles.legendeText}>Occupée</Text>
-          </View>
+        <View style={styles.contentContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#194A8D" />
+              <Text style={styles.loadingText}>Chargement des tables...</Text>
+            </View>
+          ) : (
+            viewMode === 'plan' ? renderPlanView() : renderListView()
+          )}
         </View>
-
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#194A8D" />
-            <Text style={styles.loadingText}>Chargement des tables...</Text>
-          </View>
-        ) : (
-          viewMode === 'plan' ? renderPlanView() : renderListView()
-        )}
       </View>
     </SafeAreaView>
   );
@@ -270,25 +320,33 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 15,
   },
+  contentContainer: {
+    flex: 1,
+    zIndex: 1,
+  },
   toggleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 15,
     paddingHorizontal: 10,
     backgroundColor: 'transparent',
+    zIndex: 999999,
+    position: 'relative',
   },
   toggleButton: {
     backgroundColor: '#CAE1EF',
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     borderRadius: 25,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    width: '45%',
+    flex: 1,
     alignItems: 'center',
+    marginHorizontal: 5,
   },
   activeToggle: {
     backgroundColor: '#EFBC51',
@@ -399,5 +457,136 @@ const styles = StyleSheet.create({
     color: '#194A8D',
     fontSize: 16,
     fontWeight: '500',
+  },
+  // Styles pour le sélecteur de salles
+  roomSelector: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.22,
+    shadowRadius: 2.22,
+  },
+  roomSelectorLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#194A8D',
+    marginBottom: 10,
+  },
+  roomSelectorRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  roomDropdownContainer: {
+    flex: 1,
+    marginRight: 10,
+  },
+  roomOption: {
+    backgroundColor: '#F3EFEF',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  roomOptionActive: {
+    backgroundColor: '#194A8D',
+    borderColor: '#194A8D',
+  },
+  roomOptionLoading: {
+    opacity: 0.6,
+  },
+  roomOptionContent: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  roomOptionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  roomOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#194A8D',
+    flex: 1,
+  },
+  roomOptionTextActive: {
+    color: '#fff',
+  },
+  roomTableCount: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+    backgroundColor: '#E8E8E8',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  roomTableCountActive: {
+    color: '#194A8D',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  roomOptionDescription: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  manageRoomsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#CAE1EF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 15,
+    alignSelf: 'flex-start',
+  },
+  manageRoomsButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#194A8D',
+    marginLeft: 4,
+  },
+  // Styles pour le sélecteur de salle déroulant
+  roomSelectorButton: {
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 25,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    flex: 1.2,
+    alignItems: 'center',
+    marginHorizontal: 5,
+    borderWidth: 1,
+    borderColor: '#194A8D',
+  },
+  roomSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roomSelectorText: {
+    color: '#194A8D',
+    fontWeight: '600',
+    fontSize: 14,
+    marginRight: 5,
+    textAlign: 'center',
+  },
+  roomSelectorCount: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
+    textAlign: 'center',
   },
 });
