@@ -53,7 +53,7 @@ export const getServiceMenuItems = (): ServiceMenuItem[] => [
   {
     label: 'Déconnexion',
     onPress: () => {
-      router.replace('/connexion/connexion' as any);
+      router.replace('/connexion' as any);
     },
     isLogout: true
   },
@@ -87,7 +87,7 @@ export const getPlanDeSalleMenuItems = (): ServiceMenuItem[] => [
   {
     label: 'Déconnexion',
     onPress: () => {
-      router.replace('/connexion/connexion' as any);
+      router.replace('/connexion' as any);
     },
     isLogout: true
   },
@@ -127,7 +127,7 @@ export const getMissionMenuItems = (): ServiceMenuItem[] => [
   {
     label: 'Déconnexion',
     onPress: () => {
-      router.replace('/connexion/connexion' as any);
+      router.replace('/connexion' as any);
     },
     isLogout: true
   },
@@ -161,7 +161,7 @@ export const getCuisineServiceMenuItems = (): ServiceMenuItem[] => [
   {
     label: 'Déconnexion',
     onPress: () => {
-      router.replace('/connexion/connexion' as any);
+      router.replace('/connexion' as any);
     },
     isLogout: true
   },

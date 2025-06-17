@@ -194,7 +194,7 @@ export default function RestaurantSettingsPage() {
     },
     {
       label: 'Accueil',
-      onPress: () => router.push('/')
+      onPress: () => router.push('/home')
     },
     {
       label: 'Profil',

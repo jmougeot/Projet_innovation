@@ -90,7 +90,7 @@ export default function RestaurantSelectPage() {
       console.log(`✅ Restaurant ${restaurant.name} sélectionné`);
       
       // Rediriger vers la page principale du restaurant
-      router.replace('/restaurant' as any);
+      router.replace('../home' as any);
     } catch (error) {
       console.error('Erreur lors de la sélection du restaurant:', error);
       Alert.alert(

@@ -103,7 +103,7 @@ export default function RestaurantIndex() {
   const reglageMenuItems = [
     {
       label: 'Accueil',
-      onPress: () => router.push('/')
+      onPress: () => router.push('/home')
     },
     {
       label: 'Profil',

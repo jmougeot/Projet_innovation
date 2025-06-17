@@ -54,7 +54,7 @@ const Header = ({
         router.back();
       } else {
         // Si pas d'écran précédent, rediriger vers la page d'accueil
-        router.replace('/');
+        router.replace('/home');
       }
     }
   };

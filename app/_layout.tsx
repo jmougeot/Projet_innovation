@@ -14,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="connexion" options={{ headerShown: false }}/>
         <Stack.Screen name="Profil" options={{ headerShown: false }}/>
         <Stack.Screen name="restaurant" options={{ headerShown: false }}/>
+        <Stack.Screen name="home" options={{ headerShown: false }}/>
       </Stack>
     </RestaurantProvider>
   );

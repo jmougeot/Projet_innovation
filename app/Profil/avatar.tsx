@@ -95,7 +95,7 @@ const ProfileAvatar = () => {
         const currentUser = auth.currentUser;
         
         if (!currentUser) {
-          router.replace('../connexion/connexion');
+          router.replace('../connexion');
           return;
         }
         

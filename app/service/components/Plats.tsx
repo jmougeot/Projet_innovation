@@ -56,11 +56,11 @@ export const PlatsContainer = ({ children }: { children: React.ReactNode }) => {
   const customMenuItems = [
     {
       label: 'Accueil',
-      onPress: () => router.replace('/')
+      onPress: () => router.replace('/home')
     },
     {
       label: 'Connexion',
-      onPress: () => router.replace('/connexion/connexion')
+      onPress: () => router.replace('/connexion')
     }
   ];
 

@@ -12,7 +12,7 @@ export default function RestaurantStatus({ style, showChangeButton = true }: Res
   const { currentRestaurant, user, isLoading } = useRestaurant();
 
   const handleNavigateToSelector = () => {
-    router.push('/');
+    router.push('/home');
   };
 
   if (!user) {
