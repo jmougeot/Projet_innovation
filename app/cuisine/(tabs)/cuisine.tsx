@@ -1,28 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, Pressable, Platform, Alert } from 'react-native';
-import { collection, onSnapshot, query, where, doc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
-import { CommandeData, PlatQuantite } from '@/app/firebase/firebaseCommandeOptimized';
+import { TicketData, PlatQuantite, listenToTicketsActifs, updateStatusPlat } from '@/app/firebase/firebaseCommandeOptimized';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
+import { useRestaurant } from '@/app/restaurant/exports';
 
 const Cuisine = () => {
-  const [commandes, setCommandes] = useState<CommandeData[]>([]);
+  const [commandes, setCommandes] = useState<TicketData[]>([]);
+  const { currentRestaurant } = useRestaurant();
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
   useEffect(() => {
-    // Écouter les changements en temps réel depuis la nouvelle collection optimisée
-    const commandesRef = collection(db, 'commandes_en_cours');
-    const q = query(commandesRef, where('status', 'in', ['en_attente', 'en_preparation', 'pret', 'envoye']));
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const nouvellesCommandes = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CommandeData[];
-      setCommandes(nouvellesCommandes);
+    if (!currentRestaurant?.id) return;
+
+    // Écouter les changements en temps réel des tickets actifs
+    const unsubscribe = listenToTicketsActifs(currentRestaurant.id, (tickets) => {
+      // Filtrer seulement les tickets avec des plats en cours de préparation
+      const ticketsEnCours = tickets.filter(ticket => 
+        ticket.status === 'en_attente' || 
+        ticket.status === 'en_preparation' || 
+        ticket.status === 'prete'
+      );
+      setCommandes(ticketsEnCours);
     });
 
     return () => unsubscribe();
@@ -52,17 +54,11 @@ const Cuisine = () => {
     }
   };
 
-  // Custom implementation to properly update the status of a dish directly in Firestore
+  // Update status using the optimized API
   const customUpdateStatusPlat = async (tableId: number, platName: string, currentStatus: string) => {
     try {
-      // Find the command document that contains this dish
-      const commandeToUpdate = commandes.find(commande => 
-        commande.tableId === tableId && 
-        commande.plats.some(plat => plat.plat.name === platName && plat.status === currentStatus)
-      );
-
-      if (!commandeToUpdate) {
-        Alert.alert("Erreur", "Commande introuvable");
+      if (!currentRestaurant?.id) {
+        Alert.alert("Erreur", "Restaurant non sélectionné");
         return;
       }
 
@@ -70,39 +66,8 @@ const Cuisine = () => {
       const nextStatus = getNextStatus(currentStatus);
       console.log(`Updating dish ${platName} from ${currentStatus} to ${nextStatus}`);
 
-      // Get a reference to the document dans la nouvelle collection
-      const docRef = doc(db, "commandes_en_cours", commandeToUpdate.id);
-      
-      // Get the latest document data
-      const docSnap = await getDoc(docRef);
-      if (!docSnap.exists()) {
-        Alert.alert("Erreur", "Document introuvable");
-        return;
-      }
-      
-      const commandeData = docSnap.data() as CommandeData;
-      
-      // Find the index of the dish to update
-      const updatedPlats = [...commandeData.plats];
-      const platIndex = updatedPlats.findIndex(
-        p => p.plat.name === platName && p.status === currentStatus
-      );
-      
-      if (platIndex === -1) {
-        Alert.alert("Erreur", "Plat introuvable dans la commande");
-        return;
-      }
-      
-      // Update the status
-      updatedPlats[platIndex] = {
-        ...updatedPlats[platIndex],
-        status: nextStatus
-      };
-      
-      // Update the document in Firestore
-      await updateDoc(docRef, {
-        plats: updatedPlats
-      });
+      // Use the optimized API to update the dish status
+      await updateStatusPlat(tableId, currentRestaurant.id, platName, nextStatus);
       
       Alert.alert("Succès", `${platName} est maintenant ${nextStatus}`);
     } catch (error) {

@@ -5,7 +5,7 @@ import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-import { createCommande, CommandeData, PlatQuantite, getCommandeByTableId, updateCommande} from '@/app/firebase/firebaseCommandeOptimized';
+import { createTicket, TicketData, PlatQuantite, getTicketByTableId, updateTicket} from '@/app/firebase/firebaseCommandeOptimized';
 import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
 import { PlatItem } from '@/app/service/components/Plats';
@@ -20,7 +20,7 @@ export default function Commande() {
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
-    const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
+    const [commandesParTable, setCommandesParTable] = useState<TicketData | null>(null);
     const [listPlats, setListPlats] = useState<Plat[]>([]);
     const [missionPlatsIds, setMissionPlatsIds] = useState<string[]>([]);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -83,7 +83,7 @@ export default function Commande() {
     useEffect(() => {
         const fetchCommande = async () => {
             try {
-                const commande = await getCommandeByTableId(Number(tableId));
+                const commande = await getTicketByTableId(Number(tableId), currentRestaurant?.id || '');
                 if (commande) {
                     setCommandesParTable(commande);
                     setPlats(commande.plats);
@@ -113,9 +113,15 @@ export default function Commande() {
                     mission: hasMission
                 };
             });
-            setListPlats(updatedPlats);
+            // Vérifier si il y a vraiment un changement avant de mettre à jour
+            const hasChanges = updatedPlats.some((plat, index) => 
+                plat.mission !== listPlats[index]?.mission
+            );
+            if (hasChanges) {
+                setListPlats(updatedPlats);
+            }
         }
-    }, [missionPlatsIds, listPlats]); 
+    }, [missionPlatsIds]); // Retirer listPlats des dépendances pour éviter la boucle 
 
     if (!fontsLoaded) {
         return null;
@@ -136,11 +142,12 @@ export default function Commande() {
         setCommandesParTable((prevCommande) => {
             // Si aucune commande n'existe, en créer une nouvelle
             if (!prevCommande) {
-                const newCommande: CommandeData = {
+                const newCommande: TicketData = {
                     id: Date.now().toString(),
                     employeeId: "default",
                     plats: [{ plat, quantite: 1, status: "en_attente", tableId: Number(tableId) }],
                     totalPrice: plat.price,
+                    active: true,
                     status: "en_attente",
                     timestamp: new Date(),
                     tableId: Number(tableId)
@@ -212,7 +219,7 @@ export default function Commande() {
     }
 
 // Fonction pour valider la commande
-    const validerCommande = async (commandesParTable: CommandeData) => {
+    const validerCommande = async (commandesParTable: TicketData) => {
         if (!commandesParTable || !commandesParTable.plats || commandesParTable.plats.length === 0) {
             alert('Veuillez ajouter des plats à la commande');
             return;
@@ -225,12 +232,12 @@ export default function Commande() {
         
         try {
             if (commandeExistante) {
-                await updateCommande(Idcommande, commandesParTable);
+                await updateTicket(Idcommande, currentRestaurant.id, commandesParTable);
             } else {
                 // ✅ CORRECTION: Capturer l'ID Firebase réel et mettre à jour l'état local
                 // Exclure l'ID temporaire avant d'envoyer à Firebase
                 const { id, ...commandeDataSansId } = commandesParTable;
-                const firebaseCommandeId = await createCommande(commandeDataSansId, currentRestaurant.id);
+                const firebaseCommandeId = await createTicket(commandeDataSansId, currentRestaurant.id);
                 console.log(`🔄 [SYNC] ID local remplacé: ${Idcommande} → ${firebaseCommandeId}`);
                 setIdcommande(firebaseCommandeId);
                 setCommandeExistante(true);

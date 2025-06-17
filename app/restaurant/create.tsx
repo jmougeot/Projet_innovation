@@ -166,7 +166,7 @@ export default function CreateRestaurant() {
     },
     {
       label: 'Accueil',
-      onPress: () => router.push('../service' as any)
+      onPress: () => router.push('/' as any)
     },
     {
       label: 'Profil',

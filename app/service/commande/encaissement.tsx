@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import {CommandeData, PlatQuantite, getCommandeByTableId, terminerCommande, diagnosticCommandesByTable} from '@/app/firebase/firebaseCommandeOptimized';
+import { TicketData, PlatQuantite } from '@/app/firebase/firebaseCommandeOptimized';
+import firebaseCommande from '@/app/firebase/firebaseCommandeOptimized';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
@@ -16,7 +17,7 @@ function Encaissement() {
     const { currentRestaurant } = useRestaurant();
     const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
-    const [commandesParTable, setCommandesParTable] = useState<CommandeData | null>(null);
+    const [commandesParTable, setCommandesParTable] = useState<TicketData | null>(null);
     const [platsSelectionnes, setPlatsSelectionnes] = useState<PlatQuantite[]>([]);
     const [platsEncaisses, setPlatsEncaisses] = useState<PlatQuantite[]>([]);
     const [totalSelectionnes, setTotalSelectionnes] = useState<number>(0);
@@ -45,9 +46,11 @@ function Encaissement() {
                 console.log(`🔍 [ENCAISSEMENT DEBUG] Recherche commande pour table: ${tableId}`);
                 
                 // Exécuter le diagnostic pour comprendre ce qui se passe
-                await diagnosticCommandesByTable(Number(tableId));
+                if (currentRestaurant?.id) {
+                    await firebaseCommande.diagnosticCommandesByTable(Number(tableId), currentRestaurant.id);
+                }
                 
-                const commande = await getCommandeByTableId(Number(tableId));
+                const commande = await firebaseCommande.getCommandeByTableId(Number(tableId), currentRestaurant?.id || '');
                 console.log(`🔍 [ENCAISSEMENT DEBUG] Commande trouvée:`, commande);
                 
                 if (commande) {
@@ -65,10 +68,10 @@ function Encaissement() {
             }
         };
         
-        if (tableId) {
+        if (tableId && currentRestaurant?.id) {
             fetchCommande();
         }
-    }, [tableId]);
+    }, [tableId, currentRestaurant?.id]);
 
     // Update totals when platsSelectionnes changes
     useEffect(() => {
@@ -188,7 +191,7 @@ function Encaissement() {
             // Ensure we have the correct Firebase ID for the command
             let commandeIdToUse = idCommande;
             if (!commandeIdToUse) {
-                const fetchedCommande = await getCommandeByTableId(Number(tableId));
+                const fetchedCommande = await firebaseCommande.getCommandeByTableId(Number(tableId), currentRestaurant?.id || '');
                 if (!fetchedCommande) {
                     alert('Erreur: Aucune commande active trouvée pour cette table.');
                     return;
@@ -204,7 +207,7 @@ function Encaissement() {
                 return;
             }
             
-            await terminerCommande(commandeIdToUse, currentRestaurant.id);
+            await firebaseCommande.terminerCommande(commandeIdToUse, currentRestaurant.id);
             
             // Afficher le message de succès avec les informations sur les missions
             alert(`Encaissement réussi !${missionMessage}`);

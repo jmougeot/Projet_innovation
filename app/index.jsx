@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, Pressable, SafeAreaView, Platform } from "react-native";
-import { Link } from "expo-router";
+import { View, Text, StyleSheet, Pressable, SafeAreaView, Platform, ScrollView, TouchableOpacity } from "react-native";
+import { Link, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from 'expo-font';
+import { MaterialIcons } from '@expo/vector-icons';
 import Reglage from './components/reglage';
 import Head from './components/Head';
 import RestaurantSelector from './components/RestaurantSelector';
@@ -9,6 +10,7 @@ import RestaurantStatus from './components/RestaurantStatus';
 import RestaurantChangeAlert from './components/RestaurantChangeAlert';
 
 export default function Index() {
+  const router = useRouter();
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
   });
@@ -32,62 +34,180 @@ export default function Index() {
         // iconSource={require('../assets/images/custom-icon.png')}
       />
 
-      <Head title="Le Challenge" />
+      <Head title="Le Challenge " />
 
       {/* Restaurant Status Bar */}
       <RestaurantStatus style={styles.restaurantStatus} />
 
-      <View style={styles.contentContainer}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Section Bienvenue */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>Bienvenue</Text>
+          <Text style={styles.welcomeTitle}>Centre de Gestion</Text>
           <LinearGradient
             colors={['transparent', '#CAE1EF', 'transparent']}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
             style={styles.separator}
           />
+          <Text style={styles.welcomeText}>Accédez à toutes les fonctionnalités de votre restaurant</Text>
         </View>
-                
-        <View style={styles.buttonsSection}>
-          <Link href="./service" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Service</Text>
-            </Pressable>
-          </Link>
+
+        {/* Section Service */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Service</Text>
+            <View style={styles.categorySeparatorContainer}>
+              <LinearGradient
+                colors={['transparent', '#CAE1EF', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.categorySeparator}
+              />
+            </View>
+          </View>
           
-          <Link href="./cuisine" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Cuisine</Text>
-            </Pressable>
-          </Link>
-
-          <Link href="./connexion/connexion" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Login</Text>
-            </Pressable>
-          </Link>
-
-          <Link href="./manageur/home" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Gestion</Text>
-            </Pressable>
-          </Link>
-
-          <Link href="./mission" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>Mission</Text>
-            </Pressable>
+          <View style={styles.menuGrid}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/service')}
+            >
+              <MaterialIcons name="table-restaurant" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Espace Service</Text>
+              <Text style={styles.cardDescription}>
+                Gestion des tables et commandes
+              </Text>
+            </TouchableOpacity>
             
-          </Link>
-          
-          <Link href="./restaurant/select" asChild>
-            <Pressable style={styles.button}>
-              <Text style={styles.buttonText}>selection restaurant</Text>
-            </Pressable>
-          </Link>
-
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/service/(tabs)/plan_de_salle')}
+            >
+              <MaterialIcons name="restaurant" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Plan de Salle</Text>
+              <Text style={styles.cardDescription}>
+                Visualiser l'état des tables
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+
+        {/* Section Cuisine */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Cuisine</Text>
+            <View style={styles.categorySeparatorContainer}>
+              <LinearGradient
+                colors={['transparent', '#CAE1EF', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.categorySeparator}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.menuGrid}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/cuisine')}
+            >
+              <MaterialIcons name="kitchen" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Espace Cuisine</Text>
+              <Text style={styles.cardDescription}>
+                Gestion des commandes
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/cuisine/(tabs)/stock')}
+            >
+              <MaterialIcons name="inventory" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Stock</Text>
+              <Text style={styles.cardDescription}>
+                Gestion des stocks
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Section Management */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Gestion</Text>
+            <View style={styles.categorySeparatorContainer}>
+              <LinearGradient
+                colors={['transparent', '#CAE1EF', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.categorySeparator}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.menuGrid}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/manageur/home')}
+            >
+              <MaterialIcons name="business-center" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Management</Text>
+              <Text style={styles.cardDescription}>
+                Gestion générale
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/mission')}
+            >
+              <MaterialIcons name="assignment" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Missions</Text>
+              <Text style={styles.cardDescription}>
+                Gestion des tâches
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Section Restaurant & Configuration */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Configuration</Text>
+            <View style={styles.categorySeparatorContainer}>
+              <LinearGradient
+                colors={['transparent', '#CAE1EF', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.categorySeparator}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.menuGrid}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/restaurant/select')}
+            >
+              <MaterialIcons name="store" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Restaurant</Text>
+              <Text style={styles.cardDescription}>
+                Sélection & configuration
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/connexion/connexion')}
+            >
+              <MaterialIcons name="login" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Connexion</Text>
+              <Text style={styles.cardDescription}>
+                Gestion des utilisateurs
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
       
       <View style={styles.footer}>
         <Text style={styles.footerText}>© Le Challenge</Text>
@@ -102,7 +222,110 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#194A8D',
   },
-  // Logo styles
+  scrollView: {
+    flex: 1,
+  },
+  welcomeSection: {
+    alignItems: 'center',
+    marginVertical: 20,
+    backgroundColor: '#F3EFEF',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 15,
+  },
+  welcomeTitle: {
+    fontSize: 32,
+    color: '#194A8D',
+    marginBottom: 10,
+    fontFamily: 'AlexBrush',
+    letterSpacing: 1,
+  },
+  welcomeText: {
+    fontSize: 16,
+    color: '#194A8D',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  separator: {
+    height: 4,
+    width: '80%',
+    marginBottom: 10,
+  },
+  restaurantStatus: {
+    marginTop: 10,
+    marginBottom: 15,
+  },
+  sectionContainer: {
+    backgroundColor: '#F3EFEF',
+    borderRadius: 20,
+    overflow: 'hidden',
+    marginBottom: 15,
+    padding: 15,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 15,
+  },
+  categoryTitle: {
+    fontSize: 22,
+    fontWeight: '600',
+    fontStyle: 'italic',
+    color: '#194A8D',
+    textAlign: 'right',
+    paddingRight: 15,
+    letterSpacing: 1,
+    fontFamily: 'AlexBrush',
+  },
+  categorySeparatorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  categorySeparator: {
+    height: 3,
+    width: '100%',
+  },
+  menuGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  card: {
+    backgroundColor: '#CAE1EF',
+    borderRadius: 15,
+    padding: 20,
+    alignItems: 'center',
+    elevation: 3,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
+    width: '48%',
+    minHeight: 120,
+    justifyContent: 'center',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#194A8D',
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  cardDescription: {
+    fontSize: 12,
+    color: '#194A8D',
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  footer: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#CAE1EF',
+    fontSize: 14,
+  },
+  // Styles obsolètes gardés pour compatibilité
   logoContainer: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 50 : 15,
@@ -113,9 +336,8 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#CAE1EF', // Temporary background if logo has transparency
+    backgroundColor: '#CAE1EF',
   },
-  // Dropdown menu styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -151,82 +373,4 @@ const styles = StyleSheet.create({
   logoutText: {
     color: '#D32F2F',
   },
-  contentContainer: {
-    flex: 1,
-    backgroundColor: '#F3EFEF',
-    borderRadius: 20,
-    overflow: 'hidden',
-    padding: 15,
-    justifyContent: 'space-between',
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  welcomeTitle: {
-    fontSize: 32,
-    color: '#194A8D',
-    marginBottom: 10,
-    fontFamily: 'AlexBrush',
-    letterSpacing: 1,
-  },
-  separator: {
-    height: 4,
-    width: '80%',
-    marginBottom: 10,
-  },
-  welcomeText: {
-    fontSize: 16,
-    color: '#194A8D',
-    textAlign: 'center',
-  },
-  restaurantStatus: {
-    marginTop: 10,
-  },
-  restaurantSelector: {
-    marginHorizontal: 20,
-    marginVertical: 10,
-  },
-  buttonsSection: {
-    width: '100%',
-    gap: 15,
-    marginTop: 10,
-    paddingHorizontal: 20,
-  },
-  button: {
-    backgroundColor: '#CAE1EF',
-    paddingVertical: 15,
-    borderRadius: 25,
-    alignItems: 'center',
-    elevation: 3,
-    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
-  },
-  specialButton: {
-    backgroundColor: 'transparent',
-    elevation: 0,
-    boxShadow: 'none',
-    overflow: 'hidden',
-    padding: 0,
-  },
-  gradientButton: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 15,
-    borderRadius: 25,
-  },
-  buttonText: {
-    color: '#083F8C',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  footer: {
-    marginTop: 15,
-    alignItems: 'center',
-  },
-  footerText: {
-    color: '#CAE1EF',
-    fontSize: 14,
-  }
 });

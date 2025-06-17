@@ -6,7 +6,7 @@ import {
   Timestamp 
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
-import { CommandeData } from "./firebaseCommandeOptimized";
+import { TicketData as CommandeData } from "./firebaseCommandeOptimized";
 
 // ---- CACHE CONFIGURATION ----
 const ANALYTICS_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes en millisecondes
@@ -32,49 +32,45 @@ const getCommandesCollectionRef = (restaurantId: string, collectionName: string)
 
 // ---- HELPER FUNCTIONS ----
 /**
- * Helper function to fetch orders from both active and completed collections
+ * Helper function to fetch tickets from the unified tickets collection
  */
 async function fetchAllOrders(restaurantId: string, filter?: AnalyticsFilter) {
   const allOrders: CommandeData[] = [];
   
-  // Fetch from both collections
-  const collections = ['commandes_en_cours', 'commandes_terminees'];
-  
-  for (const collectionName of collections) {
-    let ordersQuery = getCommandesCollectionRef(restaurantId, collectionName);
+  // Fetch from the unified tickets collection
+  let ordersQuery = getCommandesCollectionRef(restaurantId, 'tickets');
     
-    // Apply filters if provided
-    if (filter) {
-      const constraints = [];
-      
-      if (filter.status) {
-        constraints.push(where("status", "==", filter.status));
-      }
-      
-      if (filter.employeeId) {
-        constraints.push(where("employeeId", "==", filter.employeeId));
-      }
-      
-      if (filter.startDate) {
-        const startTimestamp = Timestamp.fromDate(filter.startDate);
-        constraints.push(where("timestamp", ">=", startTimestamp));
-      }
-      
-      if (filter.endDate) {
-        const endTimestamp = Timestamp.fromDate(filter.endDate);
-        constraints.push(where("timestamp", "<=", endTimestamp));
-      }
-      
-      if (constraints.length > 0) {
-        ordersQuery = query(getCommandesCollectionRef(restaurantId, collectionName), ...constraints) as any;
-      }
+  // Apply filters if provided
+  if (filter) {
+    const constraints = [];
+    
+    if (filter.status) {
+      constraints.push(where("status", "==", filter.status));
     }
     
-    const ordersSnapshot = await getDocs(ordersQuery);
-    ordersSnapshot.forEach((doc) => {
-      allOrders.push(doc.data() as CommandeData);
-    });
+    if (filter.employeeId) {
+      constraints.push(where("employeeId", "==", filter.employeeId));
+    }
+    
+    if (filter.startDate) {
+      const startTimestamp = Timestamp.fromDate(filter.startDate);
+      constraints.push(where("timestamp", ">=", startTimestamp));
+    }
+    
+    if (filter.endDate) {
+      const endTimestamp = Timestamp.fromDate(filter.endDate);
+      constraints.push(where("timestamp", "<=", endTimestamp));
+    }
+    
+    if (constraints.length > 0) {
+      ordersQuery = query(getCommandesCollectionRef(restaurantId, 'tickets'), ...constraints) as any;
+    }
   }
+  
+  const ordersSnapshot = await getDocs(ordersQuery);
+  ordersSnapshot.forEach((doc) => {
+    allOrders.push(doc.data() as CommandeData);
+  });
   
   return allOrders;
 }
@@ -361,7 +357,7 @@ export async function getTopMenuItems(limitCount: number = 10, restaurantId: str
     const itemStats: { [key: string]: { revenue: number; quantity: number } } = {};
 
     allOrders.forEach((orderData) => {
-      orderData.plats?.forEach((platQuantite) => {
+      orderData.plats?.forEach((platQuantite: any) => {
         const platName = platQuantite.plat.name;
         const itemRevenue = platQuantite.plat.price * platQuantite.quantite;
         

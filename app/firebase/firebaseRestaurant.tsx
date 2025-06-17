@@ -389,11 +389,9 @@ const initializeRestaurantSubCollections = async (restaurantId: string) => {
     // Initialize tables sub-collection
     // Tables will be added separately using existing table functions
     
-    // Initialize menu sub-collection
-    // Menu items will be migrated from existing menu collection
+    // Initialize menu sub-collection with default data
     
-    // Initialize stock sub-collection  
-    // Stock items will be migrated from existing stock collection
+    // Initialize stock sub-collection with default data
     
     // Initialize analytics sub-collection
     const analyticsRef = collection(restaurantRef, 'analytics');

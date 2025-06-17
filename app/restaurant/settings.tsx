@@ -194,11 +194,11 @@ export default function RestaurantSettingsPage() {
     },
     {
       label: 'Accueil',
-      onPress: () => router.push('../service' as any)
+      onPress: () => router.push('/')
     },
     {
       label: 'Profil',
-      onPress: () => router.push('/Profil/avatar' as any)
+      onPress: () => router.push('/Profil/avatar')
     },
     {
       label: 'Déconnexion',

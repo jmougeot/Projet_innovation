@@ -6,6 +6,7 @@ import { Table, getTables, updateTableStatus, getRoom, Room } from '@/app/fireba
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
 import { useRestaurant } from '../../restaurant/SelectionContext';
+import { saveSelectedRoomName, getSelectedRoomName } from '@/app/firebase/asyncstorage/roomStorage';
 
 import { 
   TableShapeRenderer, 
@@ -19,7 +20,7 @@ import { RoomSelector } from '../components/RoomSelector';
 export default function PlanDeSalle() {
   const router = useRouter();
   const { currentRestaurant } = useRestaurant();
-  const [viewMode, setViewMode] = useState<'plan' | 'liste'>('plan');
+  const [viewMode, setViewMode] = useState<'plan' | 'liste'>('liste');
   const [tables, setTables] = useState<Table[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoomId, setCurrentRoomId] = useState<string>('');
@@ -78,17 +79,48 @@ export default function PlanDeSalle() {
           return;
         }
         
-        // Utiliser la première room disponible
-        const firstRoomId = roomsData[0]?.id;
-        if (!firstRoomId) {
+        // Essayer de récupérer la dernière room sélectionnée depuis AsyncStorage
+        let selectedRoomId = '';
+        try {
+          const lastSelectedRoomName = await getSelectedRoomName();
+          if (lastSelectedRoomName) {
+            // Trouver l'ID de la room correspondant au nom sauvegardé
+            const foundRoom = roomsData.find(room => room.name === lastSelectedRoomName);
+            if (foundRoom && foundRoom.id) {
+              selectedRoomId = foundRoom.id;
+              console.log(`📱 [PLAN_DE_SALLE] Room récupérée depuis le storage: ${lastSelectedRoomName} (ID: ${selectedRoomId})`);
+            } else {
+              console.log(`📱 [PLAN_DE_SALLE] Room "${lastSelectedRoomName}" non trouvée, utilisation de la première room disponible`);
+            }
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération de la room sauvegardée:', error);
+        }
+        
+        // Si aucune room sauvegardée ou room non trouvée, utiliser la première room disponible
+        if (!selectedRoomId && roomsData[0]?.id) {
+          selectedRoomId = roomsData[0].id;
+        }
+        
+        if (!selectedRoomId) {
           console.error('Room ID manquant pour la première salle');
           router.replace('/service/commande/map_settings');
           return;
         }
         
-        setCurrentRoomId(firstRoomId);
-        const tablesData = await getTables(firstRoomId, true, currentRestaurant.id);
+        setCurrentRoomId(selectedRoomId);
+        const tablesData = await getTables(selectedRoomId, true, currentRestaurant.id);
         setTables(tablesData);
+        
+        // Sauvegarder la room sélectionnée dans AsyncStorage si elle n'était pas déjà sauvegardée
+        const currentRoom = roomsData.find(room => room.id === selectedRoomId);
+        if (currentRoom) {
+          const savedRoomName = await getSelectedRoomName();
+          if (savedRoomName !== currentRoom.name) {
+            await saveSelectedRoomName(currentRoom.name);
+            console.log(`📱 [PLAN_DE_SALLE] Room initiale "${currentRoom.name}" sauvegardée dans le storage`);
+          }
+        }
         
       } catch (error) {
         console.error("Erreur lors du chargement des rooms/tables:", error);
@@ -138,6 +170,14 @@ export default function PlanDeSalle() {
     try {
       setLoadingRoomChange(roomId);
       setCurrentRoomId(roomId);
+      
+      // Trouver le nom de la room pour la sauvegarde
+      const selectedRoom = rooms.find(room => room.id === roomId);
+      if (selectedRoom) {
+        // Sauvegarder la room sélectionnée dans AsyncStorage
+        await saveSelectedRoomName(selectedRoom.name);
+        console.log(`📱 [PLAN_DE_SALLE] Room "${selectedRoom.name}" sauvegardée dans le storage`);
+      }
       
       // Charger les tables pour la nouvelle salle
       const tablesData = await getTables(roomId, true, currentRestaurant.id);
@@ -196,46 +236,48 @@ export default function PlanDeSalle() {
   );
 
   // Vue liste des tables
-  const renderListView = () => (
-    <ScrollView style={styles.listContainer}>
-      {sortedTables.map((table) => (
-        <TouchableOpacity
-          key={table.id}
-          style={[styles.tableListItem, { backgroundColor: getStatusColor(table.status) }]}
-          onPress={() => handleTablePress(table.id, table.numero)}
-          onLongPress={() => handleTableLongPress(table.id, table.status)}
-          delayLongPress={500}
-          activeOpacity={0.8}
-        >
-          <View style={styles.tableListInfo}>
-            <View style={styles.tableListLeft}>
-              <TableShapeRenderer
-                table={table}
-                size={tableSize * 0.5} // 50% de la taille normale pour la vue liste
-                backgroundColor={getStatusColor(table.status)}
-                textColor="#194A8D"
-                showText={true}
-              />
-            </View>
-            <View style={styles.tableListDetails}>
-              <Text style={styles.tableListNumero}>{table.numero}</Text>
-              <View style={styles.tableListMeta}>
-                <MaterialIcons name="people" size={18} color="#194A8D" />
-                <Text style={styles.tableListPlaces}>{table.places} places</Text>
-                <Text style={styles.tableListShape}>
-                  • {table.position.shape || 'rond'}
-                </Text>
+  const renderListView = () => {
+    if (sortedTables.length === 0) {
+      return (
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Aucune table disponible dans cette salle.</Text>
+        </View>
+      );
+    }
+    return (
+      <ScrollView style={styles.listContainer}>
+        {sortedTables.map((table) => (
+          <TouchableOpacity
+            key={table.id}
+            style={[styles.tableListItem, { backgroundColor: getStatusColor(table.status) }]}
+            onPress={() => handleTablePress(table.id, table.numero)}
+            onLongPress={() => handleTableLongPress(table.id, table.status)}
+            delayLongPress={500}
+            activeOpacity={0.8}
+          >
+            <View style={styles.tableListInfo}>
+              <View style={styles.tableListLeft}>
+                <TableShapeRenderer
+                  table={table}
+                  size={tableSize * 0.5} // 50% de la taille normale pour la vue liste
+                  backgroundColor={getStatusColor(table.status)}
+                  textColor="#194A8D"
+                  showText={true}
+                />
+              </View>
+              <View style={styles.tableListDetails}>
+                <Text style={styles.tableListNumero}>{table.numero}</Text>
               </View>
             </View>
-          </View>
-          <Text style={styles.tableListStatus}>{getStatusText(table.status)}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+            <Text style={styles.tableListStatus}>{getStatusText(table.status)}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
 
   // Boutons de basculement vue plan/liste
-  const renderToggleButton = (mode: 'plan' | 'liste', text: string) => (
+  const renderToggleButton = (mode: 'liste' | 'plan', text: string) => (
     <Pressable
       style={[styles.toggleButton, viewMode === mode && styles.activeToggle]}
       onPress={() => {
@@ -282,7 +324,7 @@ export default function PlanDeSalle() {
       
       <View style={styles.contentWrapper}>
         <View style={styles.toggleContainer}>
-          {renderToggleButton('plan', 'Vue Plan')}
+          {renderToggleButton('liste', 'Liste')}
           <RoomSelector
             rooms={rooms}
             currentRoomId={currentRoomId}
@@ -290,7 +332,7 @@ export default function PlanDeSalle() {
             loadingRoomChange={loadingRoomChange}
             onRoomSelect={handleChangeRoom}
           />
-          {renderToggleButton('liste', 'Liste des Tables')}
+          {renderToggleButton('plan', 'Plan')}
         </View>
 
         <View style={styles.contentContainer}>
@@ -316,34 +358,32 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     backgroundColor: '#F3EFEF',
-    margin: 10,
-    borderRadius: 20,
-    padding: 15,
+    margin: 5,
+    borderRadius: 25,
   },
   contentContainer: {
     flex: 1,
     zIndex: 1,
   },
   toggleContainer: {
+    margin: 10,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 10,
-    backgroundColor: 'transparent',
+    marginBottom: 5,
     zIndex: 999999,
     position: 'relative',
+    
   },
   toggleButton: {
+    alignContent: 'center',
     backgroundColor: '#CAE1EF',
     paddingVertical: 10,
-    paddingHorizontal: 15,
+    paddingHorizontal: 2,
     borderRadius: 25,
-    elevation: 2,
     boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 5,
+    marginHorizontal: 2,
   },
   activeToggle: {
     backgroundColor: '#EFBC51',
@@ -390,8 +430,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    marginVertical: 8,
+    padding: 10,
+    marginVertical: 4,
     borderRadius: 15,
     elevation: 3,
     boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',

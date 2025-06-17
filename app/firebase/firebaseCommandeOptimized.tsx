@@ -29,184 +29,192 @@ export interface PlatQuantite {
   mission?: string;
 }
 
-export interface CommandeData {
+export interface TicketData {
   id: string;
   employeeId: string;
   plats: PlatQuantite[];
   totalPrice: number;
+  active: boolean; // Indique si le ticket est actif ou non
   status: 'en_attente' | 'en_preparation' | 'prete' | 'servie' | 'encaissee';
   timestamp: Timestamp | Date;
   tableId: number;
   dateCreation?: Timestamp | Date;
+  dateTerminee?: Timestamp | Date; // Date de fin si le ticket est terminé
   estimatedTime?: number; // Temps estimé en minutes
-}
-
-// Interface pour les commandes terminées (avec métadonnées d'archivage)
-export interface CommandeTerminee extends CommandeData {
-  dateTerminee: Timestamp | Date | any;
-  dureeTotal: number; // Durée en millisecondes
+  dureeTotal?: number; // Durée en millisecondes (calculée à la fin)
   satisfaction?: number; // Note de 1 à 5
   notes?: string;
-  status: 'encaissee';
 }
 
-// Interface for order creation
-export interface CreateOrderData {
+// Interface for ticket creation
+export interface CreateTicketData {
   employeeId: string;
   plats: PlatQuantite[];
   totalPrice: number;
   tableId: number;
 }
 
-// Collections - using restaurant sub-collections
+// Collections - Une seule collection de tickets
 const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
-const getCommandeRestaurantRef = (restaurantId: string) => {
+const getTicketRestaurantRef = (restaurantId: string) => {
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
-const getActiveOrdersCollectionRef = (restaurantId: string) => {
-  return collection(getCommandeRestaurantRef(restaurantId), 'active_orders');
+const getTicketsCollectionRef = (restaurantId: string) => {
+  return collection(getTicketRestaurantRef(restaurantId), 'tickets');
 };
 
-const getCompletedOrdersCollectionRef = (restaurantId: string) => {
-  return collection(getCommandeRestaurantRef(restaurantId), 'completed_orders');
-};
+// Cache pour tickets ACTIFS uniquement - Performance optimisée
+let ticketsActifsCache: TicketData[] | null = null;
+let lastTicketsActifsCacheUpdate = 0;
+const TICKETS_CACHE_DURATION = 30000; // 30 secondes
 
-// Cache pour commandes EN COURS uniquement - Performance optimisée
-let commandesEnCoursCache: CommandeData[] | null = null;
-let lastCommandesEnCoursCacheUpdate = 0;
-const COMMANDES_CACHE_DURATION = 30000; // 30 secondes
+// Cache spécifique par table pour éviter les requêtes répétitives
+let ticketsByTableCache: Map<number, TicketData | null> = new Map();
+let ticketsByTableCacheTimestamp: Map<number, number> = new Map();
+const TABLE_CACHE_DURATION = 60000; // 1 minute - plus long car moins volatil
 
 // ====== GESTION CACHE OPTIMISÉE ======
 
-export const clearCommandesCache = () => {
-  commandesEnCoursCache = null;
-  lastCommandesEnCoursCacheUpdate = 0;
-  console.log('🗑️ Cache des commandes en cours vidé');
+export const clearTicketsCache = () => {
+  ticketsActifsCache = null;
+  lastTicketsActifsCacheUpdate = 0;
+  // Vider aussi le cache par table
+  ticketsByTableCache.clear();
+  ticketsByTableCacheTimestamp.clear();
+  console.log('🗑️ Cache des tickets actifs et par table vidé');
 };
 
-export const getCommandesCacheInfo = () => {
+export const clearTableCache = (tableId: number) => {
+  ticketsByTableCache.delete(tableId);
+  ticketsByTableCacheTimestamp.delete(tableId);
+  console.log(`🗑️ Cache de la table ${tableId} vidé`);
+};
+
+export const getTicketsCacheInfo = () => {
   const now = Date.now();
-  const timeLeft = commandesEnCoursCache ? Math.max(0, COMMANDES_CACHE_DURATION - (now - lastCommandesEnCoursCacheUpdate)) : 0;
+  const timeLeft = ticketsActifsCache ? Math.max(0, TICKETS_CACHE_DURATION - (now - lastTicketsActifsCacheUpdate)) : 0;
   return {
-    isActive: !!commandesEnCoursCache,
-    itemsCount: commandesEnCoursCache?.length || 0,
+    isActive: !!ticketsActifsCache,
+    itemsCount: ticketsActifsCache?.length || 0,
     timeLeftMs: timeLeft,
     timeLeftFormatted: `${Math.ceil(timeLeft / 1000)}s`,
-    durationMs: COMMANDES_CACHE_DURATION,
-    durationFormatted: `${COMMANDES_CACHE_DURATION / 1000}s`
+    durationMs: TICKETS_CACHE_DURATION,
+    durationFormatted: `${TICKETS_CACHE_DURATION / 1000}s`
   };
+};
+
+export const getTableCacheInfo = () => {
+  const now = Date.now();
+  const tablesCached = Array.from(ticketsByTableCache.keys());
+  const tablesInfo = tablesCached.map(tableId => {
+    const cacheTime = ticketsByTableCacheTimestamp.get(tableId) || 0;
+    const timeLeft = Math.max(0, TABLE_CACHE_DURATION - (now - cacheTime));
+    const cachedData = ticketsByTableCache.get(tableId);
+    return {
+      tableId,
+      hasTicket: !!cachedData,
+      ticketId: cachedData?.id || null,
+      timeLeftMs: timeLeft,
+      timeLeftFormatted: `${Math.ceil(timeLeft / 1000)}s`
+    };
+  });
+  
+  return {
+    totalTablesCached: tablesCached.length,
+    tablesInfo,
+    cacheDurationMs: TABLE_CACHE_DURATION,
+    cacheDurationFormatted: `${TABLE_CACHE_DURATION / 1000}s`
+  };
+};
+
+export const logCacheStatus = (context?: string) => {
+  const globalCache = getTicketsCacheInfo();
+  const tableCache = getTableCacheInfo();
+  
+  console.log(`📊 [CACHE${context ? ` - ${context}` : ''}] ==================`);
+  console.log(`📊 Cache global: ${globalCache.isActive ? 'ACTIF' : 'INACTIF'} - ${globalCache.itemsCount} tickets - ${globalCache.timeLeftFormatted} restantes`);
+  console.log(`📊 Cache tables: ${tableCache.totalTablesCached} tables en cache`);
+  tableCache.tablesInfo.forEach((info: any) => {
+    console.log(`   └─ Table ${info.tableId}: ${info.hasTicket ? `Ticket ${info.ticketId}` : 'Pas de ticket'} (${info.timeLeftFormatted})`);
+  });
+  console.log(`📊 ================================================`);
 };
 
 // ====== FONCTIONS PRINCIPALES OPTIMISÉES ======
 
 /**
- * 🎯 CRÉATION DE COMMANDE - Va dans collection restaurant/active_orders
+ * 🎯 CRÉATION DE TICKET - Une seule collection tickets avec active=true
  */
-export const createCommande = async (commandeData: Omit<CommandeData, 'id'>, restaurantId: string): Promise<string> => {
+export const createTicket = async (ticketData: Omit<TicketData, 'id'>, restaurantId: string): Promise<string> => {
   try {
-    if (!commandeData.plats || !commandeData.tableId) {
-      throw new Error("Données de commande incomplètes");
+    if (!ticketData.plats || !ticketData.tableId) {
+      throw new Error("Données de ticket incomplètes");
     }
 
     // Filter out undefined values
-    const filteredCommandeData = Object.fromEntries(
+    const filteredTicketData = Object.fromEntries(
       Object.entries({
-        ...commandeData,
+        ...ticketData,
+        active: true, // Nouveau ticket = actif
         status: 'en_attente' as const,
         dateCreation: serverTimestamp(),
         timestamp: serverTimestamp()
       }).filter(([_, value]) => value !== undefined)
     );
 
-    // ✅ CRÉER dans la collection restaurant/active_orders
-    const docRef = await addDoc(getActiveOrdersCollectionRef(restaurantId), filteredCommandeData);
+    // ✅ CRÉER dans la collection restaurant/tickets
+    const docRef = await addDoc(getTicketsCollectionRef(restaurantId), filteredTicketData);
     
     // Invalider le cache après ajout
-    clearCommandesCache();
-    console.log("✅ Commande créée dans structure restaurant/active_orders, ID:", docRef.id);
+    clearTicketsCache();
+    console.log("✅ Ticket créé dans collection restaurant/tickets, ID:", docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error("❌ Erreur lors de la création de la commande:", error);
+    console.error("❌ Erreur lors de la création du ticket:", error);
     throw error;
   }
 };
 
 /**
- * 🏁 TERMINER COMMANDE - Déplace vers collection restaurant/completed_orders (ATOMIQUE)
+ * 🏁 TERMINER TICKET - Marquer comme inactif avec active=false
  */
-export const terminerCommande = async (commandeId: string, restaurantId: string, satisfaction?: number, notes?: string): Promise<void> => {
+export const terminerTicket = async (ticketId: string, restaurantId: string, satisfaction?: number, notes?: string): Promise<void> => {
   try {
-    console.log(`🏁 [TERMINER] Finalisation commande: ${commandeId}`);
+    console.log(`🏁 [TERMINER] Finalisation ticket: ${ticketId}`);
     
-    await runTransaction(db, async (transaction) => {
-      // Chercher d'abord dans la nouvelle collection restaurant/active_orders
-      const activeOrderRef = doc(getActiveOrdersCollectionRef(restaurantId), commandeId);
-      let commandeDoc = await transaction.get(activeOrderRef);
-      let isOldCollection = false;
-      let isLegacyCollection = false;
-      
-      // Si pas trouvée, chercher dans l'ancienne collection commandes_en_cours
-      if (!commandeDoc.exists()) {
-        console.log(`🔄 [TERMINER] Commande non trouvée dans restaurant/active_orders, recherche dans commandes_en_cours`);
-        const commandeEnCoursRef = doc(db, 'commandes_en_cours', commandeId);
-        commandeDoc = await transaction.get(commandeEnCoursRef);
-        isOldCollection = true;
-        
-        // Si toujours pas trouvée, chercher dans l'ancienne collection commandes
-        if (!commandeDoc.exists()) {
-          console.log(`🔄 [TERMINER] Commande non trouvée dans commandes_en_cours, recherche dans commandes`);
-          const commandeAncienneRef = doc(db, 'commandes', commandeId);
-          commandeDoc = await transaction.get(commandeAncienneRef);
-          isLegacyCollection = true;
-          
-          if (!commandeDoc.exists()) {
-            throw new Error('Commande introuvable dans toutes les collections');
-          }
-        }
-      }
-      
-      const commandeData = commandeDoc.data() as CommandeData;
-      const dateCreation = commandeData.dateCreation instanceof Date 
-        ? commandeData.dateCreation.getTime() 
-        : commandeData.dateCreation?.toMillis ? commandeData.dateCreation.toMillis() 
-        : Date.now();
-      
-      // Créer dans les archives restaurant/completed_orders avec timestamp de fin
-      const commandeTermineeRef = doc(getCompletedOrdersCollectionRef(restaurantId), commandeId);
-      // Build archive data, only include defined optional fields
-      const commandeTerminee: Partial<CommandeTerminee> = {
-        ...commandeData,
-        status: 'encaissee',
-        dateTerminee: serverTimestamp(),
-        dureeTotal: Date.now() - dateCreation,
-        // Only include satisfaction and notes if defined
-        ...(satisfaction !== undefined && { satisfaction }),
-        ...(notes !== undefined && { notes })
-      };
-      
-      transaction.set(commandeTermineeRef, commandeTerminee);
-      
-      // Supprimer de la collection source
-      if (isLegacyCollection) {
-        const commandeAncienneRef = doc(db, 'commandes', commandeId);
-        transaction.delete(commandeAncienneRef);
-        console.log(`🗑️ [TERMINER] Suppression de l'ancienne collection 'commandes'`);
-      } else if (isOldCollection) {
-        const commandeEnCoursRef = doc(db, 'commandes_en_cours', commandeId);
-        transaction.delete(commandeEnCoursRef);
-        console.log(`🗑️ [TERMINER] Suppression de 'commandes_en_cours'`);
-      } else {
-        transaction.delete(activeOrderRef);
-        console.log(`🗑️ [TERMINER] Suppression de 'restaurant/active_orders'`);
-      }
-    });
+    // Chercher le ticket dans la collection tickets
+    const ticketRef = doc(getTicketsCollectionRef(restaurantId), ticketId);
+    const ticketDoc = await getDoc(ticketRef);
     
-    // Invalider le cache après archivage
-    clearCommandesCache();
-    console.log('✅ Commande terminée et archivée dans structure restaurant:', commandeId);
+    if (!ticketDoc.exists()) {
+      throw new Error('Ticket introuvable');
+    }
+    
+    const ticketData = ticketDoc.data() as TicketData;
+    const dateCreation = ticketData.dateCreation instanceof Date 
+      ? ticketData.dateCreation.getTime() 
+      : ticketData.dateCreation?.toMillis ? ticketData.dateCreation.toMillis() 
+      : Date.now();
+    
+    // Mettre à jour le ticket: active=false + métadonnées de fin
+    const updateData: Partial<TicketData> = {
+      active: false,
+      status: 'encaissee',
+      dateTerminee: serverTimestamp() as any, // Firebase Timestamp
+      dureeTotal: Date.now() - dateCreation,
+      // Only include satisfaction and notes if defined
+      ...(satisfaction !== undefined && { satisfaction }),
+      ...(notes !== undefined && { notes })
+    };
+    
+    await updateDoc(ticketRef, updateData);
+    
+    // Invalider le cache après modification
+    clearTicketsCache();
+    console.log('✅ Ticket terminé et marqué comme inactif:', ticketId);
   } catch (error) {
     console.error('❌ Erreur lors de la finalisation:', error);
     throw error;
@@ -214,49 +222,50 @@ export const terminerCommande = async (commandeId: string, restaurantId: string,
 };
 
 /**
- * 📋 RÉCUPÉRER COMMANDES EN COURS - Performance optimisée avec cache
+ * 📋 RÉCUPÉRER TICKETS ACTIFS - Performance optimisée avec cache
  */
-export const getCommandesEnCours = async (useCache = true): Promise<CommandeData[]> => {
+export const getTicketsActifs = async (restaurantId: string, useCache = true): Promise<TicketData[]> => {
   try {
     const now = Date.now();
     
     // Vérifier le cache
-    if (useCache && commandesEnCoursCache && (now - lastCommandesEnCoursCacheUpdate) < COMMANDES_CACHE_DURATION) {
-      console.log(`📱 ${commandesEnCoursCache.length} commandes en cours depuis le cache`);
-      return commandesEnCoursCache;
+    if (useCache && ticketsActifsCache && (now - lastTicketsActifsCacheUpdate) < TICKETS_CACHE_DURATION) {
+      console.log(`📱 ${ticketsActifsCache.length} tickets actifs depuis le cache`);
+      return ticketsActifsCache;
     }
 
-    console.log(`🔄 Chargement des commandes en cours depuis Firebase...`);
+    console.log(`🔄 Chargement des tickets actifs depuis Firebase...`);
     
-    // ✅ LIRE SEULEMENT les commandes en cours
+    // ✅ LIRE SEULEMENT les tickets actifs
     const q = query(
-      collection(db, 'commandes_en_cours'),
+      getTicketsCollectionRef(restaurantId),
+      where('active', '==', true),
       orderBy('dateCreation', 'desc')
     );
     
     const querySnapshot = await getDocs(q);
-    const commandes: CommandeData[] = [];
+    const tickets: TicketData[] = [];
     
     querySnapshot.forEach((doc) => {
-      commandes.push({ 
+      tickets.push({ 
         id: doc.id, 
         ...doc.data() 
-      } as CommandeData);
+      } as TicketData);
     });
     
     // Mettre en cache
-    commandesEnCoursCache = commandes;
-    lastCommandesEnCoursCacheUpdate = now;
+    ticketsActifsCache = tickets;
+    lastTicketsActifsCacheUpdate = now;
     
-    console.log(`✅ ${commandes.length} commandes en cours chargées et mises en cache`);
-    return commandes;
+    console.log(`✅ ${tickets.length} tickets actifs chargés et mis en cache`);
+    return tickets;
   } catch (error) {
-    console.error(`❌ Erreur lors de la récupération des commandes en cours:`, error);
+    console.error(`❌ Erreur lors de la récupération des tickets actifs:`, error);
     
     // En cas d'erreur, retourner le cache si disponible
-    if (commandesEnCoursCache) {
+    if (ticketsActifsCache) {
       console.log(`🔄 Utilisation du cache de secours`);
-      return commandesEnCoursCache;
+      return ticketsActifsCache;
     }
     
     throw error;
@@ -264,118 +273,112 @@ export const getCommandesEnCours = async (useCache = true): Promise<CommandeData
 };
 
 /**
- * 📊 ÉCOUTE TEMPS RÉEL - Commandes en cours seulement
+ * 📊 ÉCOUTE TEMPS RÉEL - Tickets actifs seulement
  */
-export const listenToCommandesEnCours = (callback: (commandes: CommandeData[]) => void): Unsubscribe => {
+export const listenToTicketsActifs = (restaurantId: string, callback: (tickets: TicketData[]) => void): Unsubscribe => {
   const q = query(
-    collection(db, 'commandes_en_cours'),
+    getTicketsCollectionRef(restaurantId),
+    where('active', '==', true),
     orderBy('dateCreation', 'desc')
   );
 
   return onSnapshot(q, (snapshot) => {
-    const commandes: CommandeData[] = [];
+    const tickets: TicketData[] = [];
     snapshot.forEach((doc) => {
-      commandes.push({
+      tickets.push({
         id: doc.id,
         ...doc.data()
-      } as CommandeData);
+      } as TicketData);
     });
     
     // Mettre à jour le cache lors des changements temps réel
-    commandesEnCoursCache = commandes;
-    lastCommandesEnCoursCacheUpdate = Date.now();
+    ticketsActifsCache = tickets;
+    lastTicketsActifsCacheUpdate = Date.now();
     
-    console.log(`🔄 ${commandes.length} commandes en cours mises à jour (temps réel)`);
-    callback(commandes);
+    console.log(`🔄 ${tickets.length} tickets actifs mis à jour (temps réel)`);
+    callback(tickets);
   });
 };
 
 /**
- * 🔍 RÉCUPÉRER UNE COMMANDE EN COURS PAR TABLE ID
- * Cherche d'abord dans 'commandes_en_cours', puis dans 'commandes' (rétrocompatibilité)
+ * 🔍 RÉCUPÉRER UN TICKET ACTIF PAR TABLE ID - AVEC CACHE OPTIMISÉ
+ * Cherche dans la collection tickets avec active=true
  */
-export const getCommandeByTableId = async (tableId: number): Promise<CommandeData | null> => {
+export const getTicketByTableId = async (tableId: number, restaurantId: string, useCache = true): Promise<TicketData | null> => {
   try {
-    console.log(`🔍 [FIREBASE] Recherche commande pour table ${tableId} (type: ${typeof tableId})`);
+    const now = Date.now();
     
-    // Chercher d'abord dans la nouvelle collection avec différents types
-    const commandesEnCoursRef = collection(db, "commandes_en_cours");
-    
-    // Essayer avec le type number d'abord
-    let qEnCours = query(commandesEnCoursRef, where("tableId", "==", tableId));
-    console.log(`🔍 [FIREBASE] Exécution requête collection 'commandes_en_cours' avec tableId number: ${tableId}`);
-    let querySnapshotEnCours = await getDocs(qEnCours);
-    console.log(`🔍 [FIREBASE] Résultats 'commandes_en_cours' (number): ${querySnapshotEnCours.size} documents`);
-    
-    // Si pas trouvé, essayer avec le type string
-    if (querySnapshotEnCours.empty) {
-      qEnCours = query(commandesEnCoursRef, where("tableId", "==", tableId.toString()));
-      console.log(`🔍 [FIREBASE] Exécution requête collection 'commandes_en_cours' avec tableId string: "${tableId}"`);
-      querySnapshotEnCours = await getDocs(qEnCours);
-      console.log(`🔍 [FIREBASE] Résultats 'commandes_en_cours' (string): ${querySnapshotEnCours.size} documents`);
-    }
-    
-    if (!querySnapshotEnCours.empty) {
-      const docSnapshot = querySnapshotEnCours.docs[0];
-      const commandeData = docSnapshot.data() as Omit<CommandeData, 'id'>;
-      const commande = { id: docSnapshot.id, ...commandeData };
-      console.log(`✅ [FIREBASE] Commande trouvée dans commandes_en_cours:`, commande);
-      return commande;
-    }
-    
-    // Si pas trouvée, chercher dans l'ancienne collection pour rétrocompatibilité
-    console.log(`🔄 [FIREBASE] Recherche dans l'ancienne collection 'commandes'`);
-    const commandesRef = collection(db, "commandes");
-    const qCommandes = query(commandesRef, where("tableId", "==", tableId));
-    
-    console.log(`🔍 [FIREBASE] Exécution requête collection 'commandes'`);
-    const querySnapshotCommandes = await getDocs(qCommandes);
-    console.log(`🔍 [FIREBASE] Résultats 'commandes': ${querySnapshotCommandes.size} documents`);
-    
-    if (querySnapshotCommandes.size > 0) {
-      console.log(`🔍 [FIREBASE] Documents trouvés dans 'commandes':`);
-      querySnapshotCommandes.docs.forEach((doc, index) => {
-        const data = doc.data();
-        console.log(`  - Document ${index}: ID=${doc.id}, tableId=${data.tableId}, status=${data.status}`);
-      });
-    }
-    
-    if (!querySnapshotCommandes.empty) {
-      const docSnapshot = querySnapshotCommandes.docs[0];
-      const commandeData = docSnapshot.data() as any; // Use any to handle legacy data
-      const commande = { id: docSnapshot.id, ...commandeData };
-      
-      // Filtrer les commandes déjà encaissées (support legacy status values)
-      if (commandeData.status === 'encaissee' || commandeData.status === 'encaissée') {
-        console.log(`⚠️ [FIREBASE] Commande trouvée mais déjà encaissée, ignorée`);
-        return null;
+    // Vérifier le cache par table d'abord
+    if (useCache && ticketsByTableCache.has(tableId)) {
+      const cacheTime = ticketsByTableCacheTimestamp.get(tableId) || 0;
+      if ((now - cacheTime) < TABLE_CACHE_DURATION) {
+        const cachedResult = ticketsByTableCache.get(tableId);
+        console.log(`📱 [CACHE] Ticket table ${tableId} depuis le cache:`, cachedResult ? `ID ${cachedResult.id}` : 'null');
+        
+        // Debug: Afficher l'état du cache
+        logCacheStatus(`Table ${tableId} - Cache HIT`);
+        
+        return cachedResult || null;
       }
-      
-      console.log(`✅ [FIREBASE] Commande trouvée dans ancienne collection 'commandes':`, commande);
-      return commande as CommandeData;
     }
     
-    console.log(`❌ [FIREBASE] Aucune commande trouvée pour la table ${tableId}`);
+    // Si on arrive ici, c'est un cache MISS
+    console.log(`🔍 [FIREBASE] Cache MISS - Recherche ticket pour table ${tableId} (type: ${typeof tableId})`);
+    logCacheStatus(`Table ${tableId} - Cache MISS`);
+    
+    // Chercher dans la collection tickets avec active=true
+    const q = query(
+      getTicketsCollectionRef(restaurantId),
+      where("tableId", "==", tableId),
+      where("active", "==", true)
+    );
+    
+    console.log(`🔍 [FIREBASE] Exécution requête collection 'tickets' avec tableId: ${tableId} et active: true`);
+    const querySnapshot = await getDocs(q);
+    console.log(`🔍 [FIREBASE] Résultats 'tickets' (actifs): ${querySnapshot.size} documents`);
+    
+    if (!querySnapshot.empty) {
+      const docSnapshot = querySnapshot.docs[0];
+      const ticketData = docSnapshot.data() as Omit<TicketData, 'id'>;
+      const ticket = { id: docSnapshot.id, ...ticketData };
+      
+      // Mettre en cache le résultat
+      ticketsByTableCache.set(tableId, ticket);
+      ticketsByTableCacheTimestamp.set(tableId, now);
+      
+      console.log(`✅ [FIREBASE] Ticket trouvé dans collection tickets et mis en cache:`, ticket);
+      return ticket;
+    }
+    
+    // Aucun ticket trouvé - mettre null en cache
+    ticketsByTableCache.set(tableId, null);
+    ticketsByTableCacheTimestamp.set(tableId, now);
+    
+    console.log(`❌ [FIREBASE] Aucun ticket trouvé pour la table ${tableId} - mis en cache (null)`);
     return null;
   } catch (error) {
-    console.error("Erreur lors de la récupération de la commande:", error);
+    console.error("Erreur lors de la récupération du ticket:", error);
     return null;
   }
 };
 
 /**
- * 💰 ENCAISSER UNE COMMANDE - Déplace vers archives
+ * 💰 ENCAISSER UN TICKET - Marquer comme inactif
  */
-export const CommandeEncaisse = async (tableId: number, restaurantId: string): Promise<void> => {
+export const ticketEncaisse = async (tableId: number, restaurantId: string): Promise<void> => {
   try {
-    const commande = await getCommandeByTableId(tableId);
-    if (!commande) {
-      throw new Error("Commande non trouvée");
+    const ticket = await getTicketByTableId(tableId, restaurantId);
+    if (!ticket) {
+      throw new Error("Ticket non trouvé");
     }
     
-    // Terminer la commande (la déplace automatiquement vers les archives)
-    await terminerCommande(commande.id, restaurantId);
-    console.log(`✅ Commande table ${tableId} encaissée et archivée`);
+    // Terminer le ticket (le marque comme inactif)
+    await terminerTicket(ticket.id, restaurantId);
+    
+    // Invalider spécifiquement le cache de cette table
+    clearTableCache(tableId);
+    
+    console.log(`✅ Ticket table ${tableId} encaissé et marqué comme inactif`);
   } catch (error) {
     console.error("❌ Erreur lors de l'encaissement:", error);
     throw error;
@@ -383,80 +386,59 @@ export const CommandeEncaisse = async (tableId: number, restaurantId: string): P
 };
 
 /**
- * ✏️ METTRE À JOUR UNE COMMANDE EN COURS
+ * ✏️ METTRE À JOUR UN TICKET
  */
-export const updateCommande = async (documentId: string, newData: Partial<CommandeData>): Promise<void> => {
+export const updateTicket = async (documentId: string, restaurantId: string, newData: Partial<TicketData>): Promise<void> => {
   try {
-    console.log("Mise à jour de la commande:", documentId);
+    console.log("Mise à jour du ticket:", documentId);
     
-    // Mettre à jour dans les commandes en cours
-    const commandeRef = doc(db, 'commandes_en_cours', documentId);
+    // Mettre à jour dans la collection tickets
+    const ticketRef = doc(getTicketsCollectionRef(restaurantId), documentId);
     
     // Vérifier si le document existe
-    const docSnap = await getDoc(commandeRef);
+    const docSnap = await getDoc(ticketRef);
     
     if (!docSnap.exists()) {
-      console.log("Commande non trouvée dans les commandes en cours:", documentId);
-      throw new Error("Commande non trouvée");
+      console.log("Ticket non trouvé dans la collection tickets:", documentId);
+      throw new Error("Ticket non trouvé");
     }
 
+    // Récupérer l'ID de la table pour invalider son cache spécifique
+    const currentData = docSnap.data() as TicketData;
+    const tableId = currentData.tableId;
+
     // Mise à jour du document
-    await updateDoc(commandeRef, {
+    await updateDoc(ticketRef, {
       ...newData,
       timestamp: serverTimestamp()
     });
 
-    // Invalider le cache après modification
-    clearCommandesCache();
-    console.log("✅ Commande mise à jour avec succès:", documentId);
+    // Invalider le cache global et le cache spécifique de la table
+    clearTicketsCache();
+    if (typeof tableId === 'number') {
+      clearTableCache(tableId);
+    }
+    
+    console.log("✅ Ticket mis à jour avec succès:", documentId);
   } catch (error) {
     console.error("❌ Erreur lors de la mise à jour:", error);
     throw error;
   }
 };
 
-/**
- * 📊 RÉCUPÉRER COMMANDES PAR STATUT (en cours uniquement)
- */
-export const getCommandesByStatus = async (status: CommandeData['status']): Promise<CommandeData[]> => {
-  try {
-    console.log(`🔄 Récupération des commandes avec statut: ${status}`);
-    
-    const q = query(
-      collection(db, 'commandes_en_cours'),
-      where("status", "==", status),
-      orderBy('dateCreation', 'desc')
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const commandes: CommandeData[] = [];
-    
-    querySnapshot.forEach((doc) => {
-      commandes.push({ 
-        id: doc.id, 
-        ...(doc.data() as Omit<CommandeData, 'id'>) 
-      });
-    });
-    
-    console.log(`✅ ${commandes.length} commandes trouvées avec statut ${status}`);
-    return commandes;
-  } catch (error) {
-    console.error(`❌ Erreur récupération commandes (${status}):`, error);
-    throw error;
-  }
-};
+
 
 /**
  * 🍽️ METTRE À JOUR LE STATUT D'UN PLAT
  */
-export const updateStatusPlat = async (tableId: number, platName: string, newStatus: PlatQuantite['status']): Promise<void> => {
+export const updateStatusPlat = async (tableId: number, restaurantId: string, platName: string, newStatus: PlatQuantite['status']): Promise<void> => {
   try {
-    const commande = await getCommandeByTableId(tableId);
-    if (!commande) {
-      throw new Error("Commande non trouvée");
+    const ticket = await getTicketByTableId(tableId, restaurantId);
+    if (!ticket) {
+      throw new Error("Ticket non trouvé");
     }
     
-    const platToUpdate = commande.plats.find((p) => p.plat.name === platName);
+    const platToUpdate = ticket.plats.find((p: PlatQuantite) => p.plat.name === platName);
     if (!platToUpdate) {
       throw new Error("Plat non trouvé");
     }
@@ -464,8 +446,8 @@ export const updateStatusPlat = async (tableId: number, platName: string, newSta
     // Mettre à jour le statut du plat
     platToUpdate.status = newStatus;
     
-    // Sauvegarder la commande mise à jour
-    await updateCommande(commande.id, { plats: commande.plats });
+    // Sauvegarder le ticket mis à jour
+    await updateTicket(ticket.id, restaurantId, { plats: ticket.plats });
     
     console.log(`✅ Statut du plat "${platName}" mis à jour: ${newStatus}`);
   } catch (error) {
@@ -475,12 +457,12 @@ export const updateStatusPlat = async (tableId: number, platName: string, newSta
 };
 
 /**
- * 🔄 CHANGER LE STATUT D'UNE COMMANDE
+ * 🔄 CHANGER LE STATUT D'UN TICKET
  */
-export const changeStatusCommande = async (id: string, status: CommandeData['status']): Promise<void> => {
+export const changeStatusTicket = async (id: string, restaurantId: string, status: TicketData['status']): Promise<void> => {
   try {
-    await updateCommande(id, { status });
-    console.log(`✅ Statut de la commande ${id} changé vers: ${status}`);
+    await updateTicket(id, restaurantId, { status });
+    console.log(`✅ Statut du ticket ${id} changé vers: ${status}`);
   } catch (error) {
     console.error("❌ Erreur lors du changement de statut:", error);
     throw error;
@@ -488,12 +470,47 @@ export const changeStatusCommande = async (id: string, status: CommandeData['sta
 };
 
 /**
- * 📈 RÉCUPÉRER LES COMMANDES TERMINÉES (pour statistiques)
+ * 📊 RÉCUPÉRER TICKETS PAR STATUT
  */
-export const getCommandesTerminees = async (limitCount?: number): Promise<CommandeTerminee[]> => {
+export const getTicketsByStatus = async (restaurantId: string, status: TicketData['status'], activeOnly = true): Promise<TicketData[]> => {
   try {
+    console.log(`🔄 Récupération des tickets avec statut: ${status}`);
+    
+    const q = query(
+      getTicketsCollectionRef(restaurantId),
+      where("status", "==", status),
+      where("active", "==", activeOnly),
+      orderBy('dateCreation', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const tickets: TicketData[] = [];
+    
+    querySnapshot.forEach((doc) => {
+      tickets.push({ 
+        id: doc.id, 
+        ...(doc.data() as Omit<TicketData, 'id'>) 
+      });
+    });
+    
+    console.log(`✅ ${tickets.length} tickets trouvés avec statut ${status}`);
+    return tickets;
+  } catch (error) {
+    console.error(`❌ Erreur récupération tickets (${status}):`, error);
+    throw error;
+  }
+};
+
+/**
+ * 📈 RÉCUPÉRER LES TICKETS TERMINÉS (pour statistiques)
+ */
+export const getTicketsTermines = async (restaurantId: string, limitCount?: number): Promise<TicketData[]> => {
+  try {
+    console.log(`🔄 Récupération des tickets terminés (limite: ${limitCount || 'aucune'})`);
+    
     let q = query(
-      collection(db, 'commandes_terminees'),
+      getTicketsCollectionRef(restaurantId),
+      where('active', '==', false),
       orderBy('dateTerminee', 'desc')
     );
     
@@ -502,40 +519,41 @@ export const getCommandesTerminees = async (limitCount?: number): Promise<Comman
     }
     
     const querySnapshot = await getDocs(q);
-    const commandes: CommandeTerminee[] = [];
+    const tickets: TicketData[] = [];
     
     querySnapshot.forEach((doc) => {
-      commandes.push({ 
-        id: doc.id, 
-        ...doc.data() 
-      } as CommandeTerminee);
+      tickets.push({
+        id: doc.id,
+        ...doc.data()
+      } as TicketData);
     });
     
-    console.log(`✅ ${commandes.length} commandes terminées récupérées`);
-    return commandes;
+    console.log(`✅ ${tickets.length} tickets terminés récupérés`);
+    return tickets;
   } catch (error) {
-    console.error("❌ Erreur récupération commandes terminées:", error);
+    console.error('❌ Erreur récupération tickets terminés:', error);
     throw error;
   }
 };
 
 /**
- * 🗑️ PURGE DES ANCIENNES COMMANDES TERMINÉES
+ * 🗑️ PURGE DES ANCIENS TICKETS TERMINÉS
  */
-export const purgeOldCommandes = async (monthsOld = 6): Promise<number> => {
+export const purgeOldTickets = async (restaurantId: string, monthsOld = 6): Promise<number> => {
   try {
     const dateLimit = new Date();
     dateLimit.setMonth(dateLimit.getMonth() - monthsOld);
     
     const q = query(
-      collection(db, 'commandes_terminees'),
+      getTicketsCollectionRef(restaurantId),
+      where('active', '==', false),
       where('dateTerminee', '<', dateLimit)
     );
     
     const snapshot = await getDocs(q);
     
     if (snapshot.empty) {
-      console.log('Aucune commande ancienne à purger');
+      console.log('Aucun ticket ancien à purger');
       return 0;
     }
     
@@ -546,7 +564,7 @@ export const purgeOldCommandes = async (monthsOld = 6): Promise<number> => {
     
     await batch.commit();
     
-    console.log(`✅ ${snapshot.size} commandes anciennes purgées`);
+    console.log(`✅ ${snapshot.size} tickets anciens purgés`);
     return snapshot.size;
   } catch (error) {
     console.error('❌ Erreur lors de la purge:', error);
@@ -555,39 +573,43 @@ export const purgeOldCommandes = async (monthsOld = 6): Promise<number> => {
 };
 
 /**
- * 🔍 DIAGNOSTIC - Vérifier l'état des collections
+ * 🔍 DIAGNOSTIC - Vérifier l'état des tickets
  */
-export const diagnosticCommandes = async () => {
+export const diagnosticTickets = async (restaurantId: string) => {
   try {
-    console.log('🔍 === DIAGNOSTIC DES COMMANDES ===');
+    console.log('🔍 === DIAGNOSTIC DES TICKETS ===');
     
-    // Vérifier commandes en cours
-    const qEnCours = query(collection(db, 'commandes_en_cours'));
-    const snapshotEnCours = await getDocs(qEnCours);
+    // Vérifier tickets actifs
+    const qActifs = query(
+      getTicketsCollectionRef(restaurantId),
+      where('active', '==', true)
+    );
+    const snapshotActifs = await getDocs(qActifs);
     
-    console.log(`📊 Commandes en cours: ${snapshotEnCours.size}`);
-    snapshotEnCours.forEach((doc) => {
+    console.log(`📊 Tickets actifs: ${snapshotActifs.size}`);
+    snapshotActifs.forEach((doc) => {
       const data = doc.data();
       console.log(`  - ${doc.id}: Table ${data.tableId}, Status: ${data.status}`);
     });
     
-    // Vérifier commandes terminées
-    const qTerminees = query(
-      collection(db, 'commandes_terminees'), 
+    // Vérifier tickets terminés (derniers 5)
+    const qTermines = query(
+      getTicketsCollectionRef(restaurantId),
+      where('active', '==', false),
       orderBy('dateTerminee', 'desc'), 
       limit(5)
     );
-    const snapshotTerminees = await getDocs(qTerminees);
+    const snapshotTermines = await getDocs(qTermines);
     
-    console.log(`📋 Dernières commandes terminées: ${snapshotTerminees.size}`);
-    snapshotTerminees.forEach((doc) => {
+    console.log(`📋 Derniers tickets terminés: ${snapshotTermines.size}`);
+    snapshotTermines.forEach((doc) => {
       const data = doc.data();
-      console.log(`  - ${doc.id}: Table ${data.tableId}, Terminée: ${data.dateTerminee}`);
+      console.log(`  - ${doc.id}: Table ${data.tableId}, Terminé: ${data.dateTerminee}`);
     });
     
     return {
-      commandesEnCours: snapshotEnCours.size,
-      commandesTerminees: snapshotTerminees.size,
+      ticketsActifs: snapshotActifs.size,
+      ticketsTermines: snapshotTermines.size,
       diagnostic: 'success'
     };
   } catch (error) {
@@ -597,36 +619,38 @@ export const diagnosticCommandes = async () => {
 };
 
 /**
- * 🔍 DIAGNOSTIC - Lister toutes les commandes par table ID
+ * 🔍 DIAGNOSTIC - Lister tous les tickets par table ID
  */
-export const diagnosticCommandesByTable = async (tableId: number): Promise<void> => {
+export const diagnosticTicketsByTable = async (tableId: number, restaurantId: string): Promise<void> => {
   try {
-    console.log(`🔍 === DIAGNOSTIC COMMANDES POUR TABLE ${tableId} ===`);
+    console.log(`🔍 === DIAGNOSTIC TICKETS POUR TABLE ${tableId} ===`);
     
-    // Vérifier commandes_en_cours
-    const qEnCours = query(collection(db, 'commandes_en_cours'));
-    const snapshotEnCours = await getDocs(qEnCours);
+    // Vérifier tickets actifs pour cette table
+    const qActifs = query(
+      getTicketsCollectionRef(restaurantId),
+      where('tableId', '==', tableId),
+      where('active', '==', true)
+    );
+    const snapshotActifs = await getDocs(qActifs);
     
-    console.log(`📊 Collection 'commandes_en_cours': ${snapshotEnCours.size} documents`);
-    snapshotEnCours.forEach((doc) => {
+    console.log(`📊 Tickets actifs pour table ${tableId}: ${snapshotActifs.size} documents`);
+    snapshotActifs.forEach((doc) => {
       const data = doc.data();
-      console.log(`  - ${doc.id}: Table ${data.tableId}, Status: ${data.status}, TypeTableId: ${typeof data.tableId}`);
-      if (data.tableId === tableId || data.tableId === tableId.toString()) {
-        console.log(`    ✅ MATCH trouvé pour table ${tableId}!`);
-      }
+      console.log(`  - ${doc.id}: Status: ${data.status}, Active: ${data.active}`);
     });
     
-    // Vérifier ancienne collection commandes
-    const qCommandes = query(collection(db, 'commandes'));
-    const snapshotCommandes = await getDocs(qCommandes);
+    // Vérifier tickets terminés pour cette table
+    const qTermines = query(
+      getTicketsCollectionRef(restaurantId),
+      where('tableId', '==', tableId),
+      where('active', '==', false)
+    );
+    const snapshotTermines = await getDocs(qTermines);
     
-    console.log(`📋 Collection 'commandes': ${snapshotCommandes.size} documents`);
-    snapshotCommandes.forEach((doc) => {
+    console.log(`📋 Tickets terminés pour table ${tableId}: ${snapshotTermines.size} documents`);
+    snapshotTermines.forEach((doc) => {
       const data = doc.data();
-      console.log(`  - ${doc.id}: Table ${data.tableId}, Status: ${data.status}, TypeTableId: ${typeof data.tableId}`);
-      if (data.tableId === tableId || data.tableId === tableId.toString()) {
-        console.log(`    ✅ MATCH trouvé pour table ${tableId}!`);
-      }
+      console.log(`  - ${doc.id}: Status: ${data.status}, Active: ${data.active}, Terminé: ${data.dateTerminee}`);
     });
     
     console.log(`🔍 === FIN DIAGNOSTIC TABLE ${tableId} ===`);
@@ -638,27 +662,47 @@ export const diagnosticCommandesByTable = async (tableId: number): Promise<void>
 // ====== EXPORTS ======
 
 export default {
-  // Fonctions optimisées
-  createCommande,
-  terminerCommande,
-  getCommandesEnCours,
-  listenToCommandesEnCours,
-  getCommandesByStatus,
-  getCommandesTerminees,
-  purgeOldCommandes,
+  // Fonctions principales tickets
+  createTicket,
+  terminerTicket,
+  getTicketsActifs,
+  listenToTicketsActifs,
+  getTicketsByStatus,
+  getTicketsTermines,
+  purgeOldTickets,
   
   // Fonctions de gestion
-  getCommandeByTableId,
-  CommandeEncaisse,
-  updateCommande,
+  getTicketByTableId,
+  ticketEncaisse,
+  updateTicket,
   updateStatusPlat,
-  changeStatusCommande,
+  changeStatusTicket,
   
   // Utilitaires cache
-  clearCommandesCache,
-  getCommandesCacheInfo,
+  clearTicketsCache,
+  clearTableCache,
+  getTicketsCacheInfo,
+  getTableCacheInfo,
+  logCacheStatus,
   
   // Diagnostics
-  diagnosticCommandes,
-  diagnosticCommandesByTable
+  diagnosticTickets,
+  diagnosticTicketsByTable,
+  
+  // Alias pour compatibilité (deprecated)
+  createCommande: createTicket,
+  terminerCommande: terminerTicket,
+  getCommandesEnCours: getTicketsActifs,
+  listenToCommandesEnCours: listenToTicketsActifs,
+  getCommandesByStatus: getTicketsByStatus,
+  getCommandesTerminees: getTicketsTermines,
+  getCommandeByTableId: getTicketByTableId,
+  CommandeEncaisse: ticketEncaisse,
+  updateCommande: updateTicket,
+  changeStatusCommande: changeStatusTicket,
+  clearCommandesCache: clearTicketsCache,
+  getCommandesCacheInfo: getTicketsCacheInfo,
+  diagnosticCommandes: diagnosticTickets,
+  diagnosticCommandesByTable: diagnosticTicketsByTable,
+  purgeOldCommandes: purgeOldTickets
 };

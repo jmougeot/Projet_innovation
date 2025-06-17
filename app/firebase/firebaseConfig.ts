@@ -9,7 +9,6 @@ import {
   User 
 } from 'firebase/auth';
 import { 
-  getFirestore, 
   initializeFirestore,
   Firestore,
   doc, 

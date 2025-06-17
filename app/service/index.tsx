@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,8 +14,26 @@ export default function ServiceHome() {
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
   });
+  const [activeServices, setActiveServices] = useState({
+    tables: 0,
+    commandes: 0,
+    missions: 0
+  });
 
   const customMenuItems = getServiceMenuItems();
+
+  useEffect(() => {
+    // Simulation de données en temps réel - à remplacer par de vraies données
+    const interval = setInterval(() => {
+      setActiveServices({
+        tables: Math.floor(Math.random() * 20) + 1,
+        commandes: Math.floor(Math.random() * 15) + 1,
+        missions: Math.floor(Math.random() * 8) + 1
+      });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   if (!fontsLoaded) {
     return null;
@@ -30,11 +48,33 @@ export default function ServiceHome() {
           <Text style={styles.headerSquareText}>Espace Service</Text>
         </View>
 
+        {/* Tableau de bord en temps réel */}
+        <View style={styles.dashboardContainer}>
+          <Text style={styles.dashboardTitle}>Tableau de bord Service</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <MaterialIcons name="table-restaurant" size={24} color="#194A8D" />
+              <Text style={styles.statNumber}>{activeServices.tables}</Text>
+              <Text style={styles.statLabel}>Tables actives</Text>
+            </View>
+            <View style={styles.statCard}>
+              <MaterialIcons name="receipt" size={24} color="#194A8D" />
+              <Text style={styles.statNumber}>{activeServices.commandes}</Text>
+              <Text style={styles.statLabel}>Commandes</Text>
+            </View>
+            <View style={styles.statCard}>
+              <MaterialIcons name="assignment" size={24} color="#194A8D" />
+              <Text style={styles.statNumber}>{activeServices.missions}</Text>
+              <Text style={styles.statLabel}>Missions</Text>
+            </View>
+          </View>
+        </View>
+
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Navigation principale */}
+        {/* Gestion des Tables - Section Service uniquement */}
         <View style={styles.sectionContainer}>
           <View style={styles.categoryHeader}>
-            <Text style={styles.categoryTitle}>Navigation rapide</Text>
+            <Text style={styles.categoryTitle}>Gestion des Tables</Text>
             <View style={styles.categorySeparatorContainer}>
               <LinearGradient
                 colors={['transparent', '#CAE1EF', 'transparent']}
@@ -48,101 +88,63 @@ export default function ServiceHome() {
           <View style={styles.menuGrid}>
             <TouchableOpacity 
               style={styles.card}
-              onPress={() => router.push('/service/(tabs)/plan_de_salle' as any)}
+              onPress={() => router.push('/service/(tabs)/plan_de_salle')}
             >
               <MaterialIcons name="table-restaurant" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Navigation Service</Text>
+              <Text style={styles.cardTitle}>Plan de Salle</Text>
               <Text style={styles.cardDescription}>
-                Accès aux outils de service
+                Visualiser et gérer toutes les tables
               </Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.card}
-              onPress={() => router.push('/service/(tabs)/plan_de_salle' as any)}
-            >
-              <MaterialIcons name="restaurant" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Plan de salle</Text>
-              <Text style={styles.cardDescription}>
-                Visualiser et gérer les tables
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Actions rapides */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.categoryHeader}>
-            <Text style={styles.categoryTitle}>Actions rapides</Text>
-            <View style={styles.categorySeparatorContainer}>
-              <LinearGradient
-                colors={['transparent', '#CAE1EF', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.categorySeparator}
-              />
-            </View>
-          </View>
-          
-          <View style={styles.menuGrid}>
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/service/(tabs)/kitchen' as any)}
-            >
-              <MaterialIcons name="restaurant-menu" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Cuisine Service</Text>
-              <Text style={styles.cardDescription}>
-                Suivi des commandes en cuisine
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Gestion avancée */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.categoryHeader}>
-            <Text style={styles.categoryTitle}>Gestion avancée</Text>
-            <View style={styles.categorySeparatorContainer}>
-              <LinearGradient
-                colors={['transparent', '#CAE1EF', 'transparent']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.categorySeparator}
-              />
-            </View>
-          </View>
-          
-          <View style={styles.menuGrid}>
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/restaurant' as any)}
-            >
-              <MaterialIcons name="business" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Mon Restaurant</Text>
-              <Text style={styles.cardDescription}>
-                Configuration et paramètres
-              </Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/service/commande/map_settings' as any)}
+              onPress={() => router.push('/service/commande/map_settings')}
             >
               <MaterialIcons name="edit-location" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Modifier le plan</Text>
+              <Text style={styles.cardTitle}>Modifier Plan</Text>
               <Text style={styles.cardDescription}>
-                Configurer le plan de salle
+                Configurer l'agencement des tables
               </Text>
             </TouchableOpacity>
+          </View>
+        </View>
 
+
+        {/* Suivi Cuisine - Section Service uniquement */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Suivi Cuisine</Text>
+            <View style={styles.categorySeparatorContainer}>
+              <LinearGradient
+                colors={['transparent', '#CAE1EF', 'transparent']}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.categorySeparator}
+              />
+            </View>
+          </View>
+          
+          <View style={styles.menuGrid}>
             <TouchableOpacity 
               style={styles.card}
-              onPress={() => router.push('/restaurant/select' as any)}
+              onPress={() => router.push('/service/(tabs)/kitchen')}
             >
-              <MaterialIcons name="restaurant" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Gestion Restaurant</Text>
+              <MaterialIcons name="kitchen" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>État Cuisine</Text>
               <Text style={styles.cardDescription}>
-                Configurer et gérer votre restaurant
+                Suivi des plats en préparation
+              </Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/service/(tabs)/AffichageMission')}
+            >
+              <MaterialIcons name="assignment" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Missions Service</Text>
+              <Text style={styles.cardDescription}>
+                Tâches spécifiques au service
               </Text>
             </TouchableOpacity>
           </View>
@@ -175,6 +177,47 @@ const styles = StyleSheet.create({
     color: '#083F8C',
     fontWeight: 'bold',
     fontSize: 20,
+  },
+  dashboardContainer: {
+    backgroundColor: '#F3EFEF',
+    borderRadius: 20,
+    padding: 15,
+    marginBottom: 15,
+  },
+  dashboardTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#194A8D',
+    textAlign: 'center',
+    marginBottom: 15,
+    fontFamily: 'AlexBrush',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  statCard: {
+    backgroundColor: '#CAE1EF',
+    borderRadius: 15,
+    padding: 15,
+    alignItems: 'center',
+    minWidth: 80,
+    elevation: 2,
+    boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.15)',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#194A8D',
+    marginTop: 5,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#194A8D',
+    textAlign: 'center',
+    marginTop: 3,
+    opacity: 0.8,
   },
   scrollView: {
     flex: 1,

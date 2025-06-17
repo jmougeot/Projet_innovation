@@ -103,7 +103,7 @@ export default function RestaurantIndex() {
   const reglageMenuItems = [
     {
       label: 'Accueil',
-      onPress: () => router.push('/service')
+      onPress: () => router.push('/')
     },
     {
       label: 'Profil',
@@ -129,7 +129,7 @@ export default function RestaurantIndex() {
           backgroundColor="#194A8D"
           textColor="#FFFFFF"
           useHeadComponent={true}
-          customBackRoute="/service"
+          customBackRoute="/"
           showReglage={true}
           reglageMenuItems={reglageMenuItems}
         />
@@ -150,7 +150,7 @@ export default function RestaurantIndex() {
           backgroundColor="#194A8D"
           textColor="#FFFFFF"
           useHeadComponent={true}
-          customBackRoute="/service"
+          customBackRoute="/"
           showReglage={true}
           reglageMenuItems={[
             ...reglageMenuItems,
