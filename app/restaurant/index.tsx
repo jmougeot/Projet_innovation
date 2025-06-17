@@ -258,10 +258,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 24,
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
   },
   restaurantHeader: {
     alignItems: 'center',
@@ -315,10 +312,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
   },
   primaryButtonText: {
     color: '#fff',
@@ -348,10 +342,8 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
+
   },
   setupHeader: {
     alignItems: 'center',

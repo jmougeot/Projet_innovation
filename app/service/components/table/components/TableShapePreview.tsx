@@ -77,3 +77,5 @@ export const TableShapePreview: React.FC<TableShapePreviewProps> = ({
     </TouchableOpacity>
   );
 };
+
+export default TableShapePreview;

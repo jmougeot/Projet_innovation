@@ -40,3 +40,10 @@ export const TABLE_SHAPES: TableShapeOption[] = [
     maxCovers: 10
   }
 ];
+
+export default {
+  TABLE_SIZE,
+  EDIT_TABLE_WIDTH,
+  EDIT_TABLE_HEIGHT,
+  TABLE_SHAPES,
+};

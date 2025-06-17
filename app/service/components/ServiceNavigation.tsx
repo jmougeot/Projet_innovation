@@ -166,3 +166,5 @@ export const getCuisineServiceMenuItems = (): ServiceMenuItem[] => [
     isLogout: true
   },
 ];
+
+export default { getServiceMenuItems };

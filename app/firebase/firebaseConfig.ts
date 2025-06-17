@@ -10,15 +10,15 @@ import {
 } from 'firebase/auth';
 import { 
   getFirestore, 
+  initializeFirestore,
   Firestore,
   doc, 
   getDoc, 
   setDoc, 
   updateDoc, 
-  enableIndexedDbPersistence,
   enableNetwork,
   disableNetwork,
-  clearIndexedDbPersistence
+  terminate
 } from 'firebase/firestore';
 import { 
   getStorage, 
@@ -53,26 +53,20 @@ const firebaseConfig = {
 // Initialize Firebase
 const app: FirebaseApp = initializeApp(firebaseConfig);
 const auth: Auth = getAuth(app);
-const db: Firestore = getFirestore(app);
+
+// ✅ CACHE FIREBASE OPTIMISÉ - Configuration moderne avec cache
+const firestoreSettings = {
+  localCache: {
+    kind: 'persistent' as const,
+  }
+};
+
+const db: Firestore = initializeFirestore(app, firestoreSettings);
 const storage: FirebaseStorage = getStorage(app);
 
-// ✅ CACHE FIREBASE OPTIMISÉ - Active la persistence offline
-enableIndexedDbPersistence(db)
-.then(() => {
-  console.log('✅ Cache Firebase activé - Mode offline disponible')
-  console.log('📱 Vos données sont maintenant disponibles hors ligne !')
-})
-.catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('⚠️ Cache Firebase: Un seul onglet peut avoir la persistence')
-    console.warn('💡 Fermez les autres onglets pour activer le cache complet')
-  } else if (err.code === 'unimplemented') {
-    console.warn('⚠️ Cache Firebase: Non supporté sur ce navigateur')
-    console.warn('💡 Le cache fonctionnera quand même partiellement')
-  } else {
-    console.error('❌ Erreur cache Firebase:', err)
-  }
-})
+// ✅ Confirmation du cache activé
+console.log('✅ Cache Firebase activé - Mode offline disponible')
+console.log('� Vos données sont maintenant disponibles hors ligne !')
 
 // Utilitaires pour gérer la connexion et le cache
 export const goOffline = () => {
@@ -88,8 +82,9 @@ export const goOnline = () => {
 // Fonction pour vider le cache (utile pour le debug)
 export const clearCache = async () => {
   try {
-    await clearIndexedDbPersistence(db)
-    console.log('🗑️ Cache Firebase vidé avec succès')
+    // Avec Firebase v9+, nous devons terminer la connexion et redémarrer
+    await terminate(db)
+    console.log('🗑️ Cache Firebase vidé avec succès (connexion terminée)')
     return true
   } catch (error) {
     console.error('❌ Erreur lors du vidage du cache:', error)

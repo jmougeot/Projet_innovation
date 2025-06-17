@@ -76,10 +76,7 @@ export const pageStyles = StyleSheet.create({
   
   formInputFocused: {
     borderColor: '#1890ff',
-    shadowColor: '#1890ff',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     elevation: 2,
   },
   
@@ -107,10 +104,7 @@ export const pageStyles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     elevation: 2,
   },
   
@@ -134,10 +128,7 @@ export const pageStyles = StyleSheet.create({
     marginVertical: 8,
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     elevation: 2,
   },
   
@@ -167,10 +158,7 @@ export const pageStyles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 8,
     padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     elevation: 2,
   },
   

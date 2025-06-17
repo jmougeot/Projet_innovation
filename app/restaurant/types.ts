@@ -53,3 +53,5 @@ export interface RestaurantNavigationHooks {
 export interface RestaurantSelectionProviderProps {
   children: React.ReactNode;
 }
+
+export default {};

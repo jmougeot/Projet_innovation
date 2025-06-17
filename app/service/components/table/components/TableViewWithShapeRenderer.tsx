@@ -76,3 +76,5 @@ export const TableViewWithShapeRenderer: React.FC<TableViewBaseProps> = ({
     </SafeAreaView>
   );
 };
+
+export default TableViewWithShapeRenderer;

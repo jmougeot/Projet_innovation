@@ -35,3 +35,11 @@ export const getNextStatus = (currentStatus: TableType['status']): TableType['st
   const currentIndex = statuses.indexOf(currentStatus);
   return statuses[(currentIndex + 1) % statuses.length];
 };
+
+export default {
+  useWorkspaceDimensions,
+  getStatusColor,
+  getStatusText,
+  getNextStatus,
+};
+

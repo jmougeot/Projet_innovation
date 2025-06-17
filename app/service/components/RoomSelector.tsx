@@ -147,10 +147,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 25,
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     flex: 1.2,
     alignItems: 'center',
     marginHorizontal: 5,
@@ -184,13 +181,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     elevation: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    boxShadow: '0px 5px 10px rgba(0, 0, 0, 0.5)',
     marginTop: 5,
     maxHeight: 300,
-    zIndex: 11111999999,
+    zIndex: 11999999,
     width: 250,
   },
   roomDropdownScrollView: {
@@ -246,3 +240,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
 });
+
+export default RoomSelector;

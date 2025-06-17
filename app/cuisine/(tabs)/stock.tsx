@@ -317,10 +317,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.25,
-        shadowRadius: 3.84,
+        boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     },
     addButtonText: {
         color: '#194A8D',
@@ -338,13 +335,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#F3EFEF',
         borderRadius: 20,
         padding: 20,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2
-        },
-        shadowOpacity: 0.25,
-        shadowRadius: 4,
+        boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
         elevation: 5,
     },
     modalTitle: {

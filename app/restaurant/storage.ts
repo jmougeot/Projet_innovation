@@ -58,3 +58,5 @@ export const restaurantStorage = {
     }
   }
 };
+
+export default restaurantStorage;

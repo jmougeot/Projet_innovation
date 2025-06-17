@@ -57,3 +57,5 @@ export interface TableShapePreviewProps {
   option: TableShapeOption;
   tableStatus?: TableType['status'];
 }
+
+export default {};

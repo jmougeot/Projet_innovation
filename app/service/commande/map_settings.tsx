@@ -139,10 +139,9 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
           left: position.x,
           top: position.y,
           position: 'absolute',
+          pointerEvents: 'box-only',
         }
       ]}
-      // Propriétés pour empêcher la sélection de texte
-      pointerEvents="box-only"
       // @ts-ignore - Propriétés spécifiques React Native
       accessible={false}
       importantForAccessibility="no"
@@ -162,12 +161,10 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
             msUserSelect: 'none',
             WebkitTouchCallout: 'none',
             WebkitTapHighlightColor: 'transparent',
+            pointerEvents: 'none',
           } as any
         ]}
         // @ts-ignore - Propriétés supplémentaires pour empêcher la sélection
-        accessible={false}
-        importantForAccessibility="no"
-        pointerEvents="none"
       >
         <TableShapeRenderer
           table={table}
@@ -1236,10 +1233,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
   },
   createRoomButtonText: {
     color: '#fff',
@@ -1253,10 +1247,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 15,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    boxShadow: '0px 1px 2.22px rgba(0, 0, 0, 0.22)',
   },
   roomSelectorLabel: {
     fontSize: 16,
