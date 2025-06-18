@@ -182,18 +182,7 @@ export default function Home() {
             </View>
           </View>
           
-          <View style={styles.menuGrid}>
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/restaurant/select')}
-            >
-              <MaterialIcons name="store" size={40} color="#194A8D" />
-              <Text style={styles.cardTitle}>Restaurant</Text>
-              <Text style={styles.cardDescription}>
-                Sélection & configuration
-              </Text>
-            </TouchableOpacity>
-            
+          <View style={styles.menuGrid}>           
             <TouchableOpacity 
               style={styles.card}
               onPress={() => router.push('/connexion')}

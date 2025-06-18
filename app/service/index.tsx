@@ -40,7 +40,7 @@ export default function ServiceHome() {
   }
 
   return (
-    <AutoRedirect requireRestaurant={true} loadingMessage="Vérification du restaurant sélectionné...">
+    <AutoRedirect loadingMessage="Vérification du restaurant sélectionné...">
       <SafeAreaView style={styles.container}>
         <Reglage position={{ top: 0, right: 15 }} menuItems={customMenuItems} />
         

@@ -26,6 +26,11 @@ import {
   uploadBytes, 
   getDownloadURL 
 } from 'firebase/storage';
+import { 
+  getFunctions,
+  Functions,
+  connectFunctionsEmulator
+} from 'firebase/functions';
 
 // User data interface
 export interface UserData {
@@ -62,6 +67,17 @@ const firestoreSettings = {
 
 const db: Firestore = initializeFirestore(app, firestoreSettings);
 const storage: FirebaseStorage = getStorage(app);
+const functions: Functions = getFunctions(app);
+
+// ✅ Connect to Functions emulator in development
+if (process.env.NODE_ENV === 'development') {
+  try {
+    connectFunctionsEmulator(functions, 'localhost', 5001);
+    console.log('🔧 Connected to Functions emulator');
+  } catch (error) {
+    console.log('ℹ️ Functions emulator not available');
+  }
+}
 
 // ✅ Confirmation du cache activé
 console.log('✅ Cache Firebase activé - Mode offline disponible')
@@ -97,7 +113,7 @@ export const checkConnectionStatus = () => {
 }
 
 // Export Firebase instances
-export { auth, db, storage };
+export { auth, db, storage, functions };
 
 // Utility functions for user management
 export const createUser = async (email: string, password: string, userData: Partial<UserData>): Promise<User> => {

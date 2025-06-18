@@ -28,24 +28,19 @@ export default function RestaurantProtectedRoute({
   loadingMessage = 'Vérification des accès...'
 }: RestaurantProtectedRouteProps) {
   const router = useRouter();
-  const { user, currentRestaurant, isUserConnected, isConnectedToRestaurant, isLoading } = useRestaurant();
+  const { currentRestaurant, isConnectedToRestaurant, isLoading } = useRestaurant();
 
   // Redirection automatique si pas connecté
   React.useEffect(() => {
     if (!isLoading) {
-      if (!isUserConnected) {
-        // Use setTimeout to defer navigation until after render
-        setTimeout(() => {
-          router.replace('/connexion' as any);
-        }, 0);
-      } else if (isUserConnected && !currentRestaurant) {
+      if (!currentRestaurant) {
         // Use setTimeout to defer navigation until after render
         setTimeout(() => {
           router.replace(fallbackRoute as any);
         }, 0);
       }
     }
-  }, [isLoading, isUserConnected, currentRestaurant, router, fallbackRoute]);
+  }, [isLoading, currentRestaurant, router, fallbackRoute]);
 
   // Affichage du loading
   if (isLoading) {
@@ -61,46 +56,25 @@ export default function RestaurantProtectedRoute({
   }
 
   // Si pas connecté, ne pas afficher le contenu
-  if (!isUserConnected) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header title="Connexion requise" />
-        <View style={styles.errorContainer}>
-          <MaterialIcons name="lock" size={64} color="#DDD" />
-          <Text style={styles.errorTitle}>Connexion requise</Text>
-          <Text style={styles.errorText}>
-            Vous devez être connecté pour accéder à cette page
-          </Text>
-          <Pressable style={styles.actionButton} onPress={() => router.replace('/connexion' as any)}>
-            <LinearGradient colors={['#D4AF37', '#B8941F']} style={styles.buttonGradient}>
-              <Text style={styles.buttonText}>Se connecter</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  // Si pas de restaurant sélectionné
-  if (!currentRestaurant) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header title="Restaurant requis" />
-        <View style={styles.errorContainer}>
-          <MaterialIcons name="restaurant" size={64} color="#DDD" />
-          <Text style={styles.errorTitle}>Restaurant requis</Text>
-          <Text style={styles.errorText}>
-            Vous devez sélectionner un restaurant pour accéder à cette page
-          </Text>
-          <Pressable style={styles.actionButton} onPress={() => router.replace(fallbackRoute as any)}>
-            <LinearGradient colors={['#D4AF37', '#B8941F']} style={styles.buttonGradient}>
-              <Text style={styles.buttonText}>Sélectionner un restaurant</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // if (!user) {
+  //   return (
+  //     <SafeAreaView style={styles.container}>
+  //       <Header title="Connexion requise" />
+  // // Si pas de restaurant sélectionné
+  //         <MaterialIcons name="restaurant" size={64} color="#DDD" />
+  //         <Text style={styles.errorTitle}>Restaurant requis</Text>
+  //         <Text style={styles.errorText}>
+  //           Vous devez sélectionner un restaurant pour accéder à cette page
+  //         </Text>
+  //         <Pressable style={styles.actionButton} onPress={() => router.replace(fallbackRoute as any)}>
+  //           <LinearGradient colors={['#D4AF37', '#B8941F']} style={styles.buttonGradient}>
+  //             <Text style={styles.buttonText}>Sélectionner un restaurant</Text>
+  //           </LinearGradient>
+  //         </Pressable>
+  //       </View>
+  //     </SafeAreaView>
+  //   );
+  // }
 
   // Tout est OK, afficher le contenu
   return <>{children}</>;

@@ -5,15 +5,10 @@ import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, getRoom, Room } from '@/app/firebase/firebaseTables';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
-import { useRestaurant } from '../../restaurant/SelectionContext';
-import { saveSelectedRoomName, getSelectedRoomName } from '@/app/firebase/asyncstorage/roomStorage';
+import { useRestaurant } from '@/app/restaurant/SelectionContext';
+import { saveSelectedRoomName, getSelectedRoomName } from '@/app/asyncstorage/roomStorage';
 
-import { 
-  TableShapeRenderer, 
-  getStatusColor, 
-  getStatusText, 
-  getNextStatus
-} from '../components/Table';
+import { TableShapeRenderer, getStatusColor, getStatusText, getNextStatus } from '../components/Table';
 import { WorkspaceContainer, useWorkspaceSize } from '../components/Workspace';
 import { RoomSelector } from '../components/RoomSelector';
 

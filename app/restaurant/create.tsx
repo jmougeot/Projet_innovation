@@ -8,51 +8,38 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
-  Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
-import { useRestaurant } from './SelectionContext';
-import { initializeRestaurant, addUserMember, addUserMemberWithUserId } from '../firebase/firebaseRestaurant';
-import type { Restaurant, RestaurantSettings } from '../firebase/firebaseRestaurant';
+import { createRestaurantWithAccess } from '../firebase/firebaseRestaurant';
+import { auth } from '../firebase/firebaseConfig';
 
 interface RestaurantFormData {
+  restaurantId: string;
   name: string;
   address: string;
   phone: string;
   email: string;
   openTime: string;
   closeTime: string;
-  kitchenCapacity: string;
-  currency: string;
-  taxRate: string;
-  serviceCharge: string;
-  defaultRoomName: string;
-  migrateExistingData: boolean;
 }
 
 export default function CreateRestaurant() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const { user } = useRestaurant();
   const [formData, setFormData] = useState<RestaurantFormData>({
+    restaurantId: '',
     name: '',
     address: '',
     phone: '',
     email: '',
-    openTime: '08:00',
+    openTime: '09:00',
     closeTime: '22:00',
-    kitchenCapacity: '50',
-    currency: 'EUR',
-    taxRate: '20',
-    serviceCharge: '0',
-    defaultRoomName: 'Salle principale',
-    migrateExistingData: true,
   });
 
-  const handleInputChange = (field: keyof RestaurantFormData, value: string | boolean) => {
+  const handleInputChange = (field: keyof RestaurantFormData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value,
@@ -60,6 +47,16 @@ export default function CreateRestaurant() {
   };
 
   const validateForm = (): boolean => {
+    if (!formData.restaurantId.trim()) {
+      Alert.alert('Erreur', 'L\'ID du restaurant est obligatoire');
+      return false;
+    }
+
+    if (formData.restaurantId.length < 3) {
+      Alert.alert('Erreur', 'L\'ID du restaurant doit contenir au moins 3 caractères');
+      return false;
+    }
+
     if (!formData.name.trim()) {
       Alert.alert('Erreur', 'Le nom du restaurant est obligatoire');
       return false;
@@ -70,21 +67,9 @@ export default function CreateRestaurant() {
       return false;
     }
 
-    const kitchenCapacity = parseInt(formData.kitchenCapacity);
-    if (isNaN(kitchenCapacity) || kitchenCapacity <= 0) {
-      Alert.alert('Erreur', 'La capacité de la cuisine doit être un nombre positif');
-      return false;
-    }
-
-    const taxRate = parseFloat(formData.taxRate);
-    if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
-      Alert.alert('Erreur', 'Le taux de TVA doit être compris entre 0 et 100');
-      return false;
-    }
-
-    const serviceCharge = parseFloat(formData.serviceCharge);
-    if (isNaN(serviceCharge) || serviceCharge < 0 || serviceCharge > 100) {
-      Alert.alert('Erreur', 'Les frais de service doivent être compris entre 0 et 100');
+    // Vérifier que l'utilisateur est connecté
+    if (!auth.currentUser) {
+      Alert.alert('Erreur', 'Vous devez être connecté pour créer un restaurant');
       return false;
     }
 
@@ -94,63 +79,45 @@ export default function CreateRestaurant() {
   const handleCreateRestaurant = async () => {
     if (!validateForm()) return;
 
-    if (!user) {
-      Alert.alert('Erreur', 'Vous devez être connecté pour créer un restaurant');
-      return;
-    }
-
     try {
       setLoading(true);
-      console.log('Starting restaurant creation for user:', user.uid);
+      console.log('🏗️ Création du restaurant avec Custom Claims:', formData.restaurantId);
 
-      const restaurantSettings: RestaurantSettings = {
-        business_hours: {
-          open_time: formData.openTime,
-          close_time: formData.closeTime,
-          days_of_week: ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
-        },
-        table_service_time: 90,
-        kitchen_capacity: parseInt(formData.kitchenCapacity),
-        currency: formData.currency,
-        tax_rate: parseFloat(formData.taxRate) / 100,
-        service_charge: parseFloat(formData.serviceCharge) / 100,
-        default_room_name: formData.defaultRoomName.trim() || 'Salle principale'
-      };
-
-      const restaurantData: Partial<Restaurant> = {
+      // Créer le restaurant avec accès manager automatique via Custom Claims
+      const result = await createRestaurantWithAccess({
+        id: formData.restaurantId.trim(),
         name: formData.name.trim(),
-        address: formData.address.trim(),
-        phone: formData.phone.trim(),
-        email: formData.email.trim(),
-        settings: restaurantSettings,
-      };
+        address: formData.address.trim() || undefined,
+        phone: formData.phone.trim() || undefined,
+        email: formData.email.trim() || undefined,
+        ownerId: auth.currentUser!.uid,
+      });
 
-      console.log('Creating restaurant with data:', restaurantData);
+      console.log('✅ Restaurant créé avec succès:', result);
 
-      // Create the restaurant and get its ID
-      const restaurantId = await initializeRestaurant(restaurantData);
-      console.log('Restaurant created with ID:', restaurantId);
-
-      // Create access record for the creator as manager
-      console.log('Creating initial user member for manager...');
-      await addUserMemberWithUserId(restaurantId, {
-        name: user.displayName || user.email?.split('@')[0] || 'Manager',
-        email: user.email || '',
-        role: 'manager'
-      }, user.uid);
-      console.log('Initial user member created successfully');
-
-      // Navigate to restaurant selection
-      console.log('Navigating to restaurant selection...');
-      router.replace('/restaurant/select');
+      Alert.alert(
+        'Restaurant créé !',
+        `Le restaurant "${formData.name}" a été créé avec succès. Vous avez automatiquement les droits de manager grâce à notre système sécurisé.`,
+        [
+          {
+            text: 'Continuer',
+            onPress: () => router.replace('/restaurant')
+          }
+        ]
+      );
 
     } catch (error) {
-      console.error('Erreur lors de la création du restaurant:', error);
+      console.error('❌ Erreur lors de la création du restaurant:', error);
       
-      // More detailed error message
       let errorMessage = 'Une erreur s\'est produite lors de la création du restaurant';
       if (error instanceof Error) {
-        errorMessage += ': ' + error.message;
+        if (error.message.includes('existe déjà')) {
+          errorMessage = 'Un restaurant avec cet ID existe déjà. Veuillez choisir un autre ID.';
+        } else if (error.message.includes('permission')) {
+          errorMessage = 'Vous n\'avez pas les permissions nécessaires pour créer un restaurant.';
+        } else {
+          errorMessage += ': ' + error.message;
+        }
       }
       
       Alert.alert('Erreur', errorMessage);
@@ -194,6 +161,24 @@ export default function CreateRestaurant() {
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.form}>
+          <Text style={styles.sectionTitle}>Identifiants du restaurant</Text>
+          
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>ID du restaurant *</Text>
+            <TextInput
+              style={styles.input}
+              value={formData.restaurantId}
+              onChangeText={(value) => handleInputChange('restaurantId', value)}
+              placeholder="restaurant_123"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+              maxLength={50}
+            />
+            <Text style={styles.helpText}>
+              ID unique pour votre restaurant (lettres, chiffres, tirets autorisés)
+            </Text>
+          </View>
+
           <Text style={styles.sectionTitle}>Informations générales</Text>
           
           <View style={styles.inputGroup}>
@@ -268,60 +253,6 @@ export default function CreateRestaurant() {
                 onChangeText={(value) => handleInputChange('closeTime', value)}
                 placeholder="22:00"
                 placeholderTextColor="#999"
-              />
-            </View>
-          </View>
-
-          <Text style={styles.sectionTitle}>Configuration opérationnelle</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Capacité de la cuisine (commandes simultanées) *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.kitchenCapacity}
-              onChangeText={(value) => handleInputChange('kitchenCapacity', value)}
-              placeholder="50"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Nom de la salle par défaut</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.defaultRoomName}
-              onChangeText={(value) => handleInputChange('defaultRoomName', value)}
-              placeholder="Salle principale"
-              placeholderTextColor="#999"
-            />
-          </View>
-
-          <Text style={styles.sectionTitle}>Paramètres financiers</Text>
-
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.label}>Devise</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.currency}
-                onChangeText={(value) => handleInputChange('currency', value)}
-                placeholder="EUR"
-                placeholderTextColor="#999"
-                maxLength={3}
-                autoCapitalize="characters"
-              />
-            </View>
-
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.label}>TVA (%)</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.taxRate}
-                onChangeText={(value) => handleInputChange('taxRate', value)}
-                placeholder="20"
-                placeholderTextColor="#999"
-                keyboardType="numeric"
               />
             </View>
           </View>
@@ -434,5 +365,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });

@@ -38,7 +38,7 @@ const LoginScreen: React.FC = () => {
 
       // Après une connexion réussie, rediriger vers la sélection de restaurant
       if (userData?.role === "manager" || userData?.role === "employee") {
-        router.replace("/restaurant/select" as any);
+        router.replace("../restaurant/select" as any);
       } else {
         setMessage("Rôle utilisateur non reconnu");
       }
