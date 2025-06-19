@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { useRestaurant } from '../restaurant/SelectionContext';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 interface RestaurantStatusProps {
   style?: any;
@@ -9,35 +9,35 @@ interface RestaurantStatusProps {
 }
 
 export default function RestaurantStatus({ style, showChangeButton = true }: RestaurantStatusProps) {
-  const { currentRestaurant, user, isLoading } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = React.useState<string | null>(null);
+  
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
   const handleNavigateToSelector = () => {
     router.push('/home');
   };
-
-  if (!user) {
-    return null;
-  }
-
-  if (isLoading) {
-    return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.loadingText}>Chargement...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.container, style]}>
       <View style={styles.statusContainer}>
         <View style={[
           styles.statusIndicator, 
-          currentRestaurant ? styles.connected : styles.disconnected
+          CurrentRestaurantId ? styles.connected : styles.disconnected
         ]} />
         <View style={styles.textContainer}>
           <Text style={styles.label}>Restaurant:</Text>
           <Text style={styles.restaurantName}>
-            {currentRestaurant ? currentRestaurant.name : 'Non sélectionné'}
+            {CurrentRestaurantId ? CurrentRestaurantId : 'Non sélectionné'}
           </Text>
         </View>
       </View>

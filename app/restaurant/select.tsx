@@ -29,28 +29,55 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
-import { useRestaurant } from './SelectionContext';
-import { getMyRestaurants, getRestaurant, type Restaurant } from '../firebase/firebaseRestaurant';
+import { getMyRestaurants, getRestaurant, type Restaurant } from '@/app//firebase/firebaseRestaurant';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import { signOut } from 'firebase/auth';
-import { auth } from '../firebase/firebaseConfig';
+import { auth } from '@/app//firebase/firebaseConfig';
 
 export default function RestaurantSelectPage() {
   const router = useRouter();
-  const { user, isUserConnected, isConnectedToRestaurant, isLoading, setCurrentRestaurant, currentRestaurant } = useRestaurant();
   const [availableRestaurants, setAvailableRestaurants] = useState<Restaurant[]>([]);
   const [restaurantsLoading, setRestaurantsLoading] = useState(false);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUser] = useState(auth.currentUser);
 
-  useEffect(() => {
-    if (!isUserConnected) {
-      setTimeout(() => {
-        router.replace('../connexion' as any);
-      }, 0);
-      return;
+  // Variables calculées
+  const isConnectedToRestaurant = !!currentRestaurant;
+
+  /**
+   *  Charger le restaurant actuel depuis AsyncStorage
+   */
+  const loadCurrentRestaurant = async () => {
+    try {
+      const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+      if (savedId) {
+        const restaurant = await getRestaurant(savedId);
+        setCurrentRestaurant(restaurant);
+      }
+    } catch (error) {
+      console.error('❌ Erreur chargement restaurant actuel:', error);
     }
-    // ⚡ Charger les restaurants via Custom Claims
-    loadUserRestaurantsWithClaims();
-  }, [user, isUserConnected]);
+  };
+
+  /**
+   *  Sauvegarder la sélection du restaurant
+   */
+  const saveSelectedRestaurant = async (restaurantId: string | null) => {
+    try {
+      if (restaurantId) {
+        await RestaurantStorage.SetSelectedRestaurantiD(restaurantId);
+        const restaurant = await getRestaurant(restaurantId);
+        setCurrentRestaurant(restaurant);
+      } else {
+        await RestaurantStorage.SetSelectedRestaurantiD('');
+        setCurrentRestaurant(null);
+      }
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde restaurant:', error);
+    }
+  };
 
   /**
    * ⚡ Charger les restaurants via Custom Claims (ultra-rapide)
@@ -103,12 +130,12 @@ export default function RestaurantSelectPage() {
       setSelectedRestaurantId(restaurant.id);
       
       // ⚡ Utiliser la nouvelle API avec ID uniquement
-      await setCurrentRestaurant(restaurant.id);
+      await saveSelectedRestaurant(restaurant.id);
       
       console.log(`✅ Restaurant ${restaurant.name} sélectionné via Custom Claims`);
       
       // Rediriger vers la page principale du restaurant
-      router.replace('../home' as any);
+      router.replace('@/app/home' as any);
     } catch (error) {
       console.error('❌ Erreur sélection restaurant:', error);
       Alert.alert(
@@ -166,7 +193,7 @@ export default function RestaurantSelectPage() {
           onPress: async () => {
             try {
               console.log('🔄 Changement de restaurant...');
-              await setCurrentRestaurant(null);
+              await saveSelectedRestaurant(null);
               console.log('✅ Restaurant déconnecté');
             } catch (error) {
               console.error('❌ Erreur changement restaurant:', error);
@@ -177,6 +204,20 @@ export default function RestaurantSelectPage() {
       ]
     );
   };
+
+  // Charger les données au démarrage
+  useEffect(() => {
+    const initData = async () => {
+      setIsLoading(true);
+      await loadCurrentRestaurant();
+      await loadUserRestaurantsWithClaims();
+      setIsLoading(false);
+    };
+    
+    if (user) {
+      initData();
+    }
+  }, [user]);
 
   if (isLoading || restaurantsLoading) {
     return (
@@ -201,7 +242,6 @@ export default function RestaurantSelectPage() {
               <MaterialIcons name="account-circle" size={40} color="#D4AF37" />
               <View style={styles.userDetails}>
                 <Text style={styles.welcomeText}>Bienvenue</Text>
-                <Text style={styles.userEmail}>{user?.email}</Text>
                 <Text style={styles.claimsInfo}>⚡ Système Custom Claims</Text>
               </View>
             </View>
@@ -225,7 +265,7 @@ export default function RestaurantSelectPage() {
             <View style={styles.currentRestaurantActions}>
               <Pressable 
                 style={[styles.actionButton, styles.continueButton]} 
-                onPress={() => router.replace('/restaurant' as any)}
+                onPress={() => router.replace('../home' as any)}
               >
                 <MaterialIcons name="arrow-forward" size={20} color="white" />
                 <Text style={styles.continueButtonText}>Continuer</Text>

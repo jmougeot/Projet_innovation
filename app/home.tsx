@@ -5,8 +5,7 @@ import { useFonts } from 'expo-font';
 import { MaterialIcons } from '@expo/vector-icons';
 import Reglage from './components/reglage';
 import Head from './components/Head';
-import RestaurantStatus from './components/RestaurantStatus';
-import RestaurantChangeAlert from './components/RestaurantChangeAlert';
+import RestaurantStatus from './restaurant/components/RestaurantStatus';
 
 export default function Home() {
   const router = useRouter();
@@ -20,23 +19,10 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Restaurant Change Alert */}
-      <RestaurantChangeAlert />
-      
-      {/* Use the reusable Reglage component */}
-      <Reglage 
-        // Optional: pass custom menu items
-        // menuItems={customMenuItems}
-        // Optional: customize position
-        position={{ top: 5, right: 15 }}
-        // Optional: custom icon
-        // iconSource={require('../assets/images/custom-icon.png')}
-      />
+
+      <Reglage position={{ top: 5, right: 15 }}/>
 
       <Head title="Le Challenge " />
-
-      {/* Restaurant Status Bar */}
-      <RestaurantStatus style={styles.restaurantStatus} />
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Section Bienvenue */}

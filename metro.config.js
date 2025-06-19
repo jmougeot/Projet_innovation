@@ -1,14 +1,24 @@
 const { getDefaultConfig } = require('expo/metro-config');
-const config = getDefaultConfig(__dirname);
-config.resolver.sourceExts.push('cjs');
-config.resolver.unstable_enablePackageExports = false;
 
-// Configuration pour améliorer les source maps en développement
-if (process.env.NODE_ENV === 'development') {
-  config.serializer = {
-    ...config.serializer,
-    map: true, // Activer les source maps
-  };
-}
+const config = getDefaultConfig(__dirname);
+
+// Essential configurations only
+config.resolver.sourceExts.push('cjs');
+
+// Disable symbolication entirely to fix the "unknown" file error
+config.server = {
+  enhanceMiddleware: (middleware) => {
+    return (req, res, next) => {
+      if (req.url === '/symbolicate') {
+        // Skip symbolication requests that cause the error
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end('{"stack":[]}');
+        return;
+      }
+      return middleware(req, res, next);
+    };
+  },
+};
 
 module.exports = config;

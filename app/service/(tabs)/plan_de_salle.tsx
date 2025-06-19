@@ -5,27 +5,25 @@ import { useRouter } from 'expo-router';
 import { Table, getTables, updateTableStatus, getRoom, Room } from '@/app/firebase/firebaseTables';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
-import { useRestaurant } from '@/app/restaurant/SelectionContext';
 import { saveSelectedRoomName, getSelectedRoomName } from '@/app/asyncstorage/roomStorage';
-
 import { TableShapeRenderer, getStatusColor, getStatusText, getNextStatus } from '../components/Table';
 import { WorkspaceContainer, useWorkspaceSize } from '../components/Workspace';
 import { RoomSelector } from '../components/RoomSelector';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import AutoRedirect from '@/app/restaurant/AutoRedirect';
 
 export default function PlanDeSalle() {
   const router = useRouter();
-  const { currentRestaurant } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string>('');
   const [viewMode, setViewMode] = useState<'plan' | 'liste'>('liste');
   const [tables, setTables] = useState<Table[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [currentRoomId, setCurrentRoomId] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [loadingRoomChange, setLoadingRoomChange] = useState<string>('');
-
-  // Utilisation du hook pour les dimensions adaptatives
   const { size: workspaceSize } = useWorkspaceSize();
-  
-  // Proportions relatives pour les dimensions des tables (même système que map_settings.tsx)
+
+  // Hooks end here. Derived variables and utility functions below.
   const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
   const tableSize = workspaceSize * TABLE_SIZE_RATIO;
 
@@ -42,10 +40,25 @@ export default function PlanDeSalle() {
     return position.x <= 1 && position.y <= 1 && position.x >= 0 && position.y >= 0;
   };
 
+  // Charger l'ID du restaurant depuis AsyncStorage
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        if (savedId) {
+          setCurrentRestaurantId(savedId);
+        }
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
+
   // Charger les rooms et tables au démarrage
   useEffect(() => {
     const loadRoomsAndTables = async () => {
-      if (!currentRestaurant) {
+      if (!CurrentRestaurantId) {
         console.warn('Aucun restaurant sélectionné');
         setLoading(false);
         return;
@@ -55,7 +68,7 @@ export default function PlanDeSalle() {
         setLoading(true);
         
         // Charger les rooms d'abord
-        const roomsData = await getRoom(true, currentRestaurant.id);
+        const roomsData = await getRoom(true, CurrentRestaurantId);
         setRooms(roomsData);
         
         // Si aucune room n'existe, rediriger vers map_settings pour la création
@@ -104,7 +117,7 @@ export default function PlanDeSalle() {
         }
         
         setCurrentRoomId(selectedRoomId);
-        const tablesData = await getTables(selectedRoomId, true, currentRestaurant.id);
+        const tablesData = await getTables(selectedRoomId, true, CurrentRestaurantId);
         setTables(tablesData);
         
         // Sauvegarder la room sélectionnée dans AsyncStorage si elle n'était pas déjà sauvegardée
@@ -127,7 +140,7 @@ export default function PlanDeSalle() {
     };
     
     loadRoomsAndTables();
-  }, [currentRestaurant, router]);
+  }, [CurrentRestaurantId, router]);
 
   const handleTablePress = (tableId: number, tablenumber: string) => {
     router.push({
@@ -138,14 +151,14 @@ export default function PlanDeSalle() {
 
   // Changer le statut de la table (appui long)
   const handleTableLongPress = async (tableId: number, currentStatus: Table['status']) => {
-    if (!currentRestaurant || !currentRoomId) {
+    if (!CurrentRestaurantId || !currentRoomId) {
       alert("Aucun restaurant ou salle sélectionné");
       return;
     }
 
     try {
       const nextStatus = getNextStatus(currentStatus);
-      await updateTableStatus(tableId, nextStatus, currentRoomId, currentRestaurant.id);
+      await updateTableStatus(tableId, nextStatus, currentRoomId, CurrentRestaurantId);
       
       setTables(prevTables => 
         prevTables.map(table => 
@@ -160,7 +173,7 @@ export default function PlanDeSalle() {
 
   // Fonction pour changer de salle
   const handleChangeRoom = useCallback(async (roomId: string) => {
-    if (!currentRestaurant || roomId === currentRoomId) return;
+    if (!CurrentRestaurantId || roomId === currentRoomId) return;
 
     try {
       setLoadingRoomChange(roomId);
@@ -175,7 +188,7 @@ export default function PlanDeSalle() {
       }
       
       // Charger les tables pour la nouvelle salle
-      const tablesData = await getTables(roomId, true, currentRestaurant.id);
+      const tablesData = await getTables(roomId, true, CurrentRestaurantId);
       setTables(tablesData);
     } catch (error) {
       console.error('Erreur lors du changement de salle:', error);
@@ -183,7 +196,7 @@ export default function PlanDeSalle() {
     } finally {
       setLoadingRoomChange('');
     }
-  }, [currentRestaurant, currentRoomId]);
+  }, [CurrentRestaurantId, currentRoomId, rooms]);
 
   // Trier les tables par numéro pour la vue liste
   const sortedTables = [...tables].sort((a, b) => {
@@ -197,7 +210,7 @@ export default function PlanDeSalle() {
     <WorkspaceContainer style={{ flex: 1 }}>
       {tables.map((table) => {
         // Déterminer la position finale à utiliser
-        let finalPosition = { x: table.position.x, y: table.position.y };
+        let finalPosition = { x: table.position?.x || 0, y: table.position?.y || 0 };
         
         // Si la position est normalisée (0-1), la dénormaliser
         if (isNormalizedPosition(table.position)) {
@@ -305,43 +318,49 @@ export default function PlanDeSalle() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Header 
-        title="Plan de Salle" 
-        showBackButton={true}
-        backgroundColor="#194A8D"
-        textColor="#FFFFFF"
-        useHeadComponent={true}
-        customBackRoute="/service"
-        showReglage={true}
-        reglageMenuItems={reglageMenuItems}
-      />
-      
-      <View style={styles.contentWrapper}>
-        <View style={styles.toggleContainer}>
-          {renderToggleButton('liste', 'Liste')}
-          <RoomSelector
-            rooms={rooms}
-            currentRoomId={currentRoomId}
-            currentRestaurant={currentRestaurant}
-            loadingRoomChange={loadingRoomChange}
-            onRoomSelect={handleChangeRoom}
-          />
-          {renderToggleButton('plan', 'Plan')}
-        </View>
+    <AutoRedirect 
+      requireAnyAccess={true}
+      loadingMessage="Vérification des accès restaurant..."
+      fallbackRoute="/connexion"
+    >
+      <SafeAreaView style={styles.container}>
+        <Header 
+          title="Plan de Salle" 
+          showBackButton={true}
+          backgroundColor="#194A8D"
+          textColor="#FFFFFF"
+          useHeadComponent={true}
+          customBackRoute="/service"
+          showReglage={true}
+          reglageMenuItems={reglageMenuItems}
+        />
+        
+        <View style={styles.contentWrapper}>
+          <View style={styles.toggleContainer}>
+            {renderToggleButton('liste', 'Liste')}
+            <RoomSelector
+              rooms={rooms}
+              currentRoomId={currentRoomId}
+              currentRestaurant={CurrentRestaurantId}
+              loadingRoomChange={loadingRoomChange}
+              onRoomSelect={handleChangeRoom}
+            />
+            {renderToggleButton('plan', 'Plan')}
+          </View>
 
-        <View style={styles.contentContainer}>
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#194A8D" />
-              <Text style={styles.loadingText}>Chargement des tables...</Text>
-            </View>
-          ) : (
-            viewMode === 'plan' ? renderPlanView() : renderListView()
-          )}
+          <View style={styles.contentContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#194A8D" />
+                <Text style={styles.loadingText}>Chargement des tables...</Text>
+              </View>
+            ) : (
+              viewMode === 'plan' ? renderPlanView() : renderListView()
+            )}
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </AutoRedirect>
   );
 }
 

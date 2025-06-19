@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -7,14 +7,14 @@ import firebaseCommande from '@/app/firebase/firebaseCommandeOptimized';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
-import { useRestaurant } from '@/app/restaurant/SelectionContext';
 import Head from '@/app/components/Head';
 import Reglage from '@/app/components/reglage';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
+import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 function Encaissement() {
     const { tableId } = useLocalSearchParams();
-    const { currentRestaurant } = useRestaurant();
+    const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
     const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandesParTable, setCommandesParTable] = useState<TicketData | null>(null);
@@ -25,8 +25,18 @@ function Encaissement() {
     const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque'>('carte');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-    // Navigation menu items pour le plan de salle
-    const customMenuItems = getPlanDeSalleMenuItems();
+    // Charger l'ID du restaurant depuis AsyncStorage
+    useEffect(() => {
+        const loadRestaurantId = async () => {
+            try {
+                const savedId = await restaurantStorage.GetSelectedRestaurantId();
+                setCurrentRestaurantId(savedId);
+            } catch (error) {
+                console.error('Erreur chargement restaurant ID:', error);
+            }
+        };
+        loadRestaurantId();
+    }, []);
 
     useEffect(() => {
         const user = auth.currentUser;
@@ -46,11 +56,12 @@ function Encaissement() {
                 console.log(`🔍 [ENCAISSEMENT DEBUG] Recherche commande pour table: ${tableId}`);
                 
                 // Exécuter le diagnostic pour comprendre ce qui se passe
-                if (currentRestaurant?.id) {
-                    await firebaseCommande.diagnosticCommandesByTable(Number(tableId), currentRestaurant.id);
+                if (CurrentRestaurantId
+                ) {
+                    await firebaseCommande.diagnosticCommandesByTable(Number(tableId), CurrentRestaurantId);
                 }
                 
-                const commande = await firebaseCommande.getCommandeByTableId(Number(tableId), currentRestaurant?.id || '');
+                const commande = await firebaseCommande.getCommandeByTableId(Number(tableId), CurrentRestaurantId || '');
                 console.log(`🔍 [ENCAISSEMENT DEBUG] Commande trouvée:`, commande);
                 
                 if (commande) {
@@ -68,10 +79,10 @@ function Encaissement() {
             }
         };
         
-        if (tableId && currentRestaurant?.id) {
+        if (tableId && CurrentRestaurantId) {
             fetchCommande();
         }
-    }, [tableId, currentRestaurant?.id]);
+    }, [tableId, CurrentRestaurantId]);
 
     // Update totals when platsSelectionnes changes
     useEffect(() => {
@@ -155,14 +166,14 @@ function Encaissement() {
             let missionMessage = '';
             if (commandesParTable && commandesParTable.plats.length > 0) {
                 try {
-                    if (!currentRestaurant) {
+                    if (!CurrentRestaurantId) {
                         console.warn('💰 [ENCAISSEMENT WARNING] Aucun restaurant sélectionné, mise à jour des missions ignorée');
                         missionMessage = `\n⚠️ Aucun restaurant sélectionné, missions non mises à jour.`;
                     } else {
-                        console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId} et restaurant: ${currentRestaurant.id}`);
+                        console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId} et restaurant: ${CurrentRestaurantId}`);
                         console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, commandesParTable.plats.map(p => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
                         
-                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats, currentRestaurant.id);
+                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats, CurrentRestaurantId);
                         
                         console.log(`💰 [ENCAISSEMENT DEBUG] Résultat mise à jour missions:`, missionUpdateResult);
                         
@@ -191,7 +202,7 @@ function Encaissement() {
             // Ensure we have the correct Firebase ID for the command
             let commandeIdToUse = idCommande;
             if (!commandeIdToUse) {
-                const fetchedCommande = await firebaseCommande.getCommandeByTableId(Number(tableId), currentRestaurant?.id || '');
+                const fetchedCommande = await firebaseCommande.getCommandeByTableId(Number(tableId), CurrentRestaurantId || '');
                 if (!fetchedCommande) {
                     alert('Erreur: Aucune commande active trouvée pour cette table.');
                     return;
@@ -202,12 +213,12 @@ function Encaissement() {
              
             console.log(`💰 [ENCAISSEMENT] Finalisation commande ID: ${commandeIdToUse} pour table ${tableId}`);
             
-            if (!currentRestaurant?.id) {
+            if (!CurrentRestaurantId) {
                 alert('Erreur: Aucun restaurant sélectionné.');
                 return;
             }
             
-            await firebaseCommande.terminerCommande(commandeIdToUse, currentRestaurant.id);
+            await firebaseCommande.terminerCommande(commandeIdToUse, CurrentRestaurantId);
             
             // Afficher le message de succès avec les informations sur les missions
             alert(`Encaissement réussi !${missionMessage}`);
@@ -237,6 +248,9 @@ function Encaissement() {
             ]}>{label}</Text>
         </Pressable>
     );
+
+    // Derived variables after all hooks
+    const customMenuItems = getPlanDeSalleMenuItems();
 
     return (
         <SafeAreaView style={styles.container}>

@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
-import { useRestaurant } from '../../restaurant/SelectionContext';
+import RestaurantStorage from '../../asyncstorage/restaurantStorage';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -34,14 +34,30 @@ interface UserMissionWithDetails {
 }
 
 const UserMissionsPage = () => {
+  // Tous les hooks au début
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const currentUser = auth.currentUser;
-  const { currentRestaurant } = useRestaurant();
-
+  const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
+
+  // Charger l'ID du restaurant depuis AsyncStorage
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
+
+  // Variables dérivées après tous les hooks
+  const currentUser = auth.currentUser;
 
   // Fonction pour charger les missions de l'utilisateur
   const loadUserMissions = React.useCallback(async () => {
@@ -51,7 +67,7 @@ const UserMissionsPage = () => {
       return;
     }
 
-    if (!currentRestaurant) {
+    if (!currentRestaurantId) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       setLoading(false);
       return;
@@ -59,13 +75,13 @@ const UserMissionsPage = () => {
 
     try {
       // Récupérer les missions de l'utilisateur
-      const missions = await getUserMissions(currentUser.uid, currentRestaurant.id);
+      const missions = await getUserMissions(currentUser.uid, currentRestaurantId);
       
       // Pour chaque mission, récupérer les détails complets
       const missionsWithDetails = await Promise.all(
         missions.map(async (mission) => {
           try {
-            const missionDetails = mission.missionId ? await getMission(mission.missionId, currentRestaurant.id) : null;
+            const missionDetails = mission.missionId ? await getMission(mission.missionId, currentRestaurantId) : null;
             return { ...mission, missionDetails };
           } catch {
             return { ...mission, missionDetails: null };
@@ -83,7 +99,7 @@ const UserMissionsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, currentRestaurant]);
+  }, [currentUser?.uid, currentRestaurantId]);
 
   useEffect(() => {
     loadUserMissions();

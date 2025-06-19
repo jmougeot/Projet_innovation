@@ -59,6 +59,9 @@ const RESTAURANTS_COLLECTION = 'restaurants';
 
 // Helper functions to get collection references
 const getTicketRestaurantRef = (restaurantId: string) => {
+  if (!restaurantId || restaurantId.trim() === '') {
+    throw new Error('Restaurant ID is required and cannot be empty');
+  }
   return doc(db, RESTAURANTS_COLLECTION, restaurantId);
 };
 
@@ -306,6 +309,17 @@ export const listenToTicketsActifs = (restaurantId: string, callback: (tickets: 
  */
 export const getTicketByTableId = async (tableId: number, restaurantId: string, useCache = true): Promise<TicketData | null> => {
   try {
+    // Validation des paramètres
+    if (!restaurantId || restaurantId.trim() === '') {
+      console.error('getTicketByTableId: Restaurant ID manquant ou vide');
+      return null;
+    }
+    
+    if (!tableId || isNaN(tableId)) {
+      console.error('getTicketByTableId: Table ID invalide:', tableId);
+      return null;
+    }
+    
     const now = Date.now();
     
     // Vérifier le cache par table d'abord

@@ -6,7 +6,8 @@ import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized'
 import { getAuth } from 'firebase/auth';
 import Reglage from '@/app/components/reglage';
 import { router } from 'expo-router';
-import { useRestaurant } from '@/app/restaurant/SelectionContext';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
+
 
 export interface PlatProps {
   plat: Plat;
@@ -15,19 +16,33 @@ export interface PlatProps {
 
 export const PlatItem = ({ plat, onPress }: PlatProps) => {
   const [isMission, setIsMission] = useState(false);
-  const { currentRestaurant } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  // État pour l'ID du restaurant courant
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
+  // Vérification si le plat est une mission
   useEffect(() => {
     const fetchMissionPlats = async () => {
       const user = getAuth().currentUser;
-      if (user && plat.id && currentRestaurant?.id) {
-        const missionPlatIds = await getMissionPlatsForUser(user.uid, currentRestaurant.id);
+      if (user && plat.id && CurrentRestaurantId) {
+        const missionPlatIds = await getMissionPlatsForUser(user.uid, CurrentRestaurantId);
         setIsMission(missionPlatIds.includes(plat.id));
       }
     };
     fetchMissionPlats();
-  }, [plat.id, currentRestaurant?.id]);
+  }, [plat.id, CurrentRestaurantId]);
 
+  // Affichage du plat avec ou sans mission
   return (
     <Pressable
       key={plat.id}
@@ -52,6 +67,7 @@ export const PlatItem = ({ plat, onPress }: PlatProps) => {
   );
 };
 
+// Container pour les plats avec le menu de réglages
 export const PlatsContainer = ({ children }: { children: React.ReactNode }) => {
   const customMenuItems = [
     {

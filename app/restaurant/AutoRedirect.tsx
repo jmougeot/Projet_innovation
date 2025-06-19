@@ -1,17 +1,5 @@
 /**
- * ⚡ AutoRedirect - Version Custom Claims Ultra-Rapide
- * 
- * APPROCHE SIMPLIFIÉE AVEC CUSTOM CLAIMS:
- * - Lecture instantanée des Custom Claims (0-50ms)
- * - Vérifications locales uniquement (pas d'appels réseau)
- * - Ultra-performant et fonctionne offline
- * - Logic simple et robuste
- * 
- * AVANTAGES CLÉS:
- * - 95% plus rapide que Firebase Functions (0-50ms vs 500-8000ms)
- * - Zéro latence réseau pour les vérifications d'accès
- * - UX fluide et instantanée
- * - Fonctionne même sans connexion internet
+ * ⚡ AutoRedirect - Version simplifiée
  * 
  * UTILISATION:
  * <AutoRedirect requireRole="manager" restaurantId="rest_123">
@@ -24,21 +12,17 @@ import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons } from '@expo/vector-icons';
+import { onAuthStateChanged } from 'firebase/auth';
+import RestaurantStorage from '../asyncstorage/restaurantStorage';
 
 // Import des fonctions Custom Claims optimisées
-import { 
-  canAccessRestaurant, 
-  hasRestaurantRole, 
-  getAccessibleRestaurants 
-} from '../firebase/firebaseRestaurantAccess';
+import { canAccessRestaurant, hasRestaurantRole, getAccessibleRestaurants } from '../firebase/firebaseRestaurantAccess';
 import { auth } from '../firebase/firebaseConfig';
 
 interface AutoRedirectProps {
   children?: React.ReactNode;
   loadingMessage?: string;
   showLoading?: boolean;
-  
-  // ⚡ PROPS POUR CUSTOM CLAIMS
   restaurantId?: string;           // Restaurant spécifique requis
   requireRole?: 'manager' | 'waiter' | 'chef' | 'cleaner'; // Rôle requis
   requireAnyAccess?: boolean;      // Juste vérifier qu'il a accès à un restaurant
@@ -47,10 +31,25 @@ interface AutoRedirectProps {
   fallbackRoute?: '/connexion' | '/home' | '/' | string; // Où rediriger si pas d'accès (défaut: /connexion)
 }
 
-/**
- * AutoRedirect - Version ultra-simplifiée avec Custom Claims uniquement
- */
-export default function AutoRedirect({ 
+// AMÉLIORATION SÉCURITÉ : Validation stricte des paramètres
+const validateSecureParams = (restaurantId?: string, fallbackRoute?: string) => {
+  // Validation de l'ID restaurant
+  if (restaurantId && !/^[a-zA-Z0-9_-]+$/.test(restaurantId)) {
+    console.warn('🚨 [Security] Restaurant ID invalide détecté');
+    return false;
+  }
+  
+  // Validation de la route de fallback
+  const allowedRoutes = ['/connexion', '/home', '/', '/restaurant/select'];
+  if (fallbackRoute && !allowedRoutes.includes(fallbackRoute)) {
+    console.warn('🚨 [Security] Route de fallback non autorisée:', fallbackRoute);
+    return false;
+  }
+  
+  return true;
+};
+
+const AutoRedirect = ({ 
   children, 
   loadingMessage = "Vérification des permissions...", 
   showLoading = true,
@@ -58,30 +57,96 @@ export default function AutoRedirect({
   requireRole,
   requireAnyAccess = false,
   fallbackRoute = '/connexion'
-}: AutoRedirectProps) {
+}: AutoRedirectProps) => {
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
+  const [authStateLoaded, setAuthStateLoaded] = useState(false);
+  const [currentUser, setCurrentUser] = useState(auth.currentUser);
+  const [checkCompleted, setCheckCompleted] = useState(false);
+
+  // Écouter les changements d'état d'authentification
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('🔐 [AutoRedirect] État d\'authentification changé:', user ? 'connecté' : 'déconnecté');
+      setCurrentUser(user);
+      setAuthStateLoaded(true);
+    });
+
+    return unsubscribe;
+  }, []);
 
   // ⚡ Vérification ultra-rapide avec Custom Claims
   useEffect(() => {
+    if (checkCompleted) {
+      return;
+    }
+    if (!authStateLoaded) {
+      console.log('⏳ [AutoRedirect] En attente de l\'authentification...', { authStateLoaded });
+      return;
+    }
+
     const checkAccess = async () => {
       try {
-        console.log('🔍 [AutoRedirect] Démarrage vérification Custom Claims...');
-        const startTime = Date.now();
-
-        // Vérification utilisateur connecté
-        if (!auth.currentUser) {
-          console.log('🚫 [AutoRedirect] Utilisateur non connecté');
-          router.replace(fallbackRoute as any);
+        // SÉCURITÉ : Validation stricte des paramètres dès le début
+        if (!validateSecureParams(restaurantId, fallbackRoute)) {
+          console.error('🚨 [Security] Paramètres non sécurisés détectés');
+          router.replace('/connexion');
           return;
         }
 
+        console.log('🔍 [AutoRedirect] Démarrage vérification Custom Claims...');
+        const startTime = Date.now();
+        setCheckCompleted(true);
+
+        // Vérification utilisateur connecté avec null check
+        if (!currentUser) {
+          console.log('🚫 [AutoRedirect] Utilisateur non connecté');
+          setIsChecking(false);
+          router.replace('/connexion'); // Route sécurisée fixe
+          return;
+        }
+        
+        // SÉCURITÉ : Vérifier la validité du token (currentUser est garanti non-null ici)
+        try {
+          const tokenResult = await currentUser.getIdTokenResult();
+          if (!tokenResult?.token) {
+            console.warn('🚨 [Security] Token invalide');
+            router.replace('/connexion');
+            return;
+          }
+        } catch (tokenError) {
+          console.error('🚨 [Security] Erreur de validation du token:', tokenError);
+          router.replace('/connexion');
+          return;
+        }
+
+        // SÉCURITÉ : Récupérer l'ID du restaurant avec validation
+        let targetRestaurantId: string | undefined | null = restaurantId;
+        if (!targetRestaurantId) {
+          try {
+            const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+            targetRestaurantId = savedId; // savedId peut être string | null
+            // SÉCURITÉ : Ne pas logger l'ID complet
+            console.log('📱 [AutoRedirect] Restaurant depuis AsyncStorage:', targetRestaurantId ? 'trouvé' : 'non trouvé');
+          } catch (storageError) {
+            console.error('❌ [AutoRedirect] Erreur AsyncStorage:', storageError);
+            // SÉCURITÉ : En cas d'erreur AsyncStorage, rediriger vers sélection
+            router.replace('/restaurant/select');
+            return;
+          }
+        }
+        // SÉCURITÉ : Validation de l'ID restaurant
+        if (targetRestaurantId && !/^[a-zA-Z0-9_-]+$/.test(targetRestaurantId)) {
+          console.warn('🚨 [Security] ID restaurant invalide détecté');
+          router.replace('/restaurant/select');
+          return;
+        }
         // Si on demande juste un accès à n'importe quel restaurant
         if (requireAnyAccess) {
           const accessibleRestaurants = await getAccessibleRestaurants();
-          const hasAnyAccess = accessibleRestaurants.length > 0;
+          const hasAnyAccess = accessibleRestaurants && accessibleRestaurants.length > 0;
           
           if (!hasAnyAccess) {
             console.log('🚫 [AutoRedirect] Aucun accès restaurant trouvé');
@@ -96,32 +161,38 @@ export default function AutoRedirect({
           return;
         }
 
-        // Si un restaurant spécifique est requis
-        if (restaurantId) {
-          const canAccess = await canAccessRestaurant(restaurantId);
+        // Si un restaurant spécifique est requis (soit via prop, soit via AsyncStorage)
+        if (targetRestaurantId) {
+
+          const canAccess = await canAccessRestaurant(targetRestaurantId);
           
           if (!canAccess) {
-            console.log('🚫 [AutoRedirect] Pas d\'accès au restaurant:', restaurantId);
-            setAccessError(`Pas d'accès au restaurant ${restaurantId}`);
+            console.log('🚫 [AutoRedirect] Pas d\'accès au restaurant:', targetRestaurantId);
+            setAccessError(`Pas d'accès au restaurant ${targetRestaurantId}`);
             router.replace(fallbackRoute as any);
             return;
           }
 
           // Si un rôle spécifique est requis
           if (requireRole) {
-            const hasRole = await hasRestaurantRole(restaurantId, requireRole);
+            const hasRole = await hasRestaurantRole(targetRestaurantId, requireRole);
             
             if (!hasRole) {
-              console.log('🚫 [AutoRedirect] Rôle insuffisant:', requireRole, 'pour restaurant:', restaurantId);
+              console.log('🚫 [AutoRedirect] Rôle insuffisant:', requireRole, 'pour restaurant:', targetRestaurantId);
               setAccessError(`Rôle ${requireRole} requis`);
               router.replace(fallbackRoute as any);
               return;
             }
           }
+        } else {
+          console.log('🚫 [AutoRedirect] Aucun restaurant sélectionné');
+          setAccessError('Aucun restaurant sélectionné');
+          router.replace(fallbackRoute as any);
+          return;
         }
 
         const endTime = Date.now();
-        console.log(`✅ [AutoRedirect] Accès autorisé en ${endTime - startTime}ms (Custom Claims)`);
+        console.log(`✅ [AutoRedirect] Accès autorisé en ${endTime - startTime}ms - Rendu du contenu`);
         
         setHasAccess(true);
         setIsChecking(false);
@@ -135,11 +206,19 @@ export default function AutoRedirect({
     };
 
     checkAccess();
-  }, [restaurantId, requireRole, requireAnyAccess, fallbackRoute, router]);
+  }, [authStateLoaded, checkCompleted, currentUser, restaurantId, requireRole, fallbackRoute, requireAnyAccess]);
 
   // Affichage du loading si nécessaire
   if (isChecking) {
     if (!showLoading) return null;
+    
+    // Message de chargement dynamique selon l'état
+    let currentMessage = loadingMessage;
+    if (!authStateLoaded) {
+      currentMessage = "Initialisation de l'authentification...";
+    } else if (!currentUser) {
+      currentMessage = "Vérification de la connexion...";
+    }
     
     return (
       <LinearGradient
@@ -151,9 +230,9 @@ export default function AutoRedirect({
             <MaterialIcons name="security" size={60} color="white" />
           </View>
           <ActivityIndicator size="large" color="white" style={styles.spinner} />
-          <Text style={styles.loadingText}>{loadingMessage}</Text>
+          <Text style={styles.loadingText}>{currentMessage}</Text>
           <Text style={styles.subText}>
-            Vérification des Custom Claims...
+            État: {!authStateLoaded ? 'Chargement auth...' : !currentUser ? 'Non connecté' : 'Vérification permissions...'}
           </Text>
           {restaurantId && (
             <Text style={styles.restaurantText}>
@@ -194,11 +273,8 @@ export default function AutoRedirect({
 
   // ✅ Accès autorisé - afficher le contenu
   if (hasAccess) {
-    console.log('✅ [AutoRedirect] Rendu du contenu autorisé');
     return <>{children}</>;
   }
-
-  // Fallback (ne devrait jamais arriver)
   return null;
 }
 
@@ -294,3 +370,5 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
 });
+
+export default AutoRedirect;

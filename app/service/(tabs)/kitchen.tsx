@@ -1,42 +1,35 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, StyleSheet, Pressable, Platform, Alert } from 'react-native';
-import { db } from '@/app/firebase/firebaseConfig';
 import { TicketData, PlatQuantite, listenToTicketsActifs, updateStatusPlat } from '@/app/firebase/firebaseCommandeOptimized';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import Reglage from '@/app/components/reglage';
 import { getCuisineServiceMenuItems } from '../components/ServiceNavigation';
-import { useRestaurant } from '@/app/restaurant/exports';
+import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 const Cuisine = () => {
+  // Tous les hooks au début
   const [commandes, setCommandes] = useState<TicketData[]>([]);
-  const { currentRestaurant } = useRestaurant();
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
 
-  const cuisineMenuItems = getCuisineServiceMenuItems();
-
+  // Charger l'ID du restaurant depuis AsyncStorage
   useEffect(() => {
-    if (!currentRestaurant?.id) return;
-
-    // Écouter les changements en temps réel des tickets actifs
-    const unsubscribe = listenToTicketsActifs(currentRestaurant.id, (tickets) => {
-      // Filtrer seulement les tickets avec des plats en cours de préparation
-      const ticketsEnCours = tickets.filter(ticket => 
-        ticket.status === 'en_attente' || 
-        ticket.status === 'en_preparation' || 
-        ticket.status === 'prete'
-      );
-      setCommandes(ticketsEnCours);
-    });
-
-    return () => unsubscribe();
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await restaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
   }, []);
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  // Variables dérivées après tous les hooks
+  const cuisineMenuItems = getCuisineServiceMenuItems();
 
   // Function to get the next status - updated pour les nouveaux types
   const getNextStatus = (currentStatus: string): 'en_attente' | 'en_preparation' | 'pret' | 'envoye' | 'servi' => {
@@ -61,7 +54,7 @@ const Cuisine = () => {
   // Update status using the optimized API
   const customUpdateStatusPlat = async (tableId: number, platName: string, currentStatus: string) => {
     try {
-      if (!currentRestaurant?.id) {
+      if (!CurrentRestaurantId) {
         Alert.alert("Erreur", "Restaurant non sélectionné");
         return;
       }
@@ -71,7 +64,7 @@ const Cuisine = () => {
       console.log(`Updating dish ${platName} from ${currentStatus} to ${nextStatus}`);
 
       // Use the optimized API to update the dish status
-      await updateStatusPlat(tableId, currentRestaurant.id, platName, nextStatus);
+      await updateStatusPlat(tableId, CurrentRestaurantId, platName, nextStatus);
       
       Alert.alert("Succès", `${platName} est maintenant ${nextStatus}`);
     } catch (error) {

@@ -3,11 +3,11 @@ import { View, Text, FlatList, ActivityIndicator, Button, StyleSheet , Touchable
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
 import { Plat, get_plats, ajout_plat } from '@/app/firebase/firebaseMenu';
-import { useRestaurant } from '@/app/restaurant/SelectionContext';
+import RestaurantStorage from '../../asyncstorage/restaurantStorage';
 
 
 export default function Menu() {
-  const { currentRestaurant } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [plats, setPlats] = useState<Plat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,16 +18,29 @@ export default function Menu() {
     price: '',
     });
 
+    // Charger l'ID du restaurant depuis AsyncStorage
+    useEffect(() => {
+      const loadRestaurantId = async () => {
+        try {
+          const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+          setCurrentRestaurantId(savedId);
+        } catch (error) {
+          console.error('Erreur chargement restaurant ID:', error);
+        }
+      };
+      loadRestaurantId();
+    }, []);
+
 
   const fetchPlats = async () => {
     setLoading(true);
     setError(null);
     try {
-      if (!currentRestaurant) {
+      if (!CurrentRestaurantId) {
         setError("Aucun restaurant sélectionné");
         return;
       }
-      const menuItems = await get_plats(true, currentRestaurant.id);
+      const menuItems = await get_plats(true, CurrentRestaurantId);
       setPlats(menuItems);
     } catch (err) {
       console.error('Erreur lors de la récupération des plats:', err);
@@ -38,11 +51,11 @@ export default function Menu() {
   };
   useEffect(() => {
     fetchPlats();
-  }, []);
+  }, [CurrentRestaurantId]);
 
   const handleAddPlat = async () => {
     try {
-      if (!currentRestaurant) {
+      if (!CurrentRestaurantId) {
         Alert.alert('Erreur', 'Aucun restaurant sélectionné');
         return;
       }
@@ -56,7 +69,7 @@ export default function Menu() {
         name: newPlat.name,
         category: newPlat.category,
         price: Number(newPlat.price)
-      }, currentRestaurant.id);
+      }, CurrentRestaurantId);
 
       setModalVisible(false);
       setNewPlat({ name: '', category: '', price: '' });

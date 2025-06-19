@@ -20,8 +20,6 @@ export default function ServiceHome() {
     missions: 0
   });
 
-  const customMenuItems = getServiceMenuItems();
-
   useEffect(() => {
     // Simulation de données en temps réel - à remplacer par de vraies données
     const interval = setInterval(() => {
@@ -34,6 +32,9 @@ export default function ServiceHome() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Derived variables after all hooks
+  const customMenuItems = getServiceMenuItems();
 
   if (!fontsLoaded) {
     return null;

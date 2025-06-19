@@ -1,9 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { View, TextInput, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { signInUser } from "../firebase/firebaseAuth";
 import { getDoc, doc } from "firebase/firestore";
-import { db } from "../firebase/firebaseConfig";
+import { db, auth } from "../firebase/firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 
@@ -12,20 +13,27 @@ interface UserData {
 }
 
 const LoginScreen: React.FC = () => {
+  // 1. Tous les hooks d'état en premier, dans un ordre stable
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [message, setMessage] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  // 2. Hooks de routeur et polices ensuite
   const router = useRouter();
-
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
-  if (!fontsLoaded) {
-    return null;
-  }
+  // 3. Fonction de navigation stable
+  const navigateToRestaurantSelect = useCallback(() => {
+    if (router?.replace) {
+      router.replace("../restaurant/select" as any);
+    }
+  }, [router]);
 
-  const handleLogin = async (): Promise<void> => {
+  // 4. Fonction de connexion stable
+  const handleLogin = useCallback(async (): Promise<void> => {
     try {
       if (!email || !password) {
         setMessage("Veuillez remplir tous les champs");
@@ -38,7 +46,7 @@ const LoginScreen: React.FC = () => {
 
       // Après une connexion réussie, rediriger vers la sélection de restaurant
       if (userData?.role === "manager" || userData?.role === "employee") {
-        router.replace("../restaurant/select" as any);
+        navigateToRestaurantSelect();
       } else {
         setMessage("Rôle utilisateur non reconnu");
       }
@@ -51,7 +59,38 @@ const LoginScreen: React.FC = () => {
       }
       setMessage(errorMessage);
     }
-  };
+  }, [email, password, navigateToRestaurantSelect]);
+
+  // 5. useEffect pour vérifier l'authentification
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        try {
+          // Utilisateur connecté, vérifier son rôle et rediriger
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          const userData = userDoc.data() as UserData;
+          
+          if (userData?.role === "manager" || userData?.role === "employee") {
+            navigateToRestaurantSelect();
+            return;
+          }
+        } catch (error) {
+          console.error("Erreur lors de la vérification du rôle:", error);
+        }
+      }
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [navigateToRestaurantSelect]); // Dépendance stable
+
+  if (!fontsLoaded || isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -210,6 +249,17 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     color: '#194A8D',
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#194A8D',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });

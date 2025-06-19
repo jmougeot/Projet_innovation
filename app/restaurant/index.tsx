@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, use } from 'react';
 import { 
   View, 
   Text, 
@@ -11,45 +11,28 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '../components/Header';
-import RestaurantProtectedRoute from './components/RestaurantProtectedRoute';
-import { useRestaurant } from './SelectionContext';
 import { getRestaurant, Restaurant} from '../firebase/firebaseRestaurant';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 export default function RestaurantIndex() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
-  const { currentRestaurant, setCurrentRestaurant } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
 
+  //
   useEffect(() => {
-    // Only check restaurant exists if we have a current restaurant
-    if (currentRestaurant) {
-      setRestaurant(currentRestaurant as any);
-      setLoading(false);
-    } else {
-      // Let RestaurantProtectedRoute handle the redirection
-      setLoading(false);
-    }
-  }, [currentRestaurant]);
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
-  const checkRestaurantExists = async () => {
-    if (!currentRestaurant) {
-      setRestaurant(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const existingRestaurant = await getRestaurant(currentRestaurant.id, false);
-      setRestaurant(existingRestaurant);
-    } catch (error) {
-      console.error('Erreur lors de la vérification du restaurant:', error);
-      setRestaurant(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleCreateRestaurant = () => {
     router.push('/restaurant/create' as any);
@@ -68,7 +51,7 @@ export default function RestaurantIndex() {
         {
           text: 'Changer',
           onPress: async () => {
-            await setCurrentRestaurant(null);
+            await setCurrentRestaurantId(null);
             router.replace('/restaurant/select' as any);
           }
         }
@@ -120,32 +103,10 @@ export default function RestaurantIndex() {
     },
   ];
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <Header 
-          title={currentRestaurant ? currentRestaurant.name : "Mon Restaurant"} 
-          showBackButton={true}
-          backgroundColor="#194A8D"
-          textColor="#FFFFFF"
-          useHeadComponent={true}
-          customBackRoute="/"
-          showReglage={true}
-          reglageMenuItems={reglageMenuItems}
-        />
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#194A8D" />
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <RestaurantProtectedRoute>
       <SafeAreaView style={styles.container}>
         <Header 
-          title={currentRestaurant ? currentRestaurant.name : "Mon Restaurant"} 
+          title={CurrentRestaurantId ? CurrentRestaurantId : "Mon Restaurant"} 
           showBackButton={true}
           backgroundColor="#194A8D"
           textColor="#FFFFFF"
@@ -224,7 +185,6 @@ export default function RestaurantIndex() {
           )}
         </View>
       </SafeAreaView>
-    </RestaurantProtectedRoute>
   );
 }
 

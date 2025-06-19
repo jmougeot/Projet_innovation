@@ -67,6 +67,7 @@ interface InfoFieldProps {
 }
 
 const ProfileAvatar = () => {
+  // Tous les hooks doivent être au début du composant
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);

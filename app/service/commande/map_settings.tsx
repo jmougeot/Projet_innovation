@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicator, TextInput, Modal } from "react-native";
+import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicator, TextInput, Modal, Platform } from "react-native";
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,7 @@ import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
 import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
-import { useRestaurant } from '../../restaurant/SelectionContext';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 // Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
 const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
@@ -60,7 +60,7 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
   const [position, setPosition] = useState(() => {
     // Dénormaliser la position pour l'affichage
     return denormalizePosition(
-      { x: table.position.x, y: table.position.y },
+      { x: table.position?.x || 0, y: table.position?.y || 0 },
       workspaceWidth
     );
   });
@@ -70,11 +70,11 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
   // Mettre à jour la position locale quand la table change
   useEffect(() => {
     const denormalizedPos = denormalizePosition(
-      { x: table.position.x, y: table.position.y },
+      { x: table.position?.x || 0, y: table.position?.y || 0 },
       workspaceWidth
     );
     setPosition(denormalizedPos);
-  }, [table.position.x, table.position.y, table.id, workspaceWidth]);
+  }, [table.position?.x, table.position?.y, table.id, workspaceWidth]);
 
   // Fonction pour contraindre la position dans les limites du workspace
   const constrainPosition = (newX: number, newY: number) => {
@@ -139,7 +139,7 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
           left: position.x,
           top: position.y,
           position: 'absolute',
-          pointerEvents: 'box-only',
+          ...(Platform.OS !== 'web' && { pointerEvents: 'box-only' }),
         }
       ]}
       // @ts-ignore - Propriétés spécifiques React Native
@@ -161,7 +161,7 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
             msUserSelect: 'none',
             WebkitTouchCallout: 'none',
             WebkitTapHighlightColor: 'transparent',
-            pointerEvents: 'none',
+            ...(Platform.OS !== 'web' && { pointerEvents: 'none' }),
           } as any
         ]}
         // @ts-ignore - Propriétés supplémentaires pour empêcher la sélection
@@ -195,7 +195,7 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
 // Composant principal MapSettings
 export default function MapSettings() {
   const router = useRouter();
-  const { currentRestaurant } = useRestaurant();
+  const [CurrentRestaurantID, setCurrentRestaurantId] = useState<string | null>(null);
   // État local pour les tables
   const [tables, setTables] = useState<Table[]>([]);
   const [originalTables, setOriginalTables] = useState<Table[]>([]);
@@ -218,21 +218,35 @@ export default function MapSettings() {
   // État pour le modal de confirmation d'annulation
   const [showDiscardModal, setShowDiscardModal] = useState(false);
 
-  // Dimensions du workspace adaptives avec le hook personnalisé
+  // Tous les hooks personnalisés doivent être groupés
   const { size: workspaceSize } = useWorkspaceSize();
-  const workspaceWidth = workspaceSize;
-  const workspaceHeight = workspaceSize;
-
-  // Calcul des dimensions des tables proportionnelles au workspace
-  const tableSize = workspaceSize * TABLE_SIZE_RATIO;
-
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
+  // Chargement de l'ID du restaurant depuis le stockage local
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        if (savedId) {
+          setCurrentRestaurantId(savedId);
+        }
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
+
+  // Calculs et variables dérivées après tous les hooks
+  const workspaceWidth = workspaceSize;
+  const workspaceHeight = workspaceSize;
+  const tableSize = workspaceSize * TABLE_SIZE_RATIO;
+
   // Chargement des rooms et tables depuis Firebase
   const loadRoomsAndTables = useCallback(async () => {
-    if (!currentRestaurant) {
+    if (!CurrentRestaurantID) {
       console.warn('Aucun restaurant sélectionné');
       setLoading(false);
       return;
@@ -242,7 +256,7 @@ export default function MapSettings() {
       setLoading(true);
       
       // Charger les rooms
-      const roomsData = await getRoom(true, currentRestaurant.id);
+      const roomsData = await getRoom(true, CurrentRestaurantID);
       setRooms(roomsData);
       
       // Si aucune room n'existe, montrer l'interface de création
@@ -270,7 +284,7 @@ export default function MapSettings() {
       setCurrentRoomId(firstRoomId);
       
       // Charger les tables pour la room actuelle
-      const tablesData = await getTables(firstRoomId, true, currentRestaurant.id);
+      const tablesData = await getTables(firstRoomId, true, CurrentRestaurantID);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData))); // Deep copy pour comparaison
       setHasUnsavedChanges(false);
@@ -281,7 +295,7 @@ export default function MapSettings() {
     } finally {
       setLoading(false);
     }
-  }, [currentRestaurant]);
+  }, [CurrentRestaurantID]);
 
   // Fonction pour comparer les tables et détecter les changements
   const checkForUnsavedChanges = useCallback((currentTables: Table[]) => {
@@ -296,8 +310,8 @@ export default function MapSettings() {
     
     if (hasChanges) {
       console.log('📊 Tables are different!');
-      console.log('Current tables positions:', currentTables.map(t => ({ id: t.id, x: t.position.x, y: t.position.y })));
-      console.log('Original tables positions:', originalTables.map(t => ({ id: t.id, x: t.position.x, y: t.position.y })));
+      console.log('Current tables positions:', currentTables.map(t => ({ id: t.id, x: t.position?.x || 0, y: t.position?.y || 0 })));
+      console.log('Original tables positions:', originalTables.map(t => ({ id: t.id, x: t.position?.x || 0, y: t.position?.y || 0 })));
     }
     
     setHasUnsavedChanges(hasChanges);
@@ -306,14 +320,14 @@ export default function MapSettings() {
 
   // Sauvegarde manuelle de toutes les modifications
   const saveAllChanges = useCallback(async () => {
-    if (!currentRestaurant || !currentRoomId) {
+    if (!CurrentRestaurantID || !currentRoomId) {
       Alert.alert('Erreur', 'Aucun restaurant ou salle sélectionné');
       return;
     }
 
     try {
       setSaving(true);
-      await updateTables(tables, currentRoomId, currentRestaurant.id);
+      await updateTables(tables, currentRoomId, CurrentRestaurantID);
       
       // Invalider les caches après sauvegarde
       clearTablesCache(currentRoomId);
@@ -329,7 +343,7 @@ export default function MapSettings() {
     } finally {
       setSaving(false);
     }
-  }, [tables, currentRestaurant, currentRoomId]);
+  }, [tables, CurrentRestaurantID, currentRoomId]);
 
   // Annuler toutes les modifications non sauvegardées
   const discardChanges = useCallback(() => {
@@ -380,7 +394,7 @@ export default function MapSettings() {
   }, []);
 
   const handleSaveTable = useCallback(async (tableData: Omit<Table, 'id' | 'status'>) => {
-    if (!currentRestaurant || !currentRoomId) {
+    if (!CurrentRestaurantID || !currentRoomId) {
       Alert.alert('Erreur', 'Aucun restaurant ou salle sélectionné');
       return;
     }
@@ -399,7 +413,7 @@ export default function MapSettings() {
           }
         };
         
-        await saveTable(updatedTable, currentRoomId, currentRestaurant.id);
+        await saveTable(updatedTable, currentRoomId, CurrentRestaurantID);
         
         // Invalider le cache après modification
         clearTablesCache(currentRoomId);
@@ -430,7 +444,7 @@ export default function MapSettings() {
           }
         };
 
-        await saveTable(newTable, currentRoomId, currentRestaurant.id);
+        await saveTable(newTable, currentRoomId, CurrentRestaurantID);
         
         // Invalider le cache après création
         clearTablesCache(currentRoomId);
@@ -459,13 +473,13 @@ export default function MapSettings() {
   }, []);
 
   const removeTable = useCallback(async (id: number) => {
-    if (!currentRestaurant || !currentRoomId) {
+    if (!CurrentRestaurantID || !currentRoomId) {
       Alert.alert('Erreur', 'Aucun restaurant ou salle sélectionné');
       return;
     }
 
     try {
-      await deleteTable(id, currentRoomId, currentRestaurant.id);
+      await deleteTable(id, currentRoomId, CurrentRestaurantID);
       
       // Invalider le cache après suppression
       clearTablesCache(currentRoomId);
@@ -480,7 +494,7 @@ export default function MapSettings() {
     } catch (error) {
       console.error('Erreur lors de la suppression:', error);
     }
-  }, [checkForUnsavedChanges, currentRestaurant, currentRoomId]);
+  }, [checkForUnsavedChanges, CurrentRestaurantID, currentRoomId]);
 
   const handleDeleteTable = useCallback((table: Table) => {
     removeTable(table.id);
@@ -488,7 +502,7 @@ export default function MapSettings() {
 
   // Fonctions de gestion des salles
   const handleCreateRoom = useCallback(async () => {
-    if (!currentRestaurant || !newRoomName.trim()) {
+    if (!CurrentRestaurantID || !newRoomName.trim()) {
       Alert.alert('Erreur', 'Veuillez saisir un nom de salle valide');
       return;
     }
@@ -503,10 +517,10 @@ export default function MapSettings() {
         newRoom.description = newRoomDescription.trim();
       }
 
-      await addRoom(newRoom, currentRestaurant.id);
+      await addRoom(newRoom, CurrentRestaurantID);
       
       // Recharger les rooms
-      const updatedRooms = await getRoom(false, currentRestaurant.id);
+      const updatedRooms = await getRoom(false, CurrentRestaurantID);
       setRooms(updatedRooms);
       
       // Si c'est la première salle créée, la sélectionner automatiquement
@@ -515,7 +529,7 @@ export default function MapSettings() {
         if (newRoomId) {
           setCurrentRoomId(newRoomId);
           // Charger les tables pour cette nouvelle salle (sera vide)
-          const tablesData = await getTables(newRoomId, true, currentRestaurant.id);
+          const tablesData = await getTables(newRoomId, true, CurrentRestaurantID);
           setTables(tablesData);
           setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
           setHasUnsavedChanges(false);
@@ -533,7 +547,7 @@ export default function MapSettings() {
       console.error('Erreur lors de la création de la salle:', error);
       Alert.alert('Erreur', 'Impossible de créer la salle');
     }
-  }, [currentRestaurant, newRoomName, newRoomDescription]);
+  }, [CurrentRestaurantID, newRoomName, newRoomDescription]);
 
   const handleEditRoom = useCallback((room: Room) => {
     setEditingRoom(room);
@@ -543,7 +557,7 @@ export default function MapSettings() {
   }, []);
 
   const handleUpdateRoom = useCallback(async () => {
-    if (!currentRestaurant || !editingRoom || !newRoomName.trim()) {
+    if (!CurrentRestaurantID || !editingRoom || !newRoomName.trim()) {
       Alert.alert('Erreur', 'Données invalides pour la modification');
       return;
     }
@@ -558,10 +572,10 @@ export default function MapSettings() {
         updatedRoom.description = newRoomDescription.trim();
       }
 
-      await updateRoom(editingRoom.id!, updatedRoom, currentRestaurant.id);
+      await updateRoom(editingRoom.id!, updatedRoom, CurrentRestaurantID);
       
       // Recharger les rooms
-      const updatedRooms = await getRoom(false, currentRestaurant.id);
+      const updatedRooms = await getRoom(false, CurrentRestaurantID);
       setRooms(updatedRooms);
       
       // Réinitialiser le formulaire
@@ -575,10 +589,10 @@ export default function MapSettings() {
       console.error('Erreur lors de la modification de la salle:', error);
       Alert.alert('Erreur', 'Impossible de modifier la salle');
     }
-  }, [currentRestaurant, editingRoom, newRoomName, newRoomDescription]);
+  }, [CurrentRestaurantID, editingRoom, newRoomName, newRoomDescription]);
 
   const handleDeleteRoom = useCallback(async (room: Room) => {
-    if (!currentRestaurant || !room.id) {
+    if (!CurrentRestaurantID || !room.id) {
       Alert.alert('Erreur', 'Données invalides pour la suppression');
       return;
     }
@@ -596,10 +610,10 @@ export default function MapSettings() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deleteRoom(room.id!, currentRestaurant.id);
+              await deleteRoom(room.id!, CurrentRestaurantID);
               
               // Recharger les rooms
-              const updatedRooms = await getRoom(false, currentRestaurant.id);
+              const updatedRooms = await getRoom(false, CurrentRestaurantID);
               setRooms(updatedRooms);
               
               // Si la salle supprimée était la salle courante, sélectionner une autre ou vider
@@ -607,7 +621,7 @@ export default function MapSettings() {
                 if (updatedRooms.length > 0) {
                   const newCurrentRoomId = updatedRooms[0].id!;
                   setCurrentRoomId(newCurrentRoomId);
-                  const tablesData = await getTables(newCurrentRoomId, true, currentRestaurant.id);
+                  const tablesData = await getTables(newCurrentRoomId, true, CurrentRestaurantID);
                   setTables(tablesData);
                   setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
                 } else {
@@ -627,17 +641,17 @@ export default function MapSettings() {
         }
       ]
     );
-  }, [currentRestaurant, currentRoomId]);
+  }, [CurrentRestaurantID, currentRoomId]);
 
   const handleChangeRoom = useCallback(async (roomId: string) => {
-    if (!currentRestaurant || roomId === currentRoomId) return;
+    if (!CurrentRestaurantID || roomId === currentRoomId) return;
 
     try {
       setLoading(true);
       setCurrentRoomId(roomId);
       
       // Charger les tables pour la nouvelle salle
-      const tablesData = await getTables(roomId, true, currentRestaurant.id);
+      const tablesData = await getTables(roomId, true, CurrentRestaurantID);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
       setHasUnsavedChanges(false);
@@ -647,7 +661,7 @@ export default function MapSettings() {
     } finally {
       setLoading(false);
     }
-  }, [currentRestaurant, currentRoomId]);
+  }, [CurrentRestaurantID, currentRoomId]);
 
   useEffect(() => {
     loadRoomsAndTables();

@@ -36,7 +36,8 @@ export {
 export type { Plat } from './firebaseMenu';
 
 // Order/Command management
-export {
+import firebaseCommandeOptimized from './firebaseCommandeOptimized';
+export const {
   createCommande,
   terminerCommande,
   getCommandesEnCours,
@@ -47,11 +48,11 @@ export {
   updateStatusPlat,
   changeStatusCommande,
   diagnosticCommandes,
-} from './firebaseCommandeOptimized';
+} = firebaseCommandeOptimized;
 export type { 
   PlatQuantite, 
-  CommandeData, 
-  CreateOrderData 
+  TicketData, 
+  CreateTicketData 
 } from './firebaseCommandeOptimized';
 
 // Stock management

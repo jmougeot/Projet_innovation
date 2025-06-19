@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
-import { useRestaurant } from './SelectionContext';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import {
   getRestaurant,
   updateRestaurant,
@@ -37,7 +37,7 @@ interface SettingsFormData {
 
 export default function RestaurantSettingsPage() {
   const router = useRouter();
-  const { currentRestaurant } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -57,11 +57,20 @@ export default function RestaurantSettingsPage() {
   });
 
   useEffect(() => {
-    loadRestaurant();
-  }, [currentRestaurant]);
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
+  
   const loadRestaurant = async () => {
-    if (!currentRestaurant) {
+    if (!CurrentRestaurantId) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       router.push('/restaurant/select' as any);
       return;
@@ -69,23 +78,25 @@ export default function RestaurantSettingsPage() {
 
     try {
       setLoading(true);
-      const restaurantData = await getRestaurant(currentRestaurant.id, false);
+      const restaurantData = await getRestaurant(CurrentRestaurantId, false);
 
       if (restaurantData) {
         setRestaurant(restaurantData);
-        setFormData({
+        setFormData(prev => ({
+          ...prev,
           name: restaurantData.name || '',
           address: restaurantData.address || '',
           phone: restaurantData.phone || '',
           email: restaurantData.email || '',
-          openTime: restaurantData.settings.business_hours.open_time || '',
-          closeTime: restaurantData.settings.business_hours.close_time || '',
-          kitchenCapacity: restaurantData.settings.kitchen_capacity.toString(),
-          currency: restaurantData.settings.currency || '',
-          taxRate: (restaurantData.settings.tax_rate * 100).toString(),
-          serviceCharge: (restaurantData.settings.service_charge * 100).toString(),
-          defaultRoomName: restaurantData.settings.default_room_name || '',
-        });
+          description: (restaurantData as any).description || '',
+          openTime: (restaurantData as any).openTime || '',
+          closeTime: (restaurantData as any).closeTime || '',
+          kitchenCapacity: (restaurantData as any).kitchenCapacity?.toString() || '',
+          currency: (restaurantData as any).currency || '',
+          taxRate: (restaurantData as any).taxRate?.toString() || '',
+          serviceCharge: (restaurantData as any).serviceCharge?.toString() || '',
+          defaultRoomName: (restaurantData as any).defaultRoomName || '',
+        }));
       }
     } catch (error) {
       console.error('Erreur lors du chargement du restaurant:', error);
@@ -137,7 +148,7 @@ export default function RestaurantSettingsPage() {
   const handleSaveSettings = async () => {
     if (!validateForm()) return;
 
-    if (!currentRestaurant) {
+    if (!CurrentRestaurantId) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       return;
     }
@@ -146,18 +157,13 @@ export default function RestaurantSettingsPage() {
       setSaving(true);
 
       const restaurantSettings: RestaurantSettings = {
-        business_hours: {
-          open_time: formData.openTime,
-          close_time: formData.closeTime,
-          days_of_week: restaurant?.settings.business_hours.days_of_week || 
-            ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        businessHours: {
+          openTime: formData.openTime,
+          closeTime: formData.closeTime,
+          timezone: restaurant?.settings?.businessHours?.timezone || 'Europe/Paris'
         },
-        table_service_time: restaurant?.settings.table_service_time || 90,
-        kitchen_capacity: parseInt(formData.kitchenCapacity),
-        currency: formData.currency,
-        tax_rate: parseFloat(formData.taxRate) / 100,
-        service_charge: parseFloat(formData.serviceCharge) / 100,
-        default_room_name: formData.defaultRoomName.trim() || 'Salle principale'
+        maxUsers: restaurant?.settings?.maxUsers || 100,
+        autoExpireHours: restaurant?.settings?.autoExpireHours || 24,
       };
 
       const restaurantData: Partial<Restaurant> = {
@@ -168,7 +174,7 @@ export default function RestaurantSettingsPage() {
         settings: restaurantSettings,
       };
 
-      await updateRestaurant(currentRestaurant.id, restaurantData);
+      await updateRestaurant(CurrentRestaurantId, restaurantData);
 
       // Reload restaurant data
       await loadRestaurant();

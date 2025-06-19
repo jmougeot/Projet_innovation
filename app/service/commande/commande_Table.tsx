@@ -11,12 +11,14 @@ import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized'
 import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
-import { useRestaurant } from '@/app/restaurant/SelectionContext';
+import RestaurantStorgae from '@/app/asyncstorage/restaurantStorage';
+
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
     const { tablenumber} = useLocalSearchParams();
-    const { currentRestaurant } = useRestaurant();
+    const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+    const [isLoadingRestaurant, setIsLoadingRestaurant] = useState<boolean>(true);
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
@@ -25,6 +27,25 @@ export default function Commande() {
     const [missionPlatsIds, setMissionPlatsIds] = useState<string[]>([]);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     
+// Chargement de l'ID du restaurant depuis AsyncStorage
+    useEffect(() => {
+        const loadRestaurantId = async () => {
+            try {
+                setIsLoadingRestaurant(true);
+                const savedId = await RestaurantStorgae.GetSelectedRestaurantId();
+                setCurrentRestaurantId(savedId);
+                if (!savedId) {
+                    console.log('Aucun restaurant sélectionné');
+                }
+            } catch (error) {
+                console.error('Erreur chargement restaurant ID:', error);
+            } finally {
+                setIsLoadingRestaurant(false);
+            }
+        };
+        loadRestaurantId();
+    }, []);
+
 // Définition des éléments du menu personnalisé
     const customMenuItems = getPlanDeSalleMenuItems();
 
@@ -46,13 +67,16 @@ export default function Commande() {
 // Chargement des plats depuis Firebase
     useEffect(() => {
         const fetchPlats = async () => {
-            if (!currentRestaurant) {
-                console.warn('Aucun restaurant sélectionné pour charger les plats');
+            if (!CurrentRestaurantId) {
+                // Ne pas afficher d'erreur si on est encore en train de charger
+                if (!isLoadingRestaurant) {
+                    console.log('Aucun restaurant sélectionné pour charger les plats');
+                }
                 return;
             }
             
             try {
-                const platsData = await get_plats(true, currentRestaurant.id);
+                const platsData = await get_plats(true, CurrentRestaurantId);
                 setListPlats(platsData);
             } catch (error) {
                 console.error('Erreur lors du chargement des plats:', error);
@@ -60,15 +84,15 @@ export default function Commande() {
             }
         };
         fetchPlats();
-    }, [currentRestaurant]);
+    }, [CurrentRestaurantId, isLoadingRestaurant]);
 
 // Chargement des plats avec missions pour l'utilisateur actuel
     useEffect(() => {
         const fetchMissionPlats = async () => {
-            if (!currentUserId || !currentRestaurant) return;
+            if (!currentUserId || !CurrentRestaurantId) return;
             
             try {
-                const platIds = await getMissionPlatsForUser(currentUserId, currentRestaurant.id);
+                const platIds = await getMissionPlatsForUser(currentUserId, CurrentRestaurantId);
                 console.log("Plats avec missions:", platIds); // Ajout de log pour déboguer
                 setMissionPlatsIds(platIds);
             } catch (error) {
@@ -77,13 +101,19 @@ export default function Commande() {
         };
         
         fetchMissionPlats();
-    }, [currentUserId, currentRestaurant]);
+    }, [currentUserId, CurrentRestaurantId]);
 
 // Chargement de la commande existante pour la table
     useEffect(() => {
         const fetchCommande = async () => {
+            if (!CurrentRestaurantId || !tableId || CurrentRestaurantId.trim() === '') {
+                console.log('fetchCommande: Paramètres manquants', { CurrentRestaurantId, tableId });
+                return;
+            }
+            
             try {
-                const commande = await getTicketByTableId(Number(tableId), currentRestaurant?.id || '');
+                console.log('fetchCommande: Tentative de récupération', { tableId: Number(tableId), CurrentRestaurantId });
+                const commande = await getTicketByTableId(Number(tableId), CurrentRestaurantId);
                 if (commande) {
                     setCommandesParTable(commande);
                     setPlats(commande.plats);
@@ -91,14 +121,12 @@ export default function Commande() {
                     setIdcommande(commande.id);
                 }
             } catch (error) {
-                console.error("Erreur lors du chargement de la commande:", error);
+                console.error("Erreur lors de la récupération du ticket:", error);
             }
         };
         
-        if (tableId) {
-            fetchCommande();
-        }
-    }, [tableId]);
+        fetchCommande();
+    }, [tableId, CurrentRestaurantId]);
 
     // Marquer les plats avec missions - Logique améliorée
     useEffect(() => {
@@ -123,8 +151,29 @@ export default function Commande() {
         }
     }, [missionPlatsIds]); // Retirer listPlats des dépendances pour éviter la boucle 
 
-    if (!fontsLoaded) {
-        return null;
+    if (!fontsLoaded || isLoadingRestaurant) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Chargement...</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (!CurrentRestaurantId) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Aucun restaurant sélectionné</Text>
+                    <Pressable 
+                        style={styles.retourButton}
+                        onPress={() => router.replace("/restaurant/select")}>
+                        <Text style={styles.buttonText}>Sélectionner un restaurant</Text>
+                    </Pressable>
+                </View>
+            </SafeAreaView>
+        );
     }
 
 // Fonction pour ajouter un plat à la commande
@@ -225,19 +274,19 @@ export default function Commande() {
             return;
         }
 
-        if (!currentRestaurant) {
+        if (!CurrentRestaurantId) {
             Alert.alert('Erreur', 'Aucun restaurant sélectionné');
             return;
         }
         
         try {
             if (commandeExistante) {
-                await updateTicket(Idcommande, currentRestaurant.id, commandesParTable);
+                await updateTicket(Idcommande, CurrentRestaurantId, commandesParTable);
             } else {
                 // ✅ CORRECTION: Capturer l'ID Firebase réel et mettre à jour l'état local
                 // Exclure l'ID temporaire avant d'envoyer à Firebase
                 const { id, ...commandeDataSansId } = commandesParTable;
-                const firebaseCommandeId = await createTicket(commandeDataSansId, currentRestaurant.id);
+                const firebaseCommandeId = await createTicket(commandeDataSansId, CurrentRestaurantId);
                 console.log(`🔄 [SYNC] ID local remplacé: ${Idcommande} → ${firebaseCommandeId}`);
                 setIdcommande(firebaseCommandeId);
                 setCommandeExistante(true);
@@ -517,5 +566,36 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         paddingVertical: 10,
         fontSize: 16,
+    },
+    
+    // Loading and error states
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '500',
+    },
+    errorContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    errorText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '500',
+        textAlign: 'center',
+        marginBottom: 20,
+    },
+    retourButton: {
+        backgroundColor: '#CAE1EF',
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 25,
     },
 });

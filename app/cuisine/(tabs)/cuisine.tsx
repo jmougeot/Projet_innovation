@@ -4,20 +4,33 @@ import { db } from '@/app/firebase/firebaseConfig';
 import { TicketData, PlatQuantite, listenToTicketsActifs, updateStatusPlat } from '@/app/firebase/firebaseCommandeOptimized';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-import { useRestaurant } from '@/app/restaurant/exports';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 const Cuisine = () => {
   const [commandes, setCommandes] = useState<TicketData[]>([]);
-  const { currentRestaurant } = useRestaurant();
+  const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
 
+  // Charger l'ID du restaurant depuis AsyncStorage
   useEffect(() => {
-    if (!currentRestaurant?.id) return;
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
+
+  useEffect(() => {
+    if (!currentRestaurantId) return;
 
     // Écouter les changements en temps réel des tickets actifs
-    const unsubscribe = listenToTicketsActifs(currentRestaurant.id, (tickets) => {
+    const unsubscribe = listenToTicketsActifs(currentRestaurantId, (tickets) => {
       // Filtrer seulement les tickets avec des plats en cours de préparation
       const ticketsEnCours = tickets.filter(ticket => 
         ticket.status === 'en_attente' || 
@@ -28,7 +41,7 @@ const Cuisine = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [currentRestaurantId]);
 
   if (!fontsLoaded) {
     return null;
@@ -57,7 +70,7 @@ const Cuisine = () => {
   // Update status using the optimized API
   const customUpdateStatusPlat = async (tableId: number, platName: string, currentStatus: string) => {
     try {
-      if (!currentRestaurant?.id) {
+      if (!currentRestaurantId) {
         Alert.alert("Erreur", "Restaurant non sélectionné");
         return;
       }
@@ -67,7 +80,7 @@ const Cuisine = () => {
       console.log(`Updating dish ${platName} from ${currentStatus} to ${nextStatus}`);
 
       // Use the optimized API to update the dish status
-      await updateStatusPlat(tableId, currentRestaurant.id, platName, nextStatus);
+      await updateStatusPlat(tableId, currentRestaurantId, platName, nextStatus);
       
       Alert.alert("Succès", `${platName} est maintenant ${nextStatus}`);
     } catch (error) {

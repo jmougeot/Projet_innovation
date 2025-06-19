@@ -33,7 +33,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
 import AutoRedirect from './AutoRedirect';
-import { useRestaurant } from './SelectionContext';
+import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import { addRestaurantMember, removeRestaurantMember } from '../firebase/firebaseRestaurant';
 
 // Type pour un membre du restaurant utilisant Custom Claims
@@ -46,21 +46,36 @@ interface RestaurantMember {
 }
 
 export default function RestaurantAdminPage() {
-  const { currentRestaurant } = useRestaurant();
+  const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<RestaurantMember[]>([]);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [selectedRole, setSelectedRole] = useState<RestaurantMember['role']>('waiter');
   const [addingUser, setAddingUser] = useState(false);
 
+  // Charger l'ID du restaurant depuis AsyncStorage
   useEffect(() => {
-    if (currentRestaurant) {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+        setLoading(false);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+        setLoading(false);
+      }
+    };
+    loadRestaurantId();
+  }, []);
+
+  useEffect(() => {
+    if (currentRestaurantId) {
       loadRestaurantUsers();
     }
-  }, [currentRestaurant]);
+  }, [currentRestaurantId]);
 
   const loadRestaurantUsers = async () => {
-    if (!currentRestaurant) return;
+    if (!currentRestaurantId) return;
 
     try {
       setLoading(true);
@@ -77,7 +92,7 @@ export default function RestaurantAdminPage() {
   };
 
   const handleAddUser = async () => {
-    if (!newUserEmail.trim() || !currentRestaurant) {
+    if (!newUserEmail.trim() || !currentRestaurantId) {
       Alert.alert('Erreur', 'Veuillez saisir un email valide');
       return;
     }
@@ -89,7 +104,7 @@ export default function RestaurantAdminPage() {
       // Note: Pour l'instant, nous utilisons l'email comme userId
       // Dans un vrai système, il faudrait d'abord résoudre l'email vers un userId
       await addRestaurantMember(
-        currentRestaurant.id, 
+        currentRestaurantId, 
         newUserEmail, // Temporaire - devrait être l'userId réel
         selectedRole
       );
@@ -106,7 +121,7 @@ export default function RestaurantAdminPage() {
   };
 
   const handleRevokeAccess = async (userId: string) => {
-    if (!currentRestaurant) return;
+    if (!currentRestaurantId) return;
 
     Alert.alert(
       'Confirmer',
@@ -119,7 +134,7 @@ export default function RestaurantAdminPage() {
           onPress: async () => {
             try {
               // ⚡ Utiliser la nouvelle fonction Custom Claims
-              await removeRestaurantMember(currentRestaurant.id, userId);
+              await removeRestaurantMember(currentRestaurantId, userId);
               await loadRestaurantUsers();
               Alert.alert('Succès', 'Accès révoqué via Custom Claims');
             } catch (error) {
@@ -171,7 +186,7 @@ export default function RestaurantAdminPage() {
 
   return (
     <AutoRedirect 
-      restaurantId={currentRestaurant?.id}
+      restaurantId={currentRestaurantId || undefined}
       requireRole="manager"
       fallbackRoute="/restaurant"
       loadingMessage="Vérification des droits d'administration..."
@@ -189,7 +204,7 @@ export default function RestaurantAdminPage() {
           <View style={styles.restaurantInfo}>
             <MaterialIcons name="restaurant" size={32} color="#194A8D" />
             <View style={styles.restaurantDetails}>
-              <Text style={styles.restaurantName}>{currentRestaurant?.name}</Text>
+              <Text style={styles.restaurantName}>Restaurant ID: {currentRestaurantId}</Text>
               <Text style={styles.restaurantRole}>🔒 Accès Manager (Custom Claims)</Text>
             </View>
           </View>

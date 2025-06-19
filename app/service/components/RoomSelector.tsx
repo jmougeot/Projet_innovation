@@ -6,18 +6,12 @@ import { Room, getTables } from '../../firebase/firebaseTables';
 interface RoomSelectorProps {
   rooms: Room[];
   currentRoomId: string;
-  currentRestaurant: { id: string } | null;
+  currentRestaurant: string | null;
   loadingRoomChange: string;
   onRoomSelect: (roomId: string) => void;
 }
 
-export const RoomSelector: React.FC<RoomSelectorProps> = ({
-  rooms,
-  currentRoomId,
-  currentRestaurant,
-  loadingRoomChange,
-  onRoomSelect
-}) => {
+export const RoomSelector: React.FC<RoomSelectorProps> = ({rooms, currentRoomId, currentRestaurant, loadingRoomChange, onRoomSelect }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [roomTableCounts, setRoomTableCounts] = useState<Record<string, number>>({});
 
@@ -29,7 +23,7 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
       const counts: Record<string, number> = {};
       for (const room of rooms) {
         if (room.id) {
-          const roomTables = await getTables(room.id, true, currentRestaurant.id);
+          const roomTables = await getTables(room.id, true, currentRestaurant);
           counts[room.id] = roomTables.length;
         }
       }
@@ -42,8 +36,9 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({
   // Charger les compteurs quand les salles changent
   useEffect(() => {
     loadRoomTableCounts();
-  }, [loadRoomTableCounts]);
+  }, [currentRestaurant, rooms]);
 
+  // Derived variables after all hooks
   const currentRoom = rooms.find(room => room.id === currentRoomId);
 
   const handleRoomSelect = (roomId: string) => {

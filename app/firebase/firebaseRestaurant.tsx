@@ -243,9 +243,7 @@ export const getMyRestaurants = async (): Promise<string[]> => {
  * 🔍 Vérifier l'accès à un restaurant
  * Utilise Custom Claims pour une vérification ultra-rapide
  */
-export const checkRestaurantAccess = async (
-  restaurantId: string,
-  requiredRole?: 'manager' | 'waiter' | 'chef' | 'cleaner'
+export const checkRestaurantAccess = async (restaurantId: string, requiredRole?: 'manager' | 'waiter' | 'chef' | 'cleaner'
 ): Promise<{ hasAccess: boolean; role?: string }> => {
   try {
     // ⚡ Vérification rapide via Custom Claims

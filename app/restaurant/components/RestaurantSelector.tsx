@@ -1,27 +1,32 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useRestaurant } from '../restaurant/SelectionContext';
+import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
 
 interface RestaurantSelectorProps {
   style?: any;
 }
 
 export default function RestaurantSelector({ style }: RestaurantSelectorProps) {
-  const { currentRestaurant, user } = useRestaurant();
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await restaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
   const handleNavigateToSelector = () => {
     router.push('/restaurant/select' as any);
   };
 
-  if (!user) {
-    return (
-      <View style={[styles.container, style]}>
-        <Text style={styles.noUserText}>Connectez-vous pour sélectionner un restaurant</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={[styles.container, style]}>
@@ -30,8 +35,8 @@ export default function RestaurantSelector({ style }: RestaurantSelectorProps) {
           colors={['#D4AF37', '#B8941F']}
           style={styles.buttonGradient}
         >
-          <Text style={styles.currentRestaurant}>
-            {currentRestaurant ? currentRestaurant.name : 'Sélectionner un restaurant'}
+          <Text style={styles.CurrentRestaurantId}>
+            {CurrentRestaurantId ? CurrentRestaurantId : 'Sélectionner un restaurant'}
           </Text>
           <Text style={styles.changeText}>Appuyer pour changer</Text>
         </LinearGradient>
@@ -56,7 +61,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: 'center',
   },
-  currentRestaurant: {
+  CurrentRestaurantId: {
     fontSize: 16,
     fontWeight: 'bold',
     color: 'white',

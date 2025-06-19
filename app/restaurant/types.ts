@@ -20,28 +20,6 @@ export interface Restaurant {
   staffIds?: UserRestaurantAccess[];
 }
 
-export interface RestaurantSelectionContextType {
-  // État utilisateur
-  user: any;
-  userLoading: boolean;
-  
-  // Restaurants accessibles à l'utilisateur
-  availableRestaurants: Restaurant[];
-  userRestaurantAccess: UserRestaurantAccess[];
-  
-  // Restaurant actuellement sélectionné
-  selectedRestaurant: Restaurant | null;
-  selectedRestaurantRole: string | null;
-  
-  // Actions
-  selectRestaurant: (restaurantId: string) => Promise<void>;
-  clearRestaurantSelection: () => void;
-  refreshRestaurants: () => Promise<void>;
-  
-  // États de chargement
-  restaurantsLoading: boolean;
-  selectionLoading: boolean;
-}
 
 export interface RestaurantNavigationHooks {
   isLoading: boolean;

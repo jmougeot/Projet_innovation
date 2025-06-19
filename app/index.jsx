@@ -3,21 +3,40 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFonts } from 'expo-font';
 import { MaterialIcons } from '@expo/vector-icons';
+import React from 'react';
+
+// Define fonts outside component to ensure stable reference
+const FONT_CONFIG = {
+  'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
+  'GreatVibes': require('../assets/fonts/GreatVibes-Regular.ttf'),
+};
 
 export default function Index() {
   const router = useRouter();
-  const [fontsLoaded] = useFonts({
-    'AlexBrush': require('../assets/fonts/AlexBrush-Regular.ttf'),
-    'GreatVibes': require('../assets/fonts/GreatVibes-Regular.ttf'),
-  });
+  
+  // Use array destructuring with stable variable names
+  const fontLoadResult = useFonts(FONT_CONFIG);
+  const fontsLoaded = fontLoadResult[0];
+  const fontError = fontLoadResult[1];
 
-  if (!fontsLoaded) {
-    return null;
+  const handleLogin = React.useCallback(() => {
+    try {
+      if (router?.push) {
+        router.push('/connexion');
+      }
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
+  }, [router]);
+
+  // Show loading if fonts haven't loaded yet
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Chargement...</Text>
+      </View>
+    );
   }
-
-  const handleLogin = () => {
-    router.push('/connexion');
-  };
 
   return (
     <LinearGradient
@@ -187,8 +206,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   footerText: {
-    color: 'rgba(255, 255, 255, 0.6)',
+    color: 'rgba(255, 255, 255, 0.8)',
     fontSize: 12,
-    fontWeight: '300',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1e3c72',
+  },
+  loadingText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

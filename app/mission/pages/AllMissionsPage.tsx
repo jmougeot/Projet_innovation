@@ -15,10 +15,10 @@ import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { MissionCard, MissionSearch, MissionFilters, ConfirmDeleteModal } from '../components';
 import { filterMissions, sortMissions } from '../utils';
-import { useRestaurant } from '../../restaurant/SelectionContext';
+import RestaurantStorage from '../../asyncstorage/restaurantStorage';
 
 const AllMissionsPage = () => {
-  const { currentRestaurant } = useRestaurant();
+  // Tous les hooks useState en premier
   const [missions, setMissions] = useState<Mission[]>([]);
   const [filteredMissions, setFilteredMissions] = useState<Mission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,13 +28,23 @@ const AllMissionsPage = () => {
   const [showDeleteButtons, setShowDeleteButtons] = useState(false);
   const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null);
   const [confirmDeleteMission, setConfirmDeleteMission] = useState<Mission | null>(null);
+  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  
+  // Charger le restaurant sélectionné depuis AsyncStorage
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      try {
+        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
+        setCurrentRestaurantId(savedId);
+      } catch (error) {
+        console.error('Erreur chargement restaurant ID:', error);
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
-  
-  
-  const currentUser = auth.currentUser;
-  
   // Appliquer les filtres
-  const applyFilters = React.useCallback((missionsToFilter: Mission[] = missions) => {
+  const applyFilters = React.useCallback((missionsToFilter: Mission[]) => {
     const filtered = filterMissions(missionsToFilter, {
       searchQuery,
       recurrence: selectedRecurrence as 'daily' | 'weekly' | 'monthly' | undefined,
@@ -43,11 +53,11 @@ const AllMissionsPage = () => {
     // Trier par titre par défaut
     const sorted = sortMissions(filtered, 'titre', 'asc');
     setFilteredMissions(sorted);
-  }, [missions, searchQuery, selectedRecurrence]);
+  }, [searchQuery, selectedRecurrence]);
   
   // Charger toutes les missions
   const loadAllMissions = React.useCallback(async () => {
-    if (!currentRestaurant) {
+    if (!CurrentRestaurantId) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       setLoading(false);
       setRefreshing(false);
@@ -55,7 +65,7 @@ const AllMissionsPage = () => {
     }
 
     try {
-      const allMissions = await getAllMissions(currentRestaurant.id);
+      const allMissions = await getAllMissions(CurrentRestaurantId);
       setMissions(allMissions);
       applyFilters(allMissions);
     } catch (error) {
@@ -65,7 +75,7 @@ const AllMissionsPage = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [applyFilters, currentRestaurant]);
+  }, [CurrentRestaurantId, applyFilters]);
   
   useEffect(() => {
     loadAllMissions();
@@ -73,8 +83,11 @@ const AllMissionsPage = () => {
   
   // Effet pour appliquer les filtres quand ils changent
   useEffect(() => {
-    applyFilters();
+    applyFilters(missions);
   }, [searchQuery, selectedRecurrence, missions, applyFilters]);
+
+  // Variables dérivées après tous les hooks
+  const currentUser = auth.currentUser;
   
   // Gestionnaires de filtres
   const handleSearchChange = (query: string) => {
@@ -113,7 +126,7 @@ const AllMissionsPage = () => {
 
   // Confirmer la suppression
   const confirmDeletion = async () => {
-    if (!confirmDeleteMission || !currentRestaurant) return;
+    if (!confirmDeleteMission || !CurrentRestaurantId) return;
     
     console.log('[DEBUG] 🗑️ Suppression confirmée pour mission:', confirmDeleteMission.id);
     
@@ -123,7 +136,7 @@ const AllMissionsPage = () => {
       console.log('[DEBUG] ✅ deletingMissionId réglé à:', confirmDeleteMission.id);
       
       console.log('[DEBUG] 📞 Appel de deleteMission avec ID:', confirmDeleteMission.id);
-      const result = await deleteMission(confirmDeleteMission.id, currentRestaurant.id);
+      const result = await deleteMission(confirmDeleteMission.id, CurrentRestaurantId);
       console.log('[DEBUG] ✅ deleteMission terminé avec succès. Résultat:', result);
       
       console.log('[DEBUG] 📢 Mission supprimée avec succès !');
@@ -167,13 +180,13 @@ const AllMissionsPage = () => {
       return;
     }
 
-    if (!currentRestaurant) {
+    if (!CurrentRestaurantId) {
       Alert.alert('Erreur', 'Aucun restaurant sélectionné');
       return;
     }
     
     try {
-      await assignMissionToUser(missionId, currentUser.uid, currentRestaurant.id);
+      await assignMissionToUser(missionId, currentUser.uid, CurrentRestaurantId);
       Alert.alert('Succès', 'Vous êtes maintenant inscrit à cette mission');
       
       // Rediriger vers la page des missions de l'utilisateur
