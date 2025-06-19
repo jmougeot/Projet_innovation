@@ -116,13 +116,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 8px 10px rgba(0,0,0,0.3)',
     elevation: 15,
   },
   logo: {
@@ -136,9 +130,7 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     marginBottom: 5,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 5,
+    textShadow: '2px 2px 5px rgba(0,0,0,0.3)',
   },
   appSubtitle: {
     fontSize: 16,
@@ -158,9 +150,7 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     marginBottom: 15,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 5,
+    textShadow: '2px 2px 5px rgba(0,0,0,0.3)',
   },
   welcomeSubtext: {
     fontSize: 18,
@@ -179,13 +169,7 @@ const styles = StyleSheet.create({
     width: '80%',
     height: 55,
     borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadow: '0px 6px 8px rgba(0,0,0,0.3)',
     elevation: 10,
   },
   loginButtonGradient: {

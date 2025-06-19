@@ -1,4 +1,4 @@
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -11,10 +11,11 @@ import Head from '@/app/components/Head';
 import Reglage from '@/app/components/reglage';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
 import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 function Encaissement() {
     const { tableId } = useLocalSearchParams();
-    const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+    const { restaurantId: CurrentRestaurantId } = useRestaurant();
     const [idCommande, setIdCommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandesParTable, setCommandesParTable] = useState<TicketData | null>(null);
@@ -24,19 +25,6 @@ function Encaissement() {
     const [totalEncaisses, setTotalEncaisses] = useState<number>(0);
     const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque'>('carte');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-    // Charger l'ID du restaurant depuis AsyncStorage
-    useEffect(() => {
-        const loadRestaurantId = async () => {
-            try {
-                const savedId = await restaurantStorage.GetSelectedRestaurantId();
-                setCurrentRestaurantId(savedId);
-            } catch (error) {
-                console.error('Erreur chargement restaurant ID:', error);
-            }
-        };
-        loadRestaurantId();
-    }, []);
 
     useEffect(() => {
         const user = auth.currentUser;

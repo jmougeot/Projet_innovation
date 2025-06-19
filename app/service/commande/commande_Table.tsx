@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
@@ -12,13 +12,13 @@ import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
 import RestaurantStorgae from '@/app/asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 
 export default function Commande() {
     const { tableId } = useLocalSearchParams();
-    const { tablenumber} = useLocalSearchParams();
-    const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
-    const [isLoadingRestaurant, setIsLoadingRestaurant] = useState<boolean>(true);
+    const { tablenumber } = useLocalSearchParams();
+    const { restaurantId: CurrentRestaurantId } = useRestaurant();
     const [Idcommande, setIdcommande] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
     const [commandeExistante, setCommandeExistante] = useState<boolean>(false);
@@ -27,25 +27,6 @@ export default function Commande() {
     const [missionPlatsIds, setMissionPlatsIds] = useState<string[]>([]);
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     
-// Chargement de l'ID du restaurant depuis AsyncStorage
-    useEffect(() => {
-        const loadRestaurantId = async () => {
-            try {
-                setIsLoadingRestaurant(true);
-                const savedId = await RestaurantStorgae.GetSelectedRestaurantId();
-                setCurrentRestaurantId(savedId);
-                if (!savedId) {
-                    console.log('Aucun restaurant sélectionné');
-                }
-            } catch (error) {
-                console.error('Erreur chargement restaurant ID:', error);
-            } finally {
-                setIsLoadingRestaurant(false);
-            }
-        };
-        loadRestaurantId();
-    }, []);
-
 // Définition des éléments du menu personnalisé
     const customMenuItems = getPlanDeSalleMenuItems();
 
@@ -69,9 +50,7 @@ export default function Commande() {
         const fetchPlats = async () => {
             if (!CurrentRestaurantId) {
                 // Ne pas afficher d'erreur si on est encore en train de charger
-                if (!isLoadingRestaurant) {
-                    console.log('Aucun restaurant sélectionné pour charger les plats');
-                }
+                console.log('Aucun restaurant sélectionné pour charger les plats');
                 return;
             }
             
@@ -84,7 +63,7 @@ export default function Commande() {
             }
         };
         fetchPlats();
-    }, [CurrentRestaurantId, isLoadingRestaurant]);
+    }, [CurrentRestaurantId]);
 
 // Chargement des plats avec missions pour l'utilisateur actuel
     useEffect(() => {
@@ -151,7 +130,7 @@ export default function Commande() {
         }
     }, [missionPlatsIds]); // Retirer listPlats des dépendances pour éviter la boucle 
 
-    if (!fontsLoaded || isLoadingRestaurant) {
+    if (!fontsLoaded) {
         return (
             <SafeAreaView style={styles.container}>
                 <View style={styles.loadingContainer}>

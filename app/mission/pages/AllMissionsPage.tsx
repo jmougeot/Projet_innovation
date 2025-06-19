@@ -15,7 +15,7 @@ import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { MissionCard, MissionSearch, MissionFilters, ConfirmDeleteModal } from '../components';
 import { filterMissions, sortMissions } from '../utils';
-import RestaurantStorage from '../../asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 const AllMissionsPage = () => {
   // Tous les hooks useState en premier
@@ -28,21 +28,8 @@ const AllMissionsPage = () => {
   const [showDeleteButtons, setShowDeleteButtons] = useState(false);
   const [deletingMissionId, setDeletingMissionId] = useState<string | null>(null);
   const [confirmDeleteMission, setConfirmDeleteMission] = useState<Mission | null>(null);
-  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  const { restaurantId: CurrentRestaurantId } = useRestaurant();
   
-  // Charger le restaurant sélectionné depuis AsyncStorage
-  useEffect(() => {
-    const loadRestaurantId = async () => {
-      try {
-        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-        setCurrentRestaurantId(savedId);
-      } catch (error) {
-        console.error('Erreur chargement restaurant ID:', error);
-      }
-    };
-    loadRestaurantId();
-  }, []);
-
   // Appliquer les filtres
   const applyFilters = React.useCallback((missionsToFilter: Mission[]) => {
     const filtered = filterMissions(missionsToFilter, {

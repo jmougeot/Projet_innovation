@@ -18,6 +18,7 @@ import { db } from '../../firebase/firebaseConfig';
 import { get_plats, Plat } from '../../firebase/firebaseMenu';
 import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import type { Mission } from '../types';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 interface User {
   id: string;
@@ -25,41 +26,28 @@ interface User {
   email: string;
 }
 
+export default function CreateMissionPage() {
   // État initial du formulaire
-const [formData, setFormData] = useState({
-  titre: '',
-  description: '',
-  points: 10,
-  frequence: 'daily' as 'daily' | 'weekly' | 'monthly',
-  dateDebut: new Date(),
-  isCollective: false,
-  targetValue: 1,
-  selectedUsers: [] as string[],
-  selectedPlat: null as Plat | null
-});
+  const [formData, setFormData] = useState({
+    titre: '',
+    description: '',
+    points: 10,
+    frequence: 'daily' as 'daily' | 'weekly' | 'monthly',
+    dateDebut: new Date(),
+    isCollective: false,
+    targetValue: 1,
+    selectedUsers: [] as string[],
+    selectedPlat: null as Plat | null
+  });
 
-// États pour le DatePicker
-const [showDatePicker, setShowDatePicker] = useState(false);
-const [users, setUsers] = useState<User[]>([]);
-const [isLoading, setIsLoading] = useState(false);
-const [plats, setPlats] = useState<Plat[]>([]);
-const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
-  
-// Charger l'ID du restaurant depuis AsyncStorage
-useEffect(() => {
-  const loadRestaurantId = async () => {
-    try {
-      const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-      setCurrentRestaurantId(savedId);
-    } catch (error) {
-      console.error('Erreur chargement restaurant ID:', error);
-    }
-  };
-  loadRestaurantId();
-}, []);
-
-// Composer la page de création de mission
-const CreateMissionPage = () => {
+  // États pour le DatePicker
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [plats, setPlats] = useState<Plat[]>([]);
+  const { restaurantId: currentRestaurantId } = useRestaurant();
+    
+  // Composer la page de création de mission
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -82,7 +70,7 @@ const CreateMissionPage = () => {
     };
     fetchUsers();
   }, []);
-  
+    
   // Récupérer les plats disponibles
   useEffect(() => {
     const fetchPlats = async () => {
@@ -101,7 +89,7 @@ const CreateMissionPage = () => {
     
     fetchPlats();
   }, [currentRestaurantId]);
-  
+    
   // Gestion de la date
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -109,7 +97,7 @@ const CreateMissionPage = () => {
       setFormData({...formData, dateDebut: selectedDate});
     }
   };
-  
+    
   // Gestion de la sélection des utilisateurs
   const toggleUserSelection = (userId: string) => {
     const selectedUsers = [...formData.selectedUsers];
@@ -125,7 +113,7 @@ const CreateMissionPage = () => {
     
     setFormData({...formData, selectedUsers});
   };
-  
+    
   // Soumettre le formulaire
   const handleSubmit = async () => {
     if (!formData.titre || formData.selectedUsers.length === 0) {
@@ -226,7 +214,7 @@ const CreateMissionPage = () => {
       setIsLoading(false);
     }
   };
-  
+    
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Créer une nouvelle mission</Text>
@@ -519,5 +507,3 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 });
-
-export default CreateMissionPage;

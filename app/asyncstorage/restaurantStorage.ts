@@ -41,3 +41,4 @@ const GetSelectedRestaurantId = async () : Promise<string | null> => {
 };
 
 export default { SetSelectedRestaurantiD, GetSelectedRestaurantId };
+

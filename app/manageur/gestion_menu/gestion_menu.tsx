@@ -3,11 +3,11 @@ import { View, Text, FlatList, ActivityIndicator, Button, StyleSheet , Touchable
 import { getDocs, collection } from 'firebase/firestore';
 import { db } from '@/app/firebase/firebaseConfig';
 import { Plat, get_plats, ajout_plat } from '@/app/firebase/firebaseMenu';
-import RestaurantStorage from '../../asyncstorage/restaurantStorage';
+import { useRestaurant } from '../../contexts/RestaurantContext';
 
 
 export default function Menu() {
-  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  const { restaurantId: CurrentRestaurantId } = useRestaurant();
   const [plats, setPlats] = useState<Plat[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,18 +18,8 @@ export default function Menu() {
     price: '',
     });
 
-    // Charger l'ID du restaurant depuis AsyncStorage
-    useEffect(() => {
-      const loadRestaurantId = async () => {
-        try {
-          const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-          setCurrentRestaurantId(savedId);
-        } catch (error) {
-          console.error('Erreur chargement restaurant ID:', error);
-        }
-      };
-      loadRestaurantId();
-    }, []);
+    // Le restaurant ID est maintenant géré par le contexte
+    // Plus besoin de charger depuis AsyncStorage
 
 
   const fetchPlats = async () => {

@@ -7,6 +7,7 @@ import { getAuth } from 'firebase/auth';
 import Reglage from '@/app/components/reglage';
 import { router } from 'expo-router';
 import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 
 export interface PlatProps {
@@ -16,19 +17,7 @@ export interface PlatProps {
 
 export const PlatItem = ({ plat, onPress }: PlatProps) => {
   const [isMission, setIsMission] = useState(false);
-  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
-  // État pour l'ID du restaurant courant
-  useEffect(() => {
-    const loadRestaurantId = async () => {
-      try {
-        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-        setCurrentRestaurantId(savedId);
-      } catch (error) {
-        console.error('Erreur chargement restaurant ID:', error);
-      }
-    };
-    loadRestaurantId();
-  }, []);
+  const { restaurantId: CurrentRestaurantId } = useRestaurant();
 
   // Vérification si le plat est une mission
   useEffect(() => {

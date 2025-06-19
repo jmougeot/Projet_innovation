@@ -6,6 +6,7 @@ import { addStock } from '@/app/firebase/firebaseStock';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 interface StockItem {
     id: string;
@@ -17,24 +18,11 @@ interface StockItem {
 }
 
 export default function Stock() {
-    const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+    const { restaurantId: CurrentRestaurantId } = useRestaurant();
     const [stockItems, setStockItems] = useState<StockItem[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [newItem, setNewItem] = useState({name: '',quantity: '', price: '',unit: ''});
     const [fontsLoaded] = useFonts({'AlexBrush': require('@/assets/fonts/AlexBrush-Regular.ttf'),});
-
-    // Load the current restaurant ID from AsyncStorage
-    useEffect(() => {
-        const loadRestaurantId = async () => {
-            try {
-                const savedId = await restaurantStorage.GetSelectedRestaurantId();
-                setCurrentRestaurantId(savedId);
-            } catch (error) {
-                console.error('Erreur chargement restaurant ID:', error);
-            }
-        };
-        loadRestaurantId();
-    }, []);
 
     useEffect(() => {
         if (CurrentRestaurantId) {

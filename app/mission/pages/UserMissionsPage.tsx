@@ -12,7 +12,7 @@ import {
 import { router } from 'expo-router';
 import { getUserMissions, getMission } from '../../firebase/firebaseMissionOptimized';
 import { auth } from '../../firebase/firebaseConfig';
-import RestaurantStorage from '../../asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 import { Mission } from '../types';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -37,24 +37,11 @@ const UserMissionsPage = () => {
   // Tous les hooks au début
   const [activeMissions, setActiveMissions] = useState<UserMissionWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  const { restaurantId: currentRestaurantId } = useRestaurant();
   
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
-
-  // Charger l'ID du restaurant depuis AsyncStorage
-  useEffect(() => {
-    const loadRestaurantId = async () => {
-      try {
-        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-        setCurrentRestaurantId(savedId);
-      } catch (error) {
-        console.error('Erreur chargement restaurant ID:', error);
-      }
-    };
-    loadRestaurantId();
-  }, []);
 
   // Variables dérivées après tous les hooks
   const currentUser = auth.currentUser;

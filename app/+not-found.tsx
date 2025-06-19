@@ -110,13 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    boxShadow: '0px 2px 3.84px rgba(0,0,0,0.25)',
     elevation: 15,
   },
   errorCode: {
@@ -125,9 +119,7 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     marginBottom: 10,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 2, height: 2 },
-    textShadowRadius: 5,
+    boxShadow: '2px 2px 5px rgba(0,0,0,0.3)',
   },
   errorTitle: {
     fontSize: 24,
@@ -135,9 +127,7 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     marginBottom: 15,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
+    boxShadow: '1px 1px 3px rgba(0,0,0,0.3)',
   },
   errorMessage: {
     fontSize: 16,
@@ -158,13 +148,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    boxShadow: '0px 2px 3.84px rgba(0,0,0,0.25)',
     elevation: 8,
   },
   logo: {
@@ -176,10 +160,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: 'AlexBrush',
     color: 'white',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 3,
   },
   actionSection: {
     width: '100%',
@@ -190,13 +170,7 @@ const styles = StyleSheet.create({
     width: '85%',
     height: 55,
     borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    boxShadow: '0px 2px 3.84px rgba(0, 0, 0, 0.25)',
     elevation: 10,
   },
   buttonGradient: {

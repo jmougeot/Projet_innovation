@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
 import Reglage from '@/app/components/reglage';
 import { getCuisineServiceMenuItems } from '../components/ServiceNavigation';
-import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 const Cuisine = () => {
   // Tous les hooks au début
@@ -13,20 +13,7 @@ const Cuisine = () => {
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
-  const [CurrentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
-
-  // Charger l'ID du restaurant depuis AsyncStorage
-  useEffect(() => {
-    const loadRestaurantId = async () => {
-      try {
-        const savedId = await restaurantStorage.GetSelectedRestaurantId();
-        setCurrentRestaurantId(savedId);
-      } catch (error) {
-        console.error('Erreur chargement restaurant ID:', error);
-      }
-    };
-    loadRestaurantId();
-  }, []);
+  const { restaurantId: CurrentRestaurantId } = useRestaurant();
 
   // Variables dérivées après tous les hooks
   const cuisineMenuItems = getCuisineServiceMenuItems();

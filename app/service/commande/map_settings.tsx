@@ -12,6 +12,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
 import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
 import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 // Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
 const TABLE_SIZE_RATIO = 0.08; // 8% de la taille du workspace
@@ -195,8 +196,6 @@ const DraggableTable: React.FC<DraggableTableProps> = ({
 // Composant principal MapSettings
 export default function MapSettings() {
   const router = useRouter();
-  const [CurrentRestaurantID, setCurrentRestaurantId] = useState<string | null>(null);
-  // État local pour les tables
   const [tables, setTables] = useState<Table[]>([]);
   const [originalTables, setOriginalTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,21 +222,7 @@ export default function MapSettings() {
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
-
-  // Chargement de l'ID du restaurant depuis le stockage local
-  useEffect(() => {
-    const loadRestaurantId = async () => {
-      try {
-        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-        if (savedId) {
-          setCurrentRestaurantId(savedId);
-        }
-      } catch (error) {
-        console.error('Erreur chargement restaurant ID:', error);
-      }
-    };
-    loadRestaurantId();
-  }, []);
+  const { restaurantId: CurrentRestaurantID } = useRestaurant();
 
   // Calculs et variables dérivées après tous les hooks
   const workspaceWidth = workspaceSize;
@@ -779,7 +764,7 @@ export default function MapSettings() {
             ))}
           </View>
           <Pressable style={styles.addRoomButton} onPress={() => setShowRoomModal(true)}>
-            <MaterialIcons name="add" size={20} color="#194A8D" />
+            <MaterialIcons name="add" size={20} color="#fff" />
           </Pressable>
           {rooms.length > 0 && (
             <Pressable 
