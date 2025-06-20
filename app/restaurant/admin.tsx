@@ -188,7 +188,7 @@ export default function RestaurantAdminPage() {
     <AutoRedirect 
       restaurantId={currentRestaurantId || undefined}
       requireRole="manager"
-      fallbackRoute="/restaurant"
+      fallbackRoute="/home"
       loadingMessage="Vérification des droits d'administration..."
     >
       <SafeAreaView style={styles.container}>

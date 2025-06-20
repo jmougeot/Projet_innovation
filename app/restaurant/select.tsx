@@ -29,9 +29,10 @@ import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Header from '@/app/components/Header';
-import { getMyRestaurants, getRestaurant, type Restaurant } from '@/app//firebase/firebaseRestaurant';
+import { getMyRestaurants, getRestaurant, type Restaurant } from '@/app/firebase/firebaseRestaurant';
+import { refreshCustomClaims } from '@/app/firebase/firebaseRestaurantAccess';
 import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
-import { signOut } from 'firebase/auth';
+import { signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/app//firebase/firebaseConfig';
 
 export default function RestaurantSelectPage() {
@@ -41,7 +42,7 @@ export default function RestaurantSelectPage() {
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState(auth.currentUser);
+  const [user, setUser] = useState<User | null>(null);
 
   // Variables calculées
   const isConnectedToRestaurant = !!currentRestaurant;
@@ -83,11 +84,12 @@ export default function RestaurantSelectPage() {
    * ⚡ Charger les restaurants via Custom Claims (ultra-rapide)
    */
   const loadUserRestaurantsWithClaims = async () => {
-    if (!user) return;
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
     
     try {
       setRestaurantsLoading(true);
-      console.log('⚡ Chargement restaurants via Custom Claims pour:', user.uid);
+      console.log('⚡ Chargement restaurants via Custom Claims pour:', currentUser.uid);
       
       // 1. Récupérer les IDs des restaurants via Custom Claims (0-50ms)
       const restaurantIds = await getMyRestaurants();
@@ -135,7 +137,7 @@ export default function RestaurantSelectPage() {
       console.log(`✅ Restaurant ${restaurant.name} sélectionné via Custom Claims`);
       
       // Rediriger vers la page principale du restaurant
-      router.replace('@/app/home' as any);
+      router.replace('../home' as any);
     } catch (error) {
       console.error('❌ Erreur sélection restaurant:', error);
       Alert.alert(
@@ -205,19 +207,65 @@ export default function RestaurantSelectPage() {
     );
   };
 
-  // Charger les données au démarrage
-  useEffect(() => {
-    const initData = async () => {
-      setIsLoading(true);
-      await loadCurrentRestaurant();
+  /**
+   * 🔄 Forcer le refresh des Custom Claims et recharger les restaurants
+   */
+  const handleRefreshRestaurants = async () => {
+    try {
+      setRestaurantsLoading(true);
+      console.log('🔄 Refresh des Custom Claims et rechargement des restaurants...');
+      
+      // 1. Forcer le refresh des Custom Claims
+      await refreshCustomClaims();
+      
+      // 2. Attendre un peu pour laisser le temps aux claims de se propager
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // 3. Recharger les restaurants avec les nouveaux claims
       await loadUserRestaurantsWithClaims();
-      setIsLoading(false);
-    };
-    
-    if (user) {
-      initData();
+      
+      Alert.alert(
+        '✅ Actualisation terminée', 
+        'Les restaurants ont été rechargés avec succès.'
+      );
+      
+    } catch (error) {
+      console.error('❌ Erreur refresh restaurants:', error);
+      Alert.alert(
+        '❌ Erreur', 
+        'Impossible d\'actualiser les restaurants. Vérifiez votre connexion.'
+      );
+    } finally {
+      setRestaurantsLoading(false);
     }
-  }, [user]);
+  };
+
+  // 🔥 NOUVEAU: Listener Firebase Auth stable (évite les boucles infinies)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      console.log('🔐 Auth state changed:', authUser?.uid || 'pas connecté');
+      setUser(authUser);
+      
+      if (authUser) {
+        // Utilisateur connecté - charger ses données
+        setIsLoading(true);
+        try {
+          await loadCurrentRestaurant();
+          await loadUserRestaurantsWithClaims();
+        } catch (error) {
+          console.error('❌ Erreur chargement données utilisateur:', error);
+        } finally {
+          setIsLoading(false);
+        }
+      } else {
+        // Utilisateur déconnecté - rediriger vers connexion
+        router.replace('/connexion' as any);
+      }
+    });
+
+    // Nettoyage du listener
+    return () => unsubscribe();
+  }, []); // ✅ Dépendances vides - pas de boucle infinie
 
   if (isLoading || restaurantsLoading) {
     return (
@@ -345,6 +393,27 @@ export default function RestaurantSelectPage() {
               </Pressable>
             ))
           )}
+        </View>
+
+        {/* Refresh Button */}
+        <View style={styles.refreshSection}>
+          <Pressable onPress={handleRefreshRestaurants} style={styles.refreshButton} disabled={restaurantsLoading}>
+            <LinearGradient
+              colors={restaurantsLoading ? ['#9E9E9E', '#757575'] : ['#FF9800', '#F57C00']}
+              style={styles.refreshButtonGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <MaterialIcons 
+                name={restaurantsLoading ? "hourglass-empty" : "refresh"} 
+                size={20} 
+                color="white" 
+              />
+              <Text style={styles.refreshButtonText}>
+                {restaurantsLoading ? 'Actualisation...' : 'Actualiser'}
+              </Text>
+            </LinearGradient>
+          </Pressable>
         </View>
 
         {/* Create Restaurant Button */}
@@ -593,6 +662,33 @@ const styles = StyleSheet.create({
   changeButtonText: {
     color: '#194A8D',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  // Styles pour le bouton refresh
+  refreshSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+  },
+  refreshButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  refreshButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  refreshButtonText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

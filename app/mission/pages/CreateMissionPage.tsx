@@ -16,7 +16,6 @@ import { createMission, assignMissionToUser, createCollectiveMission } from '../
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/firebaseConfig';
 import { get_plats, Plat } from '../../firebase/firebaseMenu';
-import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import type { Mission } from '../types';
 import { useRestaurant } from '@/app/contexts/RestaurantContext';
 

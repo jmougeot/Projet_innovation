@@ -1,50 +1,217 @@
-# Welcome to your Expo app 👋
+# 🍽️ Application de Gestion Restaurant
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application React Native/Expo pour la gestion complète d'un restaurant avec système de rôles et sécurité avancée.
 
-## Get started
+## 🚀 Démarrage Rapide
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### 1. Installation des dépendances
 
 ```bash
-npm run reset-project
+npm install
+cd functions && npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### 2. Configuration Firebase
 
-## Learn more
+```bash
+# Configurer le projet Firebase
+firebase login
+firebase use --add
 
-To learn more about developing your project with Expo, look at the following resources:
+# Démarrer les émulateurs (développement)
+firebase emulators:start
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+### 3. Lancement de l'application
 
-## Join the community
+```bash
+# Mode développement
+npx expo start
 
-Join our community of developers creating universal apps.
+# Mode web
+npx expo start --web
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+# Mode production
+npx expo start --no-dev --minify
+```
+
+## 🔐 Système de Sécurité
+
+### Authentification et Autorisation
+
+- **Firebase Authentication** : Authentification des utilisateurs
+- **Custom Claims** : Gestion des rôles par restaurant
+- **Firebase Functions** : Contrôle d'accès centralisé
+- **Firestore Rules** : Protection des données au niveau base
+
+### Hiérarchie des Rôles
+
+```
+🔴 Super-Admin
+├── Accès à tous les restaurants
+├── Peut créer des managers
+└── Peut déclencher des lockdowns
+
+🟠 Manager (par restaurant)
+├── Gestion des employés
+├── Accès complet aux données
+└── Lockdown d'urgence
+
+🟡 Chef
+├── Gestion cuisine et stock
+└── Mise à jour des commandes
+
+🟢 Serveur
+├── Gestion des commandes
+└── Encaissement
+
+🔵 Agent d'entretien
+├── Visualisation des missions
+└── Mise à jour du statut
+```
+
+### 📊 Collections de Données
+
+```
+restaurants/{id}
+├── userAccess/{userId}     # Accès utilisateurs
+├── orders/{orderId}        # Commandes
+├── menus/{menuId}          # Cartes et menus
+├── stock/{itemId}          # Gestion du stock
+├── missions/{missionId}    # Missions de nettoyage
+└── accounting/{docId}      # Comptabilité
+
+users/{userId}              # Profils utilisateurs
+audit-logs/{logId}          # Logs d'audit
+security-events/{eventId}   # Événements sécurité
+```
+
+## 🛠️ Scripts de Développement
+
+### Debugging et Tests
+
+```bash
+# Script de debugging général
+./debug-project.sh
+
+# Test des Firebase Functions
+./test-firebase-functions.sh
+
+# Test de sécurité complet
+./test-firebase-functions.sh security
+```
+
+### Déploiement
+
+```bash
+# Déploiement des functions
+./deployfunction.sh
+
+# Déploiement complet
+./deploy.sh
+```
+
+## 🏗️ Architecture
+
+### Frontend (React Native/Expo)
+- **App Router** : Navigation par fichiers
+- **Context API** : Gestion d'état globale (Restaurant)
+- **AsyncStorage** : Cache local
+- **Expo** : Plateforme de développement
+
+### Backend (Firebase)
+- **Functions** : API serverless sécurisée
+- **Firestore** : Base de données NoSQL
+- **Authentication** : Gestion des utilisateurs
+- **Hosting** : Hébergement web
+
+### Sécurité
+- **Custom Claims** : Rôles et permissions
+- **Firestore Rules** : Protection des données
+- **Audit Logs** : Traçabilité complète
+- **Emergency Lockdown** : Sécurité d'urgence
+
+## 📚 Documentation
+
+- **[SECURITY.md](./SECURITY.md)** : Documentation de sécurité complète
+- **[firestore.rules](./firestore.rules)** : Règles de sécurité Firestore
+- **[functions/src/index.ts](./functions/src/index.ts)** : API Functions commentée
+
+## 🚨 Procédures d'Urgence
+
+### Lockdown d'un Restaurant
+
+```javascript
+// Via l'interface manager ou directement
+emergencyLockdown({ restaurantId: 'restaurant-id' })
+```
+
+### Lever un Lockdown
+
+```javascript
+// Managers uniquement
+liftEmergencyLockdown({ restaurantId: 'restaurant-id' })
+```
+
+### Contact Sécurité
+
+- **Email** : security@restaurant-app.com
+- **Documentation** : [SECURITY.md](./SECURITY.md)
+
+## 🔧 Configuration
+
+### Variables d'Environnement
+
+```bash
+# functions/.env
+FIREBASE_PROJECT_ID=your-project-id
+ADMIN_EMAIL=admin@restaurant.com
+```
+
+### Expo Configuration
+
+```json
+// app.json
+{
+  "expo": {
+    "name": "Restaurant Manager",
+    "scheme": "restaurant-app"
+  }
+}
+```
+
+## 📱 Plateformes Supportées
+
+- ✅ **iOS** : Application native
+- ✅ **Android** : Application native  
+- ✅ **Web** : Progressive Web App
+- ✅ **Desktop** : Via navigateur
+
+## 🧪 Tests et Qualité
+
+```bash
+# Linting
+npm run lint
+
+# Tests unitaires
+npm test
+
+# Tests de sécurité
+./test-firebase-functions.sh all
+
+# Audit des dépendances
+npm audit
+```
+
+## 📈 Monitoring
+
+- **Firebase Analytics** : Métriques d'usage
+- **Crashlytics** : Rapports de crash
+- **Performance** : Monitoring des performances
+- **Security Events** : Alertes de sécurité
+
+---
+
+**Version** : 2.0  
+**Dernière mise à jour** : Décembre 2024  
+**Équipe** : DevTeam Restaurant

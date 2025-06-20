@@ -1,6 +1,18 @@
 import { httpsCallable, getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
-import { auth } from './firebaseConfig';
-import { Platform } from 'react-native';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  collectionGroup,
+  serverTimestamp,
+  Timestamp 
+} from 'firebase/firestore';
+import { auth, db } from './firebaseConfig';
 
 // =============== CONFIGURATION ===============
 
@@ -11,15 +23,32 @@ const functions: Functions = getFunctions();
 if (__DEV__) {
   // Connexion à l'émulateur Functions pour éviter les erreurs CORS
   connectFunctionsEmulator(functions, 'localhost', 5001);
-  console.log('🔧 Mode développement : Fonctions connectées à l\'émulateur local (localhost:5001)');
+  console.log('�� Mode développement : Fonctions connectées à l\'émulateur local (localhost:5001)');
 }
 
-// =============== INTERFACES ===============
+// =============== INTERFACES V2 (ARCHITECTURE SANS DUPLICATION) ===============
 
-interface RestaurantAccessData {
+interface RestaurantUserAccessV2 {
+  role: 'manager' | 'waiter' | 'chef' | 'cleaner';
+  grantedAt: number;
+  grantedBy: string;
+  expiresAt: number;
+  isActive: boolean;
+  permissions: string[];
+  lastActivity: number;
+  loginCount: number;
+  metadata?: {
+    ip?: string;
+    userAgent?: string;
+    geoLocation?: string;
+  };
+}
+
+interface RestaurantAccessDataV2 {
   restaurantId: string;
   role: 'manager' | 'waiter' | 'chef' | 'cleaner';
   expiresAt?: number;
+  targetUserId?: string; // Pour qu'un manager accorde l'accès à quelqu'un d'autre
 }
 
 interface RestaurantAccessResult {
@@ -29,108 +58,264 @@ interface RestaurantAccessResult {
   restaurantAccess?: { [key: string]: any };
   totalRestaurants?: number;
   details?: any;
+  architecture?: string; // Indique la version utilisée (v2-robust)
 }
 
-// =============== FONCTIONS PRINCIPALES ===============
+// =============== FONCTIONS PRINCIPALES V2 (FIRESTORE DIRECT) ===============
 
 /**
- * 🎯 Accorder l'accès restaurant à un utilisateur
- * @param restaurantId ID du restaurant
- * @param role Rôle à attribuer (manager, waiter, chef, cleaner)
- * @param expiresAt Timestamp d'expiration (optionnel, 7 jours par défaut)
+ * 🎯 V2 : Accorder l'accès restaurant à un utilisateur (sous-collection directe)
+ */
+export const grantRestaurantAccessV2 = async (
+  restaurantId: string, 
+  role: 'manager' | 'waiter' | 'chef' | 'cleaner',
+  expiresAt?: number,
+  targetUserId?: string
+): Promise<RestaurantAccessResult> => {
+  try {
+    console.log(`🎯 V2: Attribution accès ${role} pour restaurant ${restaurantId}`);
+    
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    const currentTime = Date.now();
+    const expirationTime = expiresAt || (currentTime + (7 * 24 * 60 * 60 * 1000));
+
+    // ✅ UNIQUEMENT la Firebase Function V2 qui gère tout (Firestore + Custom Claims)
+    const setRestaurantAccessV2Func = httpsCallable<RestaurantAccessDataV2, RestaurantAccessResult>(
+      functions, 
+      'setRestaurantAccessV2'
+    );
+    
+    const result = await setRestaurantAccessV2Func({
+      restaurantId,
+      role,
+      expiresAt: expirationTime,
+      targetUserId
+    });
+
+    console.log('✅ V2: Accès accordé et Custom Claims mis à jour via Functions');
+    return {
+      success: true,
+      message: 'Accès accordé avec succès',
+      expiresAt: expirationTime,
+      architecture: 'v2-functions-only',
+      details: result.data
+    };
+    
+  } catch (error: any) {
+    console.error('❌ V2: Erreur attribution accès:', error);
+    throw new Error(`Erreur attribution accès V2: ${error.message}`);
+  }
+};
+
+/**
+ * 🚫 V2 : Supprimer l'accès restaurant (sous-collection directe)
+ */
+export const revokeRestaurantAccessV2 = async (
+  restaurantId: string,
+  targetUserId?: string
+): Promise<RestaurantAccessResult> => {
+  try {
+    console.log(`🚫 V2: Suppression accès restaurant ${restaurantId}`);
+    
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    // ✅ UNIQUEMENT la Firebase Function V2 qui gère tout (Firestore + Custom Claims)
+    const removeRestaurantAccessV2Func = httpsCallable<{ restaurantId: string; targetUserId?: string }, RestaurantAccessResult>(
+      functions, 
+      'removeRestaurantAccessV2'
+    );
+    
+    const result = await removeRestaurantAccessV2Func({ 
+      restaurantId, 
+      targetUserId 
+    });
+
+    console.log('✅ V2: Accès supprimé et Custom Claims mis à jour via Functions');
+    return {
+      success: true,
+      message: 'Accès supprimé avec succès',
+      architecture: 'v2-functions-only',
+      details: result.data
+    };
+    
+  } catch (error: any) {
+    console.error('❌ V2: Erreur suppression accès:', error);
+    throw new Error(`Erreur suppression accès V2: ${error.message}`);
+  }
+};
+
+/**
+ * 📋 V2 : Obtenir tous les restaurants de l'utilisateur (Collection Group Query)
+ */
+export const getMyRestaurantAccessV2 = async (targetUserId?: string): Promise<RestaurantAccessResult> => {
+  try {
+    console.log('📋 V2: Récupération des restaurants via Collection Group');
+    
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    const userId = targetUserId || auth.currentUser.uid;
+    const currentTime = Date.now();
+
+    // Collection Group Query : chercher dans toutes les sous-collections userAccess
+    const userAccessQuery = query(collectionGroup(db, 'userAccess'),where('__name__', '==', userId));
+
+    const querySnapshot = await getDocs(userAccessQuery);
+    const restaurantAccess: { [key: string]: any } = {};
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      // Extraire l'ID du restaurant du chemin du document
+      const restaurantId = doc.ref.parent.parent?.id;
+      
+      if (restaurantId && data.isActive && (!data.expiresAt || data.expiresAt > currentTime)) {
+        restaurantAccess[restaurantId] = data;
+      }
+    });
+
+    console.log('✅ V2: Restaurants récupérés via Collection Group');
+    return {
+      success: true,
+      message: 'Restaurants récupérés avec succès',
+      restaurantAccess,
+      totalRestaurants: Object.keys(restaurantAccess).length,
+      architecture: 'v2-collectiongroup'
+    };
+    
+  } catch (error: any) {
+    console.error('❌ V2: Erreur récupération restaurants:', error);
+    throw new Error(`Erreur récupération restaurants V2: ${error.message}`);
+  }
+};
+
+/**
+ * 👥 V2 : Obtenir tous les utilisateurs d'un restaurant (sous-collection directe)
+ */
+export const getRestaurantUsersV2 = async (
+  restaurantId: string,
+  includeInactive = false
+): Promise<RestaurantAccessResult> => {
+  try {
+    console.log(`👥 V2: Récupération utilisateurs restaurant ${restaurantId}`);
+    
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    // Récupérer tous les documents de la sous-collection userAccess
+    const userAccessRef = collection(db, 'restaurants', restaurantId, 'userAccess');
+    const querySnapshot = await getDocs(userAccessRef);
+    
+    const users: { [key: string]: any } = {};
+    const currentTime = Date.now();
+
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      const userId = doc.id;
+      
+      // Filtrer selon les critères
+      const isExpired = data.expiresAt && data.expiresAt < currentTime;
+      const shouldInclude = includeInactive || (data.isActive && !isExpired);
+      
+      if (shouldInclude) {
+        users[userId] = {
+          ...data,
+          userId
+        };
+      }
+    });
+
+    console.log('✅ V2: Utilisateurs récupérés de la sous-collection');
+    return {
+      success: true,
+      message: 'Utilisateurs récupérés avec succès',
+      details: users,
+      totalRestaurants: Object.keys(users).length,
+      architecture: 'v2-subcollection'
+    };
+    
+  } catch (error: any) {
+    console.error('❌ V2: Erreur récupération utilisateurs:', error);
+    throw new Error(`Erreur récupération utilisateurs V2: ${error.message}`);
+  }
+};
+
+/**
+ * 🎯 V2 : Créer le premier manager d'un restaurant (bootstrap)
+ */
+export const bootstrapRestaurantManagerV2 = async (
+  restaurantId: string,
+  ownerEmail?: string
+): Promise<RestaurantAccessResult> => {
+  try {
+    console.log(`🎯 V2: Création premier manager pour restaurant ${restaurantId}`);
+    
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    // ✅ Appeler la Firebase Function V2 pour créer le premier manager
+    const bootstrapFunc = httpsCallable<{ restaurantId: string; ownerEmail?: string }, RestaurantAccessResult>(
+      functions, 
+      'bootstrapRestaurantManagerV2'
+    );
+    
+    const result = await bootstrapFunc({
+      restaurantId,
+      ownerEmail
+    });
+
+    console.log('✅ V2: Premier manager créé via Functions');
+    return {
+      success: true,
+      message: 'Premier manager créé avec succès',
+      architecture: 'v2-bootstrap',
+      details: result.data
+    };
+    
+  } catch (error: any) {
+    console.error('❌ V2: Erreur création premier manager:', error);
+    throw new Error(`Erreur création premier manager V2: ${error.message}`);
+  }
+};
+
+// =============== FONCTIONS LEGACY (COMPATIBILITÉ) ===============
+
+/**
+ * 🎯 LEGACY : Accorder l'accès restaurant (garde la compatibilité V1)
  */
 export const grantRestaurantAccess = async (
   restaurantId: string, 
   role: 'manager' | 'waiter' | 'chef' | 'cleaner',
   expiresAt?: number
 ): Promise<RestaurantAccessResult> => {
-  try {
-    console.log(`🎯 Attribution accès ${role} pour restaurant ${restaurantId}`);
-    
-    // Vérifier que l'utilisateur est connecté
-    if (!auth.currentUser) {
-      throw new Error('Utilisateur non connecté');
-    }
-
-    // Appeler la Firebase Function
-    const setRestaurantAccess = httpsCallable<RestaurantAccessData, RestaurantAccessResult>(
-      functions, 
-      'setRestaurantAccess'
-    );
-    
-    const result = await setRestaurantAccess({
-      restaurantId,
-      role,
-      expiresAt: expiresAt || Date.now() + (7 * 24 * 60 * 60 * 1000) // 7 jours par défaut
-    });
-
-    console.log('✅ Accès accordé:', result.data);
-    return result.data;
-    
-  } catch (error: any) {
-    console.error('❌ Erreur attribution accès:', error);
-    throw new Error(`Erreur attribution accès: ${error.message}`);
-  }
+  return grantRestaurantAccessV2(restaurantId, role, expiresAt);
 };
 
 /**
- * 🚫 Supprimer l'accès restaurant pour l'utilisateur connecté
- * @param restaurantId ID du restaurant
+ * 🚫 LEGACY : Supprimer l'accès restaurant (garde la compatibilité V1)
  */
 export const revokeRestaurantAccess = async (restaurantId: string): Promise<RestaurantAccessResult> => {
-  try {
-    console.log(`🚫 Suppression accès restaurant ${restaurantId}`);
-    
-    if (!auth.currentUser) {
-      throw new Error('Utilisateur non connecté');
-    }
-
-    const removeRestaurantAccess = httpsCallable<{ restaurantId: string }, RestaurantAccessResult>(
-      functions, 
-      'removeRestaurantAccess'
-    );
-    
-    const result = await removeRestaurantAccess({ restaurantId });
-
-    console.log('✅ Accès supprimé:', result.data);
-    return result.data;
-    
-  } catch (error: any) {
-    console.error('❌ Erreur suppression accès:', error);
-    throw new Error(`Erreur suppression accès: ${error.message}`);
-  }
+  return revokeRestaurantAccessV2(restaurantId);
 };
 
 /**
- * 📋 Obtenir tous les accès restaurant de l'utilisateur connecté
+ * 📋 LEGACY : Obtenir tous les accès restaurant (garde la compatibilité V1)
  */
 export const getMyRestaurantAccess = async (): Promise<RestaurantAccessResult> => {
-  try {
-    console.log('📋 Récupération des accès restaurant');
-    
-    if (!auth.currentUser) {
-      throw new Error('Utilisateur non connecté');
-    }
-
-    const getUserRestaurantAccess = httpsCallable<{}, RestaurantAccessResult>(
-      functions, 
-      'getUserRestaurantAccess'
-    );
-    
-    const result = await getUserRestaurantAccess();
-
-    console.log('✅ Accès récupérés:', result.data);
-    return result.data;
-    
-  } catch (error: any) {
-    console.error('❌ Erreur récupération accès:', error);
-    throw new Error(`Erreur récupération accès: ${error.message}`);
-  }
+  return getMyRestaurantAccessV2();
 };
+
+// =============== FONCTIONS CRITIQUES (FIREBASE FUNCTIONS) ===============
 
 /**
  * 🚨 Verrouillage d'urgence d'un restaurant
- * @param restaurantId ID du restaurant à verrouiller
  */
 export const lockdownRestaurant = async (restaurantId: string): Promise<RestaurantAccessResult> => {
   try {
@@ -158,7 +343,6 @@ export const lockdownRestaurant = async (restaurantId: string): Promise<Restaura
 
 /**
  * 🔓 Lever le verrouillage d'urgence d'un restaurant
- * @param restaurantId ID du restaurant à débloquer
  */
 export const unlockRestaurant = async (restaurantId: string): Promise<RestaurantAccessResult> => {
   try {
@@ -186,7 +370,6 @@ export const unlockRestaurant = async (restaurantId: string): Promise<Restaurant
 
 /**
  * 🔍 Debug des permissions utilisateur (développement)
- * @param targetUserId ID utilisateur à déboguer (optionnel)
  */
 export const debugUserPermissions = async (targetUserId?: string): Promise<RestaurantAccessResult> => {
   try {
@@ -216,7 +399,6 @@ export const debugUserPermissions = async (targetUserId?: string): Promise<Resta
 
 /**
  * ⚡ RAPIDE : Lire les Custom Claims depuis le token (0-50ms)
- * Alternative ultra-rapide aux Firebase Functions
  */
 const getCustomClaimsFromToken = async (): Promise<any> => {
   try {
@@ -224,10 +406,7 @@ const getCustomClaimsFromToken = async (): Promise<any> => {
       return null;
     }
 
-    // Récupérer le token JWT (cache local si récent)
     const token = await auth.currentUser.getIdToken();
-    
-    // Décoder la partie payload du JWT (opération locale)
     const payload = JSON.parse(atob(token.split('.')[1]));
     
     return payload;
@@ -238,16 +417,13 @@ const getCustomClaimsFromToken = async (): Promise<any> => {
 };
 
 /**
- * ⚡ RAPIDE : Vérifier si l'utilisateur a un rôle spécifique (0-50ms au lieu de 500-8000ms)
- * @param restaurantId ID du restaurant
- * @param requiredRole Rôle requis
+ * ⚡ RAPIDE : Vérifier si l'utilisateur a un rôle spécifique
  */
 export const hasRestaurantRole = async (
   restaurantId: string, 
   requiredRole: 'manager' | 'waiter' | 'chef' | 'cleaner'
 ): Promise<boolean> => {
   try {
-    // ✅ RAPIDE : Lire Custom Claims au lieu d'appeler Firebase Functions
     const claims = await getCustomClaimsFromToken();
     const restaurantAccess = claims?.restaurantAccess?.[restaurantId];
     
@@ -255,7 +431,6 @@ export const hasRestaurantRole = async (
       return false;
     }
 
-    // Vérifier l'expiration
     const now = Date.now();
     if (restaurantAccess.expiresAt && restaurantAccess.expiresAt < now) {
       console.log('⏰ Accès expiré pour', restaurantId);
@@ -273,33 +448,37 @@ export const hasRestaurantRole = async (
 };
 
 /**
- * ⚡ RAPIDE : Obtenir la liste des restaurants accessibles depuis Custom Claims
+ * ⚡ V2 : Obtenir la liste des restaurants accessibles depuis Custom Claims
  */
-export const getAccessibleRestaurants = async (): Promise<string[]> => {
+export const getAccessibleRestaurantsV2 = async (): Promise<string[]> => {
   try {
-    // ✅ RAPIDE : Lire Custom Claims au lieu d'appeler Firebase Functions
     const claims = await getCustomClaimsFromToken();
     const restaurantAccess = claims?.restaurantAccess || {};
     
-    // Filtrer les restaurants non expirés
     const now = Date.now();
     const restaurants = Object.keys(restaurantAccess).filter(restaurantId => {
       const access = restaurantAccess[restaurantId];
       return !access.expiresAt || access.expiresAt > now;
     });
     
-    console.log(`⚡ Custom Claims: ${restaurants.length} restaurants accessibles:`, restaurants);
+    console.log(`⚡ V2: Custom Claims: ${restaurants.length} restaurants accessibles:`, restaurants);
     return restaurants;
     
   } catch (error) {
-    console.error('❌ Erreur liste restaurants (Custom Claims):', error);
+    console.error('❌ V2: Erreur liste restaurants (Custom Claims):', error);
     return [];
   }
 };
 
 /**
+ * ⚡ LEGACY : Obtenir la liste des restaurants accessibles
+ */
+export const getAccessibleRestaurants = async (): Promise<string[]> => {
+  return getAccessibleRestaurantsV2();
+};
+
+/**
  * ⚡ RAPIDE : Vérifier si l'utilisateur est manager d'un restaurant
- * @param restaurantId ID du restaurant
  */
 export const isRestaurantManager = async (restaurantId: string): Promise<boolean> => {
   return await hasRestaurantRole(restaurantId, 'manager');
@@ -307,7 +486,6 @@ export const isRestaurantManager = async (restaurantId: string): Promise<boolean
 
 /**
  * ⚡ RAPIDE : Obtenir le rôle de l'utilisateur dans un restaurant
- * @param restaurantId ID du restaurant
  */
 export const getRestaurantRole = async (restaurantId: string): Promise<string | null> => {
   try {
@@ -318,7 +496,6 @@ export const getRestaurantRole = async (restaurantId: string): Promise<string | 
       return null;
     }
 
-    // Vérifier l'expiration
     const now = Date.now();
     if (restaurantAccess.expiresAt && restaurantAccess.expiresAt < now) {
       return null;
@@ -332,8 +509,7 @@ export const getRestaurantRole = async (restaurantId: string): Promise<string | 
 };
 
 /**
- * ⚡ RAPIDE : Vérifier l'accès simple à un restaurant (lecture seule)
- * @param restaurantId ID du restaurant
+ * ⚡ RAPIDE : Vérifier l'accès simple à un restaurant
  */
 export const canAccessRestaurant = async (restaurantId: string): Promise<boolean> => {
   try {
@@ -344,7 +520,6 @@ export const canAccessRestaurant = async (restaurantId: string): Promise<boolean
       return false;
     }
 
-    // Vérifier l'expiration
     const now = Date.now();
     if (restaurantAccess.expiresAt && restaurantAccess.expiresAt < now) {
       return false;
@@ -358,61 +533,113 @@ export const canAccessRestaurant = async (restaurantId: string): Promise<boolean
 };
 
 /**
- * 📊 HYBRIDE : Obtenir tous les accès avec fallback Firebase Functions
- * Utilise Custom Claims d'abord (rapide), puis Functions si nécessaire (sécurisé)
+ * 📊 V2 : Obtenir tous les accès avec méthode optimisée
  */
-export const getMyRestaurantAccessOptimized = async (): Promise<{
-  source: 'customClaims' | 'functions';
+export const getMyRestaurantAccessOptimizedV2 = async (): Promise<{
+  source: 'v2-functions' | 'customClaims';
   data: RestaurantAccessResult;
 }> => {
   try {
     // 1. ⚡ Essayer Custom Claims d'abord (rapide)
     const claims = await getCustomClaimsFromToken();
     if (claims?.restaurantAccess) {
-      console.log('⚡ Utilisation Custom Claims (rapide)');
+      console.log('⚡ V2: Utilisation Custom Claims (rapide)');
       return {
         source: 'customClaims',
         data: {
           success: true,
           message: 'Accès récupérés via Custom Claims',
           restaurantAccess: claims.restaurantAccess,
-          totalRestaurants: Object.keys(claims.restaurantAccess).length
+          totalRestaurants: Object.keys(claims.restaurantAccess).length,
+          architecture: 'v2-customclaims'
         }
       };
     }
 
-    // 2. 🐌 Fallback vers Firebase Functions (lent mais sûr)
-    console.log('🐌 Fallback vers Firebase Functions (lent)');
-    const functionResult = await getMyRestaurantAccess();
+    // 2. 📋 Utiliser les nouvelles Functions V2 (Collection Group Query)
+    console.log('📋 V2: Utilisation Functions V2 (Collection Group)');
+    const functionResult = await getMyRestaurantAccessV2();
     return {
-      source: 'functions',
+      source: 'v2-functions',
       data: functionResult
     };
 
   } catch (error) {
-    console.error('❌ Erreur récupération accès optimisée:', error);
+    console.error('❌ V2: Erreur récupération accès optimisée:', error);
     throw error;
+  }
+};
+
+
+/**
+ * 🔄 Forcer le refresh des Custom Claims côté client
+ */
+export const refreshCustomClaims = async (): Promise<any> => {
+  try {
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    console.log('🔄 Refresh des Custom Claims...');
+    
+    // Forcer le refresh du token
+    await auth.currentUser.getIdToken(true);
+    
+    // Récupérer les nouveaux claims
+    const tokenResult = await auth.currentUser.getIdTokenResult();
+    
+    console.log('✅ Custom Claims refreshés:', tokenResult.claims);
+    return tokenResult.claims;
+    
+  } catch (error) {
+    console.error('❌ Erreur refresh Custom Claims:', error);
+    throw error;
+  }
+};
+
+/**
+ * 🔍 Vérifier les Custom Claims actuels
+ */
+export const getCurrentCustomClaims = async (): Promise<any> => {
+  try {
+    if (!auth.currentUser) {
+      return null;
+    }
+
+    const tokenResult = await auth.currentUser.getIdTokenResult();
+    return tokenResult.claims;
+    
+  } catch (error) {
+    console.error('❌ Erreur récupération Custom Claims:', error);
+    return null;
   }
 };
 
 // =============== EXPORT DEFAULT ===============
 
 export default {
-  // 🐌 ACTIONS CRITIQUES : Firebase Functions (sécurisées mais lentes)
+  // 🎯 V2 FUNCTIONS : Architecture robuste (recommandées)
+  grantRestaurantAccessV2,
+  revokeRestaurantAccessV2,
+  getMyRestaurantAccessV2,
+  getRestaurantUsersV2,
+  getAccessibleRestaurantsV2,
+  getMyRestaurantAccessOptimizedV2,
+
+  // 🔄 LEGACY FUNCTIONS : Garde la compatibilité (délèguent vers V2)
   grantRestaurantAccess,
   revokeRestaurantAccess,
-  getMyRestaurantAccess, // Original - utilise Functions
+  getMyRestaurantAccess,
+  getAccessibleRestaurants,
+  
+  // 🔥 ACTIONS CRITIQUES : Firebase Functions (sécurisées)
   lockdownRestaurant,
   unlockRestaurant,
   debugUserPermissions,
   
   // ⚡ VÉRIFICATIONS RAPIDES : Custom Claims (rapides)
-  hasRestaurantRole,           // ⚡ 0-50ms au lieu de 500-8000ms
-  getAccessibleRestaurants,    // ⚡ 0-50ms au lieu de 500-8000ms
-  isRestaurantManager,         // ⚡ 0-50ms au lieu de 500-8000ms
-  getRestaurantRole,           // ⚡ 0-50ms - nouveau
-  canAccessRestaurant,         // ⚡ 0-50ms - nouveau
-  
-  // 🚀 HYBRIDE : Optimisé avec fallback
-  getMyRestaurantAccessOptimized, // ⚡ Custom Claims + fallback Functions
+  hasRestaurantRole,
+  isRestaurantManager,
+  getRestaurantRole,
+  canAccessRestaurant,
 };

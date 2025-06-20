@@ -5,7 +5,7 @@ import { useFonts } from 'expo-font';
 import { MaterialIcons } from '@expo/vector-icons';
 import Reglage from './components/reglage';
 import Head from './components/Head';
-import RestaurantStatus from './restaurant/components/RestaurantStatus';
+import AutoRedirect from './restaurant/AutoRedirect';
 
 export default function Home() {
   const router = useRouter();
@@ -18,9 +18,14 @@ export default function Home() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <AutoRedirect 
+      requireAnyAccess={true}
+      loadingMessage="Vérification de l'accès au restaurant..."
+      fallbackRoute="/restaurant/select"
+    >
+      <SafeAreaView style={styles.container}>
 
-      <Reglage position={{ top: 5, right: 15 }}/>
+      <Reglage position={{ top: 0, right: 0 }} />
 
       <Head title="Le Challenge " />
 
@@ -179,6 +184,18 @@ export default function Home() {
                 Gestion des utilisateurs
               </Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('./restaurant/admin')}
+            >
+              <MaterialIcons name="inventory" size={40} color="#194A8D" />
+              <Text style={styles.cardTitle}>Admin Restaurant</Text>
+              <Text style={styles.cardDescription}>
+                Gerer mon restaurant
+              </Text>
+            </TouchableOpacity>
+
           </View>
         </View>
       </ScrollView>
@@ -187,6 +204,7 @@ export default function Home() {
         <Text style={styles.footerText}>© Le Challenge</Text>
       </View>
     </SafeAreaView>
+    </AutoRedirect>
   );
 }
 
@@ -346,5 +364,29 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: '#D32F2F',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingTop: 5,
+    paddingBottom: 10,
+  },
+  restaurantSelectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#CAE1EF',
+  },
+  restaurantSelectText: {
+    color: '#194A8D',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
   },
 });

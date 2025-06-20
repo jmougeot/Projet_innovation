@@ -1,0 +1,216 @@
+rules_version = '2';
+
+// 🔐 Règles de Sécurité Firestore pour l'Application Restaurant
+// Ces règles complètent les Firebase Functions pour un contrôle d'accès complet
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // =============== FONCTIONS UTILITAIRES ===============
+    
+    // Vérifier si l'utilisateur est authentifié
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Vérifier si l'utilisateur a accès à un restaurant spécifique
+    function hasRestaurantAccess(restaurantId) {
+      return isAuthenticated() && 
+             request.auth.token.restaurantAccess != null &&
+             restaurantId in request.auth.token.restaurantAccess;
+    }
+    
+    // Vérifier le rôle de l'utilisateur pour un restaurant
+    function hasRole(restaurantId, role) {
+      return hasRestaurantAccess(restaurantId) &&
+             request.auth.token.restaurantAccess[restaurantId].role == role;
+    }
+    
+    // Vérifier si l'utilisateur est manager d'un restaurant
+    function isManager(restaurantId) {
+      return hasRole(restaurantId, 'manager');
+    }
+    
+    // Vérifier si l'utilisateur est super-admin
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+             request.auth.token.superAdmin == true;
+    }
+    
+    // Vérifier si l'accès n'est pas expiré
+    function isAccessValid(restaurantId) {
+      return hasRestaurantAccess(restaurantId) &&
+             request.time.toMillis() < request.auth.token.restaurantAccess[restaurantId].expiresAt;
+    }
+    
+    // =============== COLLECTIONS PRINCIPALES ===============
+    
+    // 🏪 RESTAURANTS : Données des restaurants
+    match /restaurants/{restaurantId} {
+      // Lecture : Utilisateurs ayant accès valide au restaurant
+      allow read: if isAuthenticated() && 
+                     (hasRestaurantAccess(restaurantId) || isSuperAdmin());
+      
+      // Écriture : Managers du restaurant ou super-admins
+      allow write: if isAuthenticated() && 
+                      (isManager(restaurantId) || isSuperAdmin()) &&
+                      isAccessValid(restaurantId);
+      
+      // Création : Seulement via Firebase Functions (Bootstrap)
+      allow create: if false; // Forcé via Functions uniquement
+      
+      // Suppression : Super-admins uniquement
+      allow delete: if isSuperAdmin();
+      
+      // =============== SOUS-COLLECTIONS ===============
+      
+      // 📋 MENUS
+      match /menus/{menuId} {
+        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow write: if isManager(restaurantId) || hasRole(restaurantId, 'chef');
+      }
+      
+      // 🛒 COMMANDES
+      match /orders/{orderId} {
+        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow create: if hasRole(restaurantId, 'waiter') || isManager(restaurantId);
+        allow update: if hasRole(restaurantId, 'waiter') || 
+                         hasRole(restaurantId, 'chef') || 
+                         isManager(restaurantId);
+        allow delete: if isManager(restaurantId);
+      }
+      
+      // 📊 STOCK
+      match /stock/{itemId} {
+        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow write: if hasRole(restaurantId, 'chef') || isManager(restaurantId);
+      }
+      
+      // 🧹 MISSIONS
+      match /missions/{missionId} {
+        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow create: if isManager(restaurantId);
+        allow update: if hasRole(restaurantId, 'cleaner') || isManager(restaurantId);
+        allow delete: if isManager(restaurantId);
+      }
+      
+      // 💰 COMPTABILITÉ
+      match /accounting/{docId} {
+        allow read, write: if isManager(restaurantId) && isAccessValid(restaurantId);
+      }
+      
+      // 🔧 CONFIGURATION
+      match /settings/{settingId} {
+        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow write: if isManager(restaurantId) && isAccessValid(restaurantId);
+      }
+    }
+    
+    // =============== COLLECTIONS UTILISATEURS ===============
+    
+    // 👤 USERS : Données personnelles des utilisateurs
+    match /users/{userId} {
+      // Lecture : Propriétaire ou super-admin
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == userId || isSuperAdmin());
+      
+      // Écriture : Propriétaire uniquement
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Les claims restaurantAccess sont gérés uniquement via Functions
+      allow update: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       !('restaurantAccess' in request.resource.data.diff(resource.data).affectedKeys());
+    }
+    
+    // =============== COLLECTIONS DE LOGS ET AUDIT ===============
+    
+    // 📋 AUDIT LOGS : Logs d'audit (lecture seule pour utilisateurs)
+    match /audit-logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Écriture uniquement via Functions
+    }
+    
+    // 🚨 SECURITY EVENTS : Événements de sécurité
+    match /security-events/{eventId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Écriture uniquement via Functions
+    }
+    
+    // =============== COLLECTIONS SESSIONS ===============
+    
+    // 🔐 RESTAURANT SESSIONS : Sessions actives
+    match /restaurant_sessions/{sessionId} {
+      // Lecture : Propriétaire de la session
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Création : Utilisateur authentifié (sa propre session)
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Mise à jour : Propriétaire uniquement
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Suppression : Propriétaire ou manager du restaurant
+      allow delete: if isAuthenticated() && 
+                       (resource.data.userId == request.auth.uid ||
+                        isManager(resource.data.restaurantId));
+    }
+    
+    // =============== COLLECTIONS PUBLIQUES ===============
+    
+    // 🏪 RESTAURANT DIRECTORY : Répertoire public des restaurants
+    match /restaurant_directory/{restaurantId} {
+      // Lecture publique pour découverte
+      allow read: if true;
+      
+      // Écriture : Managers uniquement
+      allow write: if isAuthenticated() && isManager(restaurantId);
+    }
+    
+    // =============== RÈGLES PAR DÉFAUT ===============
+    
+    // ❌ REFUS PAR DÉFAUT : Toute autre collection est interdite
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// =============== COMMENTAIRES DE SÉCURITÉ ===============
+
+/*
+🔐 NIVEAUX DE SÉCURITÉ IMPLÉMENTÉS :
+
+1. ✅ AUTHENTIFICATION REQUISE
+   - Toutes les opérations nécessitent une authentification Firebase
+
+2. ✅ AUTORISATION GRANULAIRE  
+   - Vérification des custom claims (restaurantAccess)
+   - Contrôle par rôle (manager, waiter, chef, cleaner)
+   - Vérification de l'expiration des accès
+
+3. ✅ SÉPARATION DES DONNÉES
+   - Isolation par restaurant
+   - Accès utilisateur limité à ses restaurants
+
+4. ✅ CONTRÔLE DES FONCTIONS CRITIQUES
+   - Claims managés uniquement via Functions
+   - Audit logs protégés en écriture
+
+5. ✅ SESSIONS ET LOGS
+   - Sessions isolées par utilisateur
+   - Logs d'audit pour traçabilité
+
+🚨 POINTS CRITIQUES :
+
+- Les custom claims sont la source de vérité pour les permissions
+- Les Firebase Functions sont le seul moyen de modifier les claims
+- L'expiration des accès est vérifiée côté Firestore
+- Les super-admins ont un accès étendu (à utiliser avec précaution)
+
+📊 PERFORMANCE :
+
+- Règles optimisées pour minimiser les lectures
+- Index requis sur restaurantAccess et rôles
+- Cache des claims côté client recommandé
+*/

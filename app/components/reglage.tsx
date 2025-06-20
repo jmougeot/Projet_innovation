@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Image, Platform, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase/firebaseConfig';
 
 interface MenuItem {
   label: string;
@@ -27,7 +29,78 @@ export default function Reglage({
   position = { top: Platform.OS === 'ios' ? 50 : 15, right: 15 }
 }: ReglageProps) {
   const [menuVisible, setMenuVisible] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
   const router = useRouter();
+
+  // Alternative: Modal de confirmation custom pour le web
+  const showCustomConfirmModal = (action: () => void) => {
+    setConfirmAction(() => action);
+    setConfirmModalVisible(true);
+  };
+
+  // Fonction d'alerte compatible web/mobile
+  const showAlert = (title: string, message: string, buttons: Array<{text: string, onPress?: () => void, style?: 'cancel' | 'destructive' | 'default'}>) => {
+    if (Platform.OS === 'web') {
+      // Essayer d'abord confirm() natif, puis fallback modal custom
+      console.log('🔔 [Web] Affichage alerte:', title, message);
+      const confirmMessage = `${title}\n\n${message}`;
+      
+      try {
+        const result = window.confirm(confirmMessage);
+        console.log('🔔 [Web] Résultat alerte:', result);
+        
+        if (result) {
+          // Trouver le bouton de confirmation (pas "Annuler")
+          const confirmButton = buttons.find(btn => btn.style !== 'cancel' && btn.onPress);
+          if (confirmButton?.onPress) {
+            console.log('🔔 [Web] Exécution action confirmation');
+            confirmButton.onPress();
+          }
+        }
+      } catch (error) {
+        console.error('❌ [Web] Erreur alerte, utilisation modal custom:', error);
+        // Fallback: utiliser modal custom
+        const confirmButton = buttons.find(btn => btn.style !== 'cancel' && btn.onPress);
+        if (confirmButton?.onPress) {
+          showCustomConfirmModal(confirmButton.onPress);
+        }
+      }
+    } else {
+      // Pour mobile, utiliser Alert natif
+      Alert.alert(title, message, buttons);
+    }
+  };
+
+  // Fonction de déconnexion Firebase
+  const handleLogout = () => {
+    setMenuVisible(false);
+    showAlert(
+      'Déconnexion',
+      'Voulez-vous vraiment vous déconnecter ?',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Déconnexion',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut(auth);
+              console.log('✅ Déconnexion Firebase réussie');
+              router.replace('/connexion' as any);
+            } catch (error) {
+              console.error('❌ Erreur déconnexion:', error);
+              if (Platform.OS === 'web') {
+                window.alert('Erreur: Impossible de se déconnecter');
+              } else {
+                Alert.alert('Erreur', 'Impossible de se déconnecter');
+              }
+            }
+          }
+        }
+      ]
+    );
+  };
 
   // Default menu items if none provided
   const defaultMenuItems: MenuItem[] = [
@@ -39,18 +112,15 @@ export default function Reglage({
       }
     },
     {
-      label: 'Paramètres',
+      label: 'Changer de restaurant',
       onPress: () => {
         setMenuVisible(false);
-        // Default settings action
+        router.push('/restaurant/select' as any);
       }
     },
     {
       label: 'Déconnexion',
-      onPress: () => {
-        setMenuVisible(false);
-        // Default logout action
-      },
+      onPress: handleLogout,
       isLogout: true
     }
   ];
