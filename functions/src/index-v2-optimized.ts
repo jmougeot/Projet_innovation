@@ -21,7 +21,8 @@ interface RestaurantAccessData {
   restaurantId: string;
   role: 'manager' | 'waiter' | 'chef' | 'cleaner';
   expiresAt?: number;
-  targetUserId?: string;
+  targetUserId?: string; // Peut être un UID Firebase ou un email
+  targetUserEmail?: string; // NOUVEAU: email utilisateur (sera résolu en UID)
 }
 
 interface UserAccessRecord {
@@ -41,6 +42,26 @@ interface UserAccessRecord {
 }
 
 // =============== FONCTIONS UTILITAIRES ===============
+
+/**
+ * 🔍 Détecter si une chaîne est un email et la résoudre en UID
+ */
+async function resolveUserIdentifier(identifier: string): Promise<string> {
+  // Si c'est déjà un UID (format Firebase), le retourner tel quel
+  if (!identifier.includes('@')) {
+    return identifier;
+  }
+  
+  // Si c'est un email, résoudre vers UID
+  try {
+    const userRecord = await getAuth().getUserByEmail(identifier);
+    console.log(`✅ Email ${identifier} résolu vers UID ${userRecord.uid}`);
+    return userRecord.uid;
+  } catch (error) {
+    console.error(`❌ Impossible de résoudre l'email ${identifier}:`, error);
+    throw new HttpsError('not-found', `Aucun utilisateur trouvé pour l'email: ${identifier}`);
+  }
+}
 
 /**
  * 🎯 Obtenir les permissions selon le rôle
@@ -178,9 +199,20 @@ export const setRestaurantAccessV2 = onCall({
     throw new HttpsError('unauthenticated', 'Utilisateur non connecté');
   }
 
-  const { restaurantId, role, expiresAt, targetUserId }: RestaurantAccessData = request.data;
+  const { restaurantId, role, expiresAt, targetUserId, targetUserEmail }: RestaurantAccessData = request.data;
   const requesterId = request.auth.uid;
-  const userId = targetUserId || requesterId;
+  
+  // 🔍 Résoudre l'identifiant utilisateur (priorité: targetUserEmail > targetUserId > requesterId)
+  let userId: string;
+  if (targetUserEmail) {
+    console.log(`🔍 Résolution de l'email: ${targetUserEmail}`);
+    userId = await resolveUserIdentifier(targetUserEmail);
+  } else if (targetUserId) {
+    console.log(`🔍 Résolution de l'identifiant: ${targetUserId}`);
+    userId = await resolveUserIdentifier(targetUserId);
+  } else {
+    userId = requesterId;
+  }
 
   // Validation des paramètres
   if (!restaurantId || !role) {
@@ -192,7 +224,7 @@ export const setRestaurantAccessV2 = onCall({
   }
 
   // 🔐 Vérifications de sécurité
-  if (targetUserId && targetUserId !== requesterId) {
+  if ((targetUserId || targetUserEmail) && userId !== requesterId) {
     const requesterAccess = await checkUserRestaurantAccess(requesterId, restaurantId);
     if (!requesterAccess || requesterAccess.role !== 'manager') {
       throw new HttpsError('permission-denied', 'Seuls les managers peuvent accorder l\'accès à d\'autres utilisateurs');
@@ -308,16 +340,31 @@ export const removeRestaurantAccessV2 = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'Utilisateur non connecté');
   }
 
-  const { restaurantId, targetUserId }: { restaurantId: string; targetUserId?: string } = request.data;
+  const { restaurantId, targetUserId, targetUserEmail }: { 
+    restaurantId: string; 
+    targetUserId?: string; 
+    targetUserEmail?: string 
+  } = request.data;
   const requesterId = request.auth.uid;
-  const userId = targetUserId || requesterId;
+  
+  // 🔍 Résoudre l'identifiant utilisateur (priorité: targetUserEmail > targetUserId > requesterId)
+  let userId: string;
+  if (targetUserEmail) {
+    console.log(`🔍 Résolution de l'email pour suppression: ${targetUserEmail}`);
+    userId = await resolveUserIdentifier(targetUserEmail);
+  } else if (targetUserId) {
+    console.log(`🔍 Résolution de l'identifiant pour suppression: ${targetUserId}`);
+    userId = await resolveUserIdentifier(targetUserId);
+  } else {
+    userId = requesterId;
+  }
 
   if (!restaurantId) {
     throw new HttpsError('invalid-argument', 'restaurantId requis');
   }
 
   // Vérifications de sécurité
-  if (targetUserId && targetUserId !== requesterId) {
+  if ((targetUserId || targetUserEmail) && userId !== requesterId) {
     const requesterAccess = await checkUserRestaurantAccess(requesterId, restaurantId);
     if (!requesterAccess || requesterAccess.role !== 'manager') {
       throw new HttpsError('permission-denied', 'Seuls les managers peuvent supprimer l\'accès d\'autres utilisateurs');
@@ -605,12 +652,8 @@ export const bootstrapRestaurantManagerV2 = onCall({
     let targetUserId = request.auth.uid;
     
     if (ownerEmail) {
-      try {
-        const ownerRecord = await getAuth().getUserByEmail(ownerEmail);
-        targetUserId = ownerRecord.uid;
-      } catch {
-        throw new HttpsError('not-found', `Utilisateur avec email ${ownerEmail} introuvable`);
-      }
+      console.log(`🔍 Résolution de l'email propriétaire: ${ownerEmail}`);
+      targetUserId = await resolveUserIdentifier(ownerEmail);
     }
 
     // 4. Créer le premier manager via setRestaurantAccessV2

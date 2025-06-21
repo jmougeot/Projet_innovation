@@ -161,7 +161,6 @@ export const getUserData = async (userId: string): Promise<UserData | null> => {
       return { 
         id: userId, 
         email: userData?.email || '',
-        role: userData?.role || '',
         ...userData 
       } as UserData;
     }

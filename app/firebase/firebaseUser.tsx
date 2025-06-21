@@ -8,12 +8,22 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebaseConfig";
 import { User } from "firebase/auth";
+import { emailToDocId } from "./firebaseAuth";
+
+/**
+ * 📝 IMPORTANT: USER ID SYSTEM
+ * 
+ * Dans cette architecture V2:
+ * - L'ID du document utilisateur dans Firestore est basé sur l'email (converti via emailToDocId)
+ * - Les paramètres userId dans ce fichier peuvent être soit un email soit un ID de document déjà converti
+ * - Pour une nouvelle intégration, utilisez getUserByEmail() qui gère automatiquement la conversion
+ * - Les autres fonctions sont maintenues pour compatibilité mais peuvent nécessiter des ajustements
+ */
 
 // Interface for User data
 export interface UserData {
   id: string;
   email: string;
-  role: string;
   points?: number;
   level?: number;
   firstName?: string;
@@ -250,21 +260,19 @@ export async function getUserByEmail(email: string): Promise<UserData | null> {
   try {
     console.log(`🔍 Recherche de l'utilisateur avec l'email: ${email}`);
     
-    // Get all users and search for the email
-    // Note: In a production app, you might want to use a query index for better performance
-    const usersCollectionRef = collection(db, "users");
-    const usersSnapshot = await getDocs(usersCollectionRef);
+    // Utiliser l'email comme ID de document directement
+    const emailDocId = emailToDocId(email);
+    const userRef = doc(db, "users", emailDocId);
+    const userDoc = await getDoc(userRef);
     
-    for (const doc of usersSnapshot.docs) {
-      const userData = doc.data() as UserData;
-      if (userData.email === email) {
-        console.log(`✅ Utilisateur trouvé avec l'email ${email}: ${doc.id}`);
-        return { ...userData, id: doc.id };
-      }
+    if (!userDoc.exists()) {
+      console.log(`❌ Aucun utilisateur trouvé avec l'email: ${email} (ID doc: ${emailDocId})`);
+      return null;
     }
     
-    console.log(`❌ Aucun utilisateur trouvé avec l'email: ${email}`);
-    return null;
+    const userData = userDoc.data() as UserData;
+    console.log(`✅ Utilisateur trouvé avec l'email ${email}: ${emailDocId}`);
+    return { ...userData, id: emailDocId };
   } catch (error) {
     console.error("❌ Erreur lors de la recherche de l'utilisateur par email:", error);
     throw error;
@@ -289,7 +297,6 @@ export async function addRestaurantToUserArray(userId: string, restaurantId: str
       const basicUserData: Partial<UserData> = {
         id: userId,
         email: '', // Will be updated later if needed
-        role: 'user', // Default role
         Restaurant: [restaurantId],
         createdAt: new Date(),
         updatedAt: new Date(),

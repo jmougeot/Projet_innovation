@@ -38,8 +38,6 @@ export const getAuthCacheInfo = () => {
 export interface UserRegistrationData {
   email: string;
   password: string;
-  name: string;
-  role: string;
   firstName?: string;
   lastName?: string;
 }
@@ -52,10 +50,7 @@ export interface UserLoginData {
 
 // Interface for user profile in Firestore
 export interface UserProfile {
-  id: string;
-  name: string;
   email: string;
-  role: string;
   points: number;
   level: number;
   firstName?: string;
@@ -65,22 +60,34 @@ export interface UserProfile {
 }
 
 /**
+ * Convert email to a valid Firestore document ID
+ * @param email - The email to convert
+ * @returns string - Valid Firestore document ID
+ */
+export function emailToDocId(email: string): string {
+  // Remplacer seulement les caractères vraiment problématiques pour Firestore
+  // Le point (.) est remplacé par un tiret (-) pour plus de lisibilité
+  return email.replace(/[.#$\/\[\]]/g, (match) => {
+    if (match === '.') return '-';
+    return '_';
+  });
+}
+
+/**
  * Register a new user
  * @param userData - User registration data
  * @returns Promise<User> - The created user
  */
 export async function signUpUser(userData: UserRegistrationData): Promise<User> {
   try {
-    const { email, password, name, role, firstName, lastName } = userData;
+    const { email, password, firstName, lastName } = userData;
     
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const userId = userCredential.user.uid;
+    const emailDocId = emailToDocId(email); // Utiliser l'email comme ID
 
     // Create user profile in Firestore
     const userProfile: Omit<UserProfile, 'id'> = {
-      name,
       email,
-      role,
       points: 0,
       level: 1,
       firstName,
@@ -88,15 +95,16 @@ export async function signUpUser(userData: UserRegistrationData): Promise<User> 
       createdAt: new Date(),
     };
 
-    await setDoc(doc(db, "users", userId), userProfile);
+    // Utiliser l'email comme ID de document au lieu de l'UID
+    await setDoc(doc(db, "users", emailDocId), userProfile);
 
     // Invalider le cache après création d'utilisateur
-    if (userProfilesCache[userId]) {
-      delete userProfilesCache[userId];
+    if (userProfilesCache[emailDocId]) {
+      delete userProfilesCache[emailDocId];
     }
-    console.log(`🔄 Cache de profil utilisateur ${userId} invalidé après création`);
+    console.log(`🔄 Cache de profil utilisateur ${emailDocId} invalidé après création`);
 
-    console.log(`Utilisateur créé avec succès: ${email}`);
+    console.log(`Utilisateur créé avec succès: ${email} (ID document: ${emailDocId})`);
     return userCredential.user;
   } catch (error) {
     console.error("Erreur lors de l'inscription:", error);
@@ -157,47 +165,98 @@ export async function signOutUser(): Promise<void> {
 }
 
 /**
- * Get user profile from Firestore
- * @param userId - The user ID
+ * Get user profile from Firestore using email
+ * @param userEmail - The user email (or already converted doc ID)
  * @returns Promise<UserProfile | null>
  */
-export async function getUserProfile(userId: string): Promise<UserProfile | null> {
+export async function getUserProfile(userEmail: string): Promise<UserProfile | null> {
   try {
     const now = Date.now();
+    const emailDocId = emailToDocId(userEmail); // Convertir l'email en ID de document valide
     
     // Vérifier le cache d'abord
-    if (userProfilesCache[userId] && (now - lastAuthCacheUpdate) < AUTH_CACHE_DURATION) {
-      console.log(`📦 Profil utilisateur ${userId} récupéré depuis le cache`);
-      return userProfilesCache[userId];
+    if (userProfilesCache[emailDocId] && (now - lastAuthCacheUpdate) < AUTH_CACHE_DURATION) {
+      console.log(`📦 Profil utilisateur ${emailDocId} récupéré depuis le cache`);
+      return userProfilesCache[emailDocId];
     }
     
-    const userRef = doc(db, "users", userId);
+    const userRef = doc(db, "users", emailDocId);
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
+      console.log(`❌ Aucun profil trouvé pour l'email: ${userEmail} (ID doc: ${emailDocId})`);
       return null;
     }
 
     const profile = {
-      id: userDoc.id,
       ...userDoc.data()
     } as UserProfile;
     
     // Mettre en cache
-    userProfilesCache[userId] = profile;
+    userProfilesCache[emailDocId] = profile;
     lastAuthCacheUpdate = now;
-    console.log(`💾 Profil utilisateur ${userId} mis en cache`);
+    console.log(`💾 Profil utilisateur ${emailDocId} mis en cache`);
 
     return profile;
   } catch (error) {
     console.error("❌ Erreur lors de la récupération du profil utilisateur:", error);
     
+    const emailDocId = emailToDocId(userEmail);
     // En cas d'erreur, retourner le cache si disponible
-    if (userProfilesCache[userId]) {
-      console.log(`🔄 Utilisation du cache de secours pour le profil utilisateur ${userId}`);
-      return userProfilesCache[userId];
+    if (userProfilesCache[emailDocId]) {
+      console.log(`🔄 Utilisation du cache de secours pour le profil utilisateur ${emailDocId}`);
+      return userProfilesCache[emailDocId];
     }
     
+    throw error;
+  }
+}
+
+/**
+ * Get current user profile using their email from auth
+ * @returns Promise<UserProfile | null>
+ */
+export async function getCurrentUserProfile(): Promise<UserProfile | null> {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.email) {
+      console.log('❌ Aucun utilisateur connecté ou email manquant');
+      return null;
+    }
+
+    return await getUserProfile(currentUser.email);
+  } catch (error) {
+    console.error("❌ Erreur lors de la récupération du profil utilisateur actuel:", error);
+    return null;
+  }
+}
+
+/**
+ * Update user profile in Firestore
+ * @param userEmail - The user email
+ * @param updates - Partial user profile updates
+ * @returns Promise<void>
+ */
+export async function updateUserProfile(userEmail: string, updates: Partial<UserProfile>): Promise<void> {
+  try {
+    const emailDocId = emailToDocId(userEmail);
+    const userRef = doc(db, "users", emailDocId);
+    
+    const updateData = {
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    await setDoc(userRef, updateData, { merge: true });
+    
+    // Invalider le cache
+    if (userProfilesCache[emailDocId]) {
+      delete userProfilesCache[emailDocId];
+    }
+    
+    console.log(`✅ Profil utilisateur ${emailDocId} mis à jour`);
+  } catch (error) {
+    console.error("❌ Erreur lors de la mise à jour du profil utilisateur:", error);
     throw error;
   }
 }
@@ -208,6 +267,9 @@ export default {
   signInUser, 
   signOutUser, 
   getUserProfile,
+  getCurrentUserProfile,
+  updateUserProfile,
+  emailToDocId,
   // Cache utilities
   clearAuthCache,
   getAuthCacheInfo

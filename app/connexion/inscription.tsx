@@ -10,7 +10,8 @@ const SignUpScreen = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState("employee");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [message, setMessage] = useState("");
   const router = useRouter();
 
@@ -24,15 +25,21 @@ const SignUpScreen = () => {
 
   const handleSignUp = async () => {
     try {
-      if (!email || !password || !name) {
-        setMessage("Veuillez remplir tous les champs");
+      if (!email || !password || !firstName || !lastName) {
+        setMessage("Veuillez remplir tous les champs obligatoires");
         return;
       }
 
-      await signUpUser({ email, password, name, role });
-      setMessage(`Inscription réussie ! Votre profil a bien été enregistré ${role === "employee" ? "Salarié" : "Gérant"}.`);
+      await signUpUser({ 
+        email, 
+        password, 
+        firstName,
+        lastName
+      });
+      
+      setMessage("Inscription réussie ! Redirection en cours...");
       setTimeout(() => {
-        router.push('./connexion');
+        router.push('./index' as any);
       }, 2500);
     } catch (error) {
       if (error instanceof Error) {
@@ -57,20 +64,33 @@ const SignUpScreen = () => {
         
         <View style={styles.formContainer}>
           <Text style={styles.title}>Inscription</Text>
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Nom</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Entrez votre nom"
-              placeholderTextColor="#AAA"
-              value={name}
-              onChangeText={setName}
-            />
+
+          <View style={styles.row}>
+            <View style={[styles.inputContainer, styles.halfWidth]}>
+              <Text style={styles.inputLabel}>Prénom</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Prénom"
+                placeholderTextColor="#AAA"
+                value={firstName}
+                onChangeText={setFirstName}
+              />
+            </View>
+            
+            <View style={[styles.inputContainer, styles.halfWidth]}>
+              <Text style={styles.inputLabel}>Nom de famille</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Nom de famille"
+                placeholderTextColor="#AAA"
+                value={lastName}
+                onChangeText={setLastName}
+              />
+            </View>
           </View>
           
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>Email *</Text>
             <TextInput
               style={styles.input}
               placeholder="Entrez votre email"
@@ -83,7 +103,7 @@ const SignUpScreen = () => {
           </View>
           
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Mot de passe</Text>
+            <Text style={styles.inputLabel}>Mot de passe *</Text>
             <TextInput
               style={styles.input}
               placeholder="Créez votre mot de passe"
@@ -92,23 +112,6 @@ const SignUpScreen = () => {
               value={password}
               onChangeText={setPassword}
             />
-          </View>
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Rôle</Text>
-            <Pressable 
-              style={[styles.input, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
-              onPress={() => {
-                const newRole = role === "employee" ? "manager" : "employee";
-                console.log("Changing role to:", newRole);
-                setRole(newRole);
-              }}
-            >
-              <Text style={{ color: '#194A8D' }}>
-                {role === "employee" ? "Salarié" : "Gérant"}
-              </Text>
-              <Text>▼</Text>
-            </Pressable>
           </View>
           
           {message ? <Text style={[styles.message, message.includes("réussie") ? styles.successMessage : styles.errorMessage]}>{message}</Text> : null}
@@ -184,6 +187,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     marginBottom: 15,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  halfWidth: {
+    width: '48%',
   },
   inputLabel: {
     fontSize: 14,

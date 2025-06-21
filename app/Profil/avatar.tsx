@@ -22,6 +22,7 @@ import {
   auth,
   db
 } from '@/app/firebase/firebaseConfig';
+import { emailToDocId } from '@/app/firebase/firebaseAuth';
 import { 
   getStorage,
   ref, 
@@ -102,11 +103,13 @@ const ProfileAvatar = () => {
         
         setUser(currentUser);
         
-        const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+        // Utiliser l'email comme ID de document au lieu de l'UID
+        const emailDocId = emailToDocId(currentUser.email || '');
+        const userDoc = await getDoc(doc(db, 'users', emailDocId));
         if (userDoc.exists()) {
           const userData = userDoc.data();
           setProfileData({
-            id: currentUser.uid,
+            id: emailDocId,
             nom: userData.nom || '',
             prenom: userData.prenom || '',
             email: userData.email || currentUser.email || '',
@@ -139,9 +142,9 @@ const ProfileAvatar = () => {
             level: 1
           };
           
-          await setDoc(doc(db, 'users', currentUser.uid), defaultUserData); // Correction: updateDoc -> setDoc pour le document initial
+          await setDoc(doc(db, 'users', emailDocId), defaultUserData);
           setProfileData({
-            id: currentUser.uid,
+            id: emailDocId,
             ...defaultUserData
           });
         }
@@ -158,11 +161,12 @@ const ProfileAvatar = () => {
 
   // Fonction pour mettre à jour le profil
   const updateProfile = async () => {
-    if (!user) return;
+    if (!user || !user.email) return;
     
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      const emailDocId = emailToDocId(user.email);
+      await updateDoc(doc(db, 'users', emailDocId), {
         nom: profileData.nom,
         prenom: profileData.prenom,
         email: profileData.email,
@@ -215,7 +219,8 @@ const ProfileAvatar = () => {
         const downloadURL = await getDownloadURL(storageRef);
         
         // Mettre à jour l'URL de l'image dans Firestore
-        await updateDoc(doc(db, 'users', user.uid), {
+        const emailDocId = emailToDocId(user.email || '');
+        await updateDoc(doc(db, 'users', emailDocId), {
           imageUrl: downloadURL
         });
         

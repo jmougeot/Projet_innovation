@@ -35,6 +35,7 @@ import Header from '@/app/components/Header';
 import AutoRedirect from './AutoRedirect';
 import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import { addRestaurantMember, removeRestaurantMember } from '../firebase/firebaseRestaurant';
+import { auth } from '../firebase/firebaseConfig';
 
 // Type pour un membre du restaurant utilisant Custom Claims
 interface RestaurantMember {
@@ -100,12 +101,10 @@ export default function RestaurantAdminPage() {
     try {
       setAddingUser(true);
       
-      // ⚡ Utiliser la nouvelle fonction Custom Claims
-      // Note: Pour l'instant, nous utilisons l'email comme userId
-      // Dans un vrai système, il faudrait d'abord résoudre l'email vers un userId
+      // ⚡ Utiliser la nouvelle fonction qui accepte email ou UID
       await addRestaurantMember(
         currentRestaurantId, 
-        newUserEmail, // Temporaire - devrait être l'userId réel
+        newUserEmail, // Peut maintenant être un email directement !
         selectedRole
       );
 

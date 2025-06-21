@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import {
   grantRestaurantAccessV2,
+  grantRestaurantAccessByEmail,
   revokeRestaurantAccessV2,
   bootstrapRestaurantManagerV2,
   canAccessRestaurant,
@@ -222,11 +223,11 @@ export const createRestaurantWithAccess = async (
 };
 
 /**
- * 👥 Ajouter un membre au restaurant
+ * 👥 Ajouter un membre au restaurant (peut accepter email ou UID)
  */
 export const addRestaurantMember = async (
   restaurantId: string,
-  userId: string,
+  userIdentifier: string, // Peut être un email ou un UID Firebase
   role: 'manager' | 'waiter' | 'chef' | 'cleaner',
   expiresAt?: number
 ): Promise<boolean> => {
@@ -237,11 +238,20 @@ export const addRestaurantMember = async (
       throw new Error('Seuls les managers peuvent ajouter des membres');
     }
     
-    // 2. Accorder l'accès via V2 Functions (sous-collection)
-    const result = await grantRestaurantAccessV2(restaurantId, role, expiresAt, userId);
+    // 2. Déterminer si c'est un email ou un UID et utiliser la fonction appropriée
+    let result;
+    if (userIdentifier.includes('@')) {
+      // C'est un email
+      console.log(`📧 Ajout membre par email: ${userIdentifier}`);
+      result = await grantRestaurantAccessByEmail(restaurantId, userIdentifier, role, expiresAt);
+    } else {
+      // C'est un UID
+      console.log(`🆔 Ajout membre par UID: ${userIdentifier}`);
+      result = await grantRestaurantAccessV2(restaurantId, role, expiresAt, userIdentifier);
+    }
     
     if (result.success) {
-      console.log(`✅ Membre ${userId} ajouté comme ${role} au restaurant ${restaurantId}`);
+      console.log(`✅ Membre ${userIdentifier} ajouté comme ${role} au restaurant ${restaurantId}`);
       return true;
     } else {
       throw new Error(result.message);

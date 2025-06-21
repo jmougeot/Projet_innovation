@@ -48,7 +48,8 @@ interface RestaurantAccessDataV2 {
   restaurantId: string;
   role: 'manager' | 'waiter' | 'chef' | 'cleaner';
   expiresAt?: number;
-  targetUserId?: string; // Pour qu'un manager accorde l'accès à quelqu'un d'autre
+  targetUserId?: string; // UID Firebase
+  targetUserEmail?: string; // Email utilisateur (sera résolu en UID côté serveur)
 }
 
 interface RestaurantAccessResult {
@@ -88,11 +89,14 @@ export const grantRestaurantAccessV2 = async (
       'setRestaurantAccessV2'
     );
     
+    // ⚠️ IMPORTANT: Utiliser l'UID Firebase Auth pour les custom claims, pas l'email converti
+    const firebaseUid = targetUserId || auth.currentUser.uid;
+    
     const result = await setRestaurantAccessV2Func({
       restaurantId,
       role,
       expiresAt: expirationTime,
-      targetUserId
+      targetUserId: firebaseUid  // Passer l'UID Firebase, pas l'email converti
     });
 
     console.log('✅ V2: Accès accordé et Custom Claims mis à jour via Functions');
@@ -282,6 +286,53 @@ export const bootstrapRestaurantManagerV2 = async (
   } catch (error: any) {
     console.error('❌ V2: Erreur création premier manager:', error);
     throw new Error(`Erreur création premier manager V2: ${error.message}`);
+  }
+};
+
+/**
+ * 📧 V2 : Accorder l'accès restaurant par email utilisateur
+ */
+export const grantRestaurantAccessByEmail = async (
+  restaurantId: string, 
+  userEmail: string,
+  role: 'manager' | 'waiter' | 'chef' | 'cleaner',
+  expiresAt?: number
+): Promise<RestaurantAccessResult> => {
+  try {
+    console.log(`📧 V2: Attribution accès ${role} par email ${userEmail} pour restaurant ${restaurantId}`);
+    
+    if (!auth.currentUser) {
+      throw new Error('Utilisateur non connecté');
+    }
+
+    const currentTime = Date.now();
+    const expirationTime = expiresAt || (currentTime + (7 * 24 * 60 * 60 * 1000));
+
+    // ✅ Utiliser la Firebase Function V2 avec email
+    const setRestaurantAccessV2Func = httpsCallable<RestaurantAccessDataV2, RestaurantAccessResult>(
+      functions, 
+      'setRestaurantAccessV2'
+    );
+    
+    const result = await setRestaurantAccessV2Func({
+      restaurantId,
+      role,
+      expiresAt: expirationTime,
+      targetUserEmail: userEmail  // 📧 Passer l'email directement
+    });
+
+    console.log('✅ V2: Accès accordé par email et Custom Claims mis à jour via Functions');
+    return {
+      success: true,
+      message: `Accès accordé avec succès à ${userEmail}`,
+      expiresAt: expirationTime,
+      architecture: 'v2-functions-email',
+      details: result.data
+    };
+    
+  } catch (error: any) {
+    console.error('❌ V2: Erreur attribution accès par email:', error);
+    throw new Error(`Erreur attribution accès V2 par email: ${error.message}`);
   }
 };
 

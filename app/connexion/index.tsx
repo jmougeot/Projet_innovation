@@ -2,15 +2,10 @@ import React, { useState, useEffect, useCallback } from "react";
 import { View, TextInput, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { signInUser } from "../firebase/firebaseAuth";
-import { getDoc, doc } from "firebase/firestore";
-import { db, auth } from "../firebase/firebaseConfig";
+import { auth } from "../firebase/firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-
-interface UserData {
-  role: "manager" | "employee";
-}
 
 const LoginScreen: React.FC = () => {
   // 1. Tous les hooks d'état en premier, dans un ordre stable
@@ -40,16 +35,10 @@ const LoginScreen: React.FC = () => {
         return;
       }
 
-      const user = await signInUser({ email, password });
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const userData = userDoc.data() as UserData;
-
+      await signInUser({ email, password });
+      
       // Après une connexion réussie, rediriger vers la sélection de restaurant
-      if (userData?.role === "manager" || userData?.role === "employee") {
-        navigateToRestaurantSelect();
-      } else {
-        setMessage("Rôle utilisateur non reconnu");
-      }
+      navigateToRestaurantSelect();
     } catch (error: any) {
       let errorMessage = "Une erreur est survenue";
       if (error.code === 'auth/user-not-found') {
@@ -65,18 +54,9 @@ const LoginScreen: React.FC = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        try {
-          // Utilisateur connecté, vérifier son rôle et rediriger
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          const userData = userDoc.data() as UserData;
-          
-          if (userData?.role === "manager" || userData?.role === "employee") {
-            navigateToRestaurantSelect();
-            return;
-          }
-        } catch (error) {
-          console.error("Erreur lors de la vérification du rôle:", error);
-        }
+        // Utilisateur connecté, rediriger vers la sélection de restaurant
+        navigateToRestaurantSelect();
+        return;
       }
       setIsLoading(false);
     });
@@ -100,11 +80,10 @@ const LoginScreen: React.FC = () => {
       />
       
       <View style={styles.logoContainer}>
-        <Text style={styles.logoText}>RestaurantApp</Text>
+        <Text style={styles.logoText}>Connection</Text>
       </View>
       
       <View style={styles.formContainer}>
-        <Text style={styles.title}>Connexion</Text>
         
         <View style={styles.inputContainer}>
           <Text style={styles.inputLabel}>Email</Text>
@@ -144,7 +123,7 @@ const LoginScreen: React.FC = () => {
         
         <View style={styles.registerContainer}>
           <Text style={styles.registerText}>Pas encore de compte? </Text>
-          <Link href="./inscription">
+          <Link href="./connexion/inscription">
             <Text style={styles.registerLink}>S&apos;inscrire</Text>
           </Link>
         </View>
