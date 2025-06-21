@@ -1,30 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, View, Text, StyleSheet, Pressable, Platform, Alert } from 'react-native';
-import { db } from '@/app/firebase/firebaseConfig';
+import { ScrollView, View, Text, StyleSheet, Pressable, Platform, Alert, ActivityIndicator } from 'react-native';
 import { TicketData, PlatQuantite, listenToTicketsActifs, updateStatusPlat } from '@/app/firebase/firebaseCommandeOptimized';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 const Cuisine = () => {
   const [commandes, setCommandes] = useState<TicketData[]>([]);
-  const [currentRestaurantId, setCurrentRestaurantId] = useState<string | null>(null);
+  
+  // 🎯 Utilisation du contexte restaurant - BEAUCOUP plus simple !
+  const { restaurantId: currentRestaurantId, isLoading, refreshRestaurant } = useRestaurant();
+  
   const [fontsLoaded] = useFonts({
     'AlexBrush': require('../../../assets/fonts/AlexBrush-Regular.ttf'),
   });
-
-  // Charger l'ID du restaurant depuis AsyncStorage
-  useEffect(() => {
-    const loadRestaurantId = async () => {
-      try {
-        const savedId = await RestaurantStorage.GetSelectedRestaurantId();
-        setCurrentRestaurantId(savedId);
-      } catch (error) {
-        console.error('Erreur chargement restaurant ID:', error);
-      }
-    };
-    loadRestaurantId();
-  }, []);
 
   useEffect(() => {
     if (!currentRestaurantId) return;
@@ -43,8 +33,12 @@ const Cuisine = () => {
     return () => unsubscribe();
   }, [currentRestaurantId]);
 
-  if (!fontsLoaded) {
-    return null;
+  if (!fontsLoaded || isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <Text style={styles.loadingText}>Chargement de la cuisine...</Text>
+      </View>
+    );
   }
 
   // Function to get the next status - updated pour les nouveaux types
@@ -115,9 +109,43 @@ const Cuisine = () => {
     <View style={styles.container}>
       <View style={styles.headerSquare}>
         <Text style={styles.headerSquareText}>Cuisine</Text>
+        <Pressable 
+          style={styles.refreshButton}
+          onPress={refreshRestaurant}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#083F8C" />
+          ) : (
+            <MaterialIcons name="refresh" size={20} color="#083F8C" />
+          )}
+        </Pressable>
       </View>
 
       <ScrollView style={styles.scrollView}>
+        {/* Indicateur de statut du restaurant avec contexte */}
+        <View style={styles.restaurantStatus}>
+          <MaterialIcons 
+            name="restaurant" 
+            size={16} 
+            color={currentRestaurantId ? "#4CAF50" : "#FF5722"} 
+          />
+          <Text style={[
+            styles.restaurantStatusText,
+            { color: currentRestaurantId ? "#4CAF50" : "#FF5722" }
+          ]}>
+            {isLoading 
+              ? "Chargement restaurant..." 
+              : currentRestaurantId 
+                ? `Restaurant: ${currentRestaurantId}` 
+                : "Aucun restaurant sélectionné"
+            }
+          </Text>
+          {isLoading && (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          )}
+        </View>
+
         <View style={styles.sectionContainer}>
           <View style={styles.categoryHeader}>
             <Text style={styles.categoryTitle}>Commandes prêtes</Text>
@@ -179,6 +207,16 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#194A8D',
   },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#CAE1EF',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   headerSquare: {
     alignSelf: 'center',
     backgroundColor: '#CAE1EF',
@@ -189,6 +227,8 @@ const styles = StyleSheet.create({
     padding: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    position: 'relative',
     ...Platform.select({
       ios: {
         marginTop: 45,
@@ -198,6 +238,13 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  refreshButton: {
+    position: 'absolute',
+    right: 10,
+    padding: 5,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
   headerSquareText: {
     color: '#083F8C',
     fontWeight: 'bold',
@@ -205,6 +252,19 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  restaurantStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 15,
+    gap: 8,
+  },
+  restaurantStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   sectionContainer: {
     backgroundColor: '#F3EFEF',

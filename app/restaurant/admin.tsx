@@ -35,7 +35,6 @@ import Header from '@/app/components/Header';
 import AutoRedirect from './AutoRedirect';
 import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import { addRestaurantMember, removeRestaurantMember } from '../firebase/firebaseRestaurant';
-import { auth } from '../firebase/firebaseConfig';
 
 // Type pour un membre du restaurant utilisant Custom Claims
 interface RestaurantMember {
@@ -204,26 +203,7 @@ export default function RestaurantAdminPage() {
             <MaterialIcons name="restaurant" size={32} color="#194A8D" />
             <View style={styles.restaurantDetails}>
               <Text style={styles.restaurantName}>Restaurant ID: {currentRestaurantId}</Text>
-              <Text style={styles.restaurantRole}>🔒 Accès Manager (Custom Claims)</Text>
-            </View>
-          </View>
-
-          {/* System Info */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>⚡ Système Custom Claims</Text>
-            <View style={styles.systemInfo}>
-              <View style={styles.systemItem}>
-                <MaterialIcons name="speed" size={20} color="#4CAF50" />
-                <Text style={styles.systemText}>Vérifications ultra-rapides (0-50ms)</Text>
-              </View>
-              <View style={styles.systemItem}>
-                <MaterialIcons name="security" size={20} color="#2196F3" />
-                <Text style={styles.systemText}>Sécurité Firebase native</Text>
-              </View>
-              <View style={styles.systemItem}>
-                <MaterialIcons name="flash-on" size={20} color="#FF9800" />
-                <Text style={styles.systemText}>Fonctionne offline</Text>
-              </View>
+              <Text style={styles.restaurantRole}>🔒 Accès Manager </Text>
             </View>
           </View>
 
