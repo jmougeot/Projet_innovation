@@ -3,7 +3,9 @@ import { View, Text, StyleSheet, Pressable, PanResponder, Alert, ActivityIndicat
 import { useFonts } from 'expo-font';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Table, getTables, addTable as saveTable, deleteTable, updateTables, clearTableCache as clearTablesCache, getRoom, addRoom, updateRoom, deleteRoom, Room } from '../../firebase/firebaseTables';
+import { Table, Room } from '../../firebase/room&table/types';
+import { getAllTables, addTable as saveTable, deleteTable, clearTableCache as clearTablesCache, updateTables } from '../../firebase/room&table/table';
+import { getRooms, createRoom, updateRoom, deleteRoom } from '../../firebase/room&table/room';
 import { getRealtimeTablesCache } from '../../firebase/firebaseRealtimeCache';
 import { TableComponent, getStatusColor, TableShapeRenderer } from '../components/Table';
 import ConfirmModal from '../components/ConfirmModal';
@@ -11,7 +13,6 @@ import TableOptionsModal from '../components/TableOptionsModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import Header from '@/app/components/Header';
 import { WorkspaceContainer, WorkspaceCoordinates, useWorkspaceSize } from '../components/Workspace';
-import RestaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 // Proportions relatives pour les dimensions des tables (en pourcentage du workspace)
@@ -241,7 +242,7 @@ export default function MapSettings() {
       setLoading(true);
       
       // Charger les rooms
-      const roomsData = await getRoom(true, CurrentRestaurantID);
+      const roomsData = await getRooms(CurrentRestaurantID);
       setRooms(roomsData);
       
       // Si aucune room n'existe, montrer l'interface de création
@@ -269,7 +270,7 @@ export default function MapSettings() {
       setCurrentRoomId(firstRoomId);
       
       // Charger les tables pour la room actuelle
-      const tablesData = await getTables(firstRoomId, true, CurrentRestaurantID);
+      const tablesData = await getAllTables(firstRoomId, true, CurrentRestaurantID);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData))); // Deep copy pour comparaison
       setHasUnsavedChanges(false);
@@ -502,10 +503,10 @@ export default function MapSettings() {
         newRoom.description = newRoomDescription.trim();
       }
 
-      await addRoom(newRoom, CurrentRestaurantID);
+      await createRoom(CurrentRestaurantID, newRoom);
       
       // Recharger les rooms
-      const updatedRooms = await getRoom(false, CurrentRestaurantID);
+      const updatedRooms = await getRooms(CurrentRestaurantID);
       setRooms(updatedRooms);
       
       // Si c'est la première salle créée, la sélectionner automatiquement
@@ -514,7 +515,7 @@ export default function MapSettings() {
         if (newRoomId) {
           setCurrentRoomId(newRoomId);
           // Charger les tables pour cette nouvelle salle (sera vide)
-          const tablesData = await getTables(newRoomId, true, CurrentRestaurantID);
+          const tablesData = await getAllTables(newRoomId, true, CurrentRestaurantID);
           setTables(tablesData);
           setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
           setHasUnsavedChanges(false);
@@ -557,10 +558,10 @@ export default function MapSettings() {
         updatedRoom.description = newRoomDescription.trim();
       }
 
-      await updateRoom(editingRoom.id!, updatedRoom, CurrentRestaurantID);
+      await updateRoom(CurrentRestaurantID, editingRoom.id!, updatedRoom);
       
       // Recharger les rooms
-      const updatedRooms = await getRoom(false, CurrentRestaurantID);
+      const updatedRooms = await getRooms(CurrentRestaurantID);
       setRooms(updatedRooms);
       
       // Réinitialiser le formulaire
@@ -598,7 +599,7 @@ export default function MapSettings() {
               await deleteRoom(room.id!, CurrentRestaurantID);
               
               // Recharger les rooms
-              const updatedRooms = await getRoom(false, CurrentRestaurantID);
+              const updatedRooms = await getRooms(CurrentRestaurantID);
               setRooms(updatedRooms);
               
               // Si la salle supprimée était la salle courante, sélectionner une autre ou vider
@@ -606,7 +607,7 @@ export default function MapSettings() {
                 if (updatedRooms.length > 0) {
                   const newCurrentRoomId = updatedRooms[0].id!;
                   setCurrentRoomId(newCurrentRoomId);
-                  const tablesData = await getTables(newCurrentRoomId, true, CurrentRestaurantID);
+                  const tablesData = await getAllTables(newCurrentRoomId, true, CurrentRestaurantID);
                   setTables(tablesData);
                   setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
                 } else {
@@ -636,7 +637,7 @@ export default function MapSettings() {
       setCurrentRoomId(roomId);
       
       // Charger les tables pour la nouvelle salle
-      const tablesData = await getTables(roomId, true, CurrentRestaurantID);
+      const tablesData = await getAllTables(roomId, true, CurrentRestaurantID);
       setTables(tablesData);
       setOriginalTables(JSON.parse(JSON.stringify(tablesData)));
       setHasUnsavedChanges(false);

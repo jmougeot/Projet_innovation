@@ -1,4 +1,4 @@
-import { Table as TableType } from '@/app/firebase/firebaseTables';
+import { Table as TableType } from '@/app/firebase/room&table/types';
 import { MaterialIcons } from '@expo/vector-icons';
 
 // Types de formes de tables disponibles

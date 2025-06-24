@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Table, getTables, updateTableStatus, getRoom, Room } from '@/app/firebase/firebaseTables';
+import { Table, Room } from '@/app/firebase/room&table/types';
+import { getAllTables, updateTable } from '@/app/firebase/room&table/table';
+import { getRooms } from '@/app/firebase/room&table/room';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Header from '@/app/components/Header';
 import { saveSelectedRoomName, getSelectedRoomName } from '@/app/asyncstorage/roomStorage';
@@ -68,7 +70,7 @@ export default function PlanDeSalle() {
         setLoading(true);
         
         // Charger les rooms d'abord
-        const roomsData = await getRoom(true, CurrentRestaurantId);
+        const roomsData = await getRooms(CurrentRestaurantId);
         setRooms(roomsData);
         
         // Si aucune room n'existe, rediriger vers map_settings pour la création
@@ -117,7 +119,7 @@ export default function PlanDeSalle() {
         }
         
         setCurrentRoomId(selectedRoomId);
-        const tablesData = await getTables(selectedRoomId, true, CurrentRestaurantId);
+        const tablesData = await getAllTables(selectedRoomId, true, CurrentRestaurantId);
         setTables(tablesData);
         
         // Sauvegarder la room sélectionnée dans AsyncStorage si elle n'était pas déjà sauvegardée
@@ -158,7 +160,7 @@ export default function PlanDeSalle() {
 
     try {
       const nextStatus = getNextStatus(currentStatus);
-      await updateTableStatus(tableId, nextStatus, currentRoomId, CurrentRestaurantId);
+      await updateTable(tableId, { status: nextStatus }, currentRoomId, CurrentRestaurantId);
       
       setTables(prevTables => 
         prevTables.map(table => 
@@ -188,7 +190,7 @@ export default function PlanDeSalle() {
       }
       
       // Charger les tables pour la nouvelle salle
-      const tablesData = await getTables(roomId, true, CurrentRestaurantId);
+      const tablesData = await getAllTables(roomId, true, CurrentRestaurantId);
       setTables(tablesData);
     } catch (error) {
       console.error('Erreur lors du changement de salle:', error);

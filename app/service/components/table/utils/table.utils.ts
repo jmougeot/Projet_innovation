@@ -1,4 +1,4 @@
-import { Table as TableType } from '@/app/firebase/firebaseTables';
+import { Table as TableType } from '@/app/firebase/room&table/types';
 import { useWorkspaceSize } from '../../Workspace';
 
 // Hook pour obtenir les dimensions du workspace au lieu de l'écran

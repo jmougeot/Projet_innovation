@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Room, getTables } from '../../firebase/firebaseTables';
+import { Room } from '../../firebase/room&table/types';
+import { getAllTables } from '../../firebase/room&table/table';
 
 interface RoomSelectorProps {
   rooms: Room[];
@@ -23,7 +24,7 @@ export const RoomSelector: React.FC<RoomSelectorProps> = ({rooms, currentRoomId,
       const counts: Record<string, number> = {};
       for (const room of rooms) {
         if (room.id) {
-          const roomTables = await getTables(room.id, true, currentRestaurant);
+          const roomTables = await getAllTables(room.id, true, currentRestaurant);
           counts[room.id] = roomTables.length;
         }
       }

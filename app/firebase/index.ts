@@ -63,7 +63,7 @@ export {
   updateTableStatus, 
   deleteTable,  
 } from './firebaseTables';
-export type { Table } from './firebaseTables';
+export type { Table } from './room&table/types';
 
 // Analytics and reporting
 export { 
@@ -116,12 +116,16 @@ export {
   debugCacheHealth
 } from './firebaseRealtimeCache';
 
+// Room & Table management (new modular structure)
+export * from './room&table';
+
 // Default exports for backward compatibility
 export { default as firebaseAuth } from './firebaseAuth';
 export { default as firebaseMenu } from './firebaseMenu';
 export { default as firebaseticket } from './ticket/index';
 export { default as firebaseStock } from './firebaseStock';
 export { default as firebaseTables } from './firebaseTables';
+export { default as firebaseRoomTable } from './room&table/index';
 export { default as firebaseUser } from './firebaseUser';
 export { default as firebaseAnalytics } from './firebaseAnalytics';
 export { default as firebaseRestaurant } from './firebaseRestaurant';

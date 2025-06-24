@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useFonts } from 'expo-font';
-import { Table as TableType } from '@/app/firebase/firebaseTables';
+import { Table as TableType } from '@/app/firebase/room&table/types';
 import { TableComponentProps, TableShape } from '../types/table.types';
 import { useWorkspaceDimensions } from '../utils/table.utils';
 import { TABLE_SHAPES } from '../constants/table.constants';
