@@ -32,7 +32,6 @@ export interface RestaurantSettings {
     enableAnalytics: boolean;
   };
 }
-
 export interface Restaurant {
   id: string;
   name: string;
@@ -53,7 +52,6 @@ export interface Restaurant {
       cleaner: number;
     };
   };
-  // ❌ SUPPRIMÉ : userAccess (maintenant dans sous-collection restaurants/{id}/userAccess/{userId})
 }
 
 // ====== COLLECTION CONSTANTS ======
@@ -100,8 +98,7 @@ export const getDefaultRestaurantSettings = (): RestaurantSettings => {
  * 🏗️ CREATE OR INITIALIZE RESTAURANT (architecture V2 sans duplication)
  */
 export const initializeRestaurant = async (
-  restaurantData: Partial<Restaurant> = {}
-): Promise<string> => {
+  restaurantData: Partial<Restaurant> = {}): Promise<string> => {
   try {
     // Generate unique restaurant ID if not provided
     let restaurantId: string;
@@ -134,7 +131,6 @@ export const initializeRestaurant = async (
       address: restaurantData.address || "",
       phone: restaurantData.phone || "",
       email: restaurantData.email || "",
-      // ❌ PAS de userAccess → maintenant dans sous-collection restaurants/{id}/userAccess/{userId}
       createdAt: Date.now(),
       updatedAt: Date.now(),
       settings: { ...getDefaultRestaurantSettings(), ...restaurantData.settings },

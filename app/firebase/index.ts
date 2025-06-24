@@ -35,25 +35,14 @@ export {
 } from './firebaseMenu';
 export type { Plat } from './firebaseMenu';
 
-// Order/Command management
-import firebaseCommandeOptimized from './firebaseCommandeOptimized';
-export const {
-  createCommande,
-  terminerCommande,
-  getCommandesEnCours,
-  getCommandeByTableId,
-  CommandeEncaisse,
-  updateCommande,
-  getCommandesByStatus,
-  updateStatusPlat,
-  changeStatusCommande,
-  diagnosticCommandes,
-} = firebaseCommandeOptimized;
+// Ticket management (new modular structure)
 export type { 
   PlatQuantite, 
   TicketData, 
-  CreateTicketData 
-} from './firebaseCommandeOptimized';
+  CreateTicketData,
+  ChainTicketData,
+  TicketChainInfo
+} from './ticket';
 
 // Stock management
 export { 
@@ -87,7 +76,6 @@ export type { RevenueData, AnalyticsFilter } from './firebaseAnalytics';
 
 // Restaurant management
 export { 
-  initializeRestaurant,
   getRestaurant,
   updateRestaurant,
   updateRestaurantSettings,
@@ -131,7 +119,7 @@ export {
 // Default exports for backward compatibility
 export { default as firebaseAuth } from './firebaseAuth';
 export { default as firebaseMenu } from './firebaseMenu';
-export { default as firebaseCommandeOptimized } from './firebaseCommandeOptimized';
+export { default as firebaseticket } from './ticket/index';
 export { default as firebaseStock } from './firebaseStock';
 export { default as firebaseTables } from './firebaseTables';
 export { default as firebaseUser } from './firebaseUser';

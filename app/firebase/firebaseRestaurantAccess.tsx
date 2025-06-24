@@ -1,16 +1,10 @@
 import { httpsCallable, getFunctions, connectFunctionsEmulator, Functions } from 'firebase/functions';
 import { 
   collection, 
-  doc, 
-  setDoc, 
-  deleteDoc, 
-  getDoc, 
   getDocs, 
   query, 
   where, 
-  collectionGroup,
-  serverTimestamp,
-  Timestamp 
+  collectionGroup
 } from 'firebase/firestore';
 import { auth, db } from './firebaseConfig';
 
@@ -253,9 +247,7 @@ export const getRestaurantUsersV2 = async (
 /**
  * 🎯 V2 : Créer le premier manager d'un restaurant (bootstrap)
  */
-export const bootstrapRestaurantManagerV2 = async (
-  restaurantId: string,
-  ownerEmail?: string
+export const bootstrapRestaurantManagerV2 = async (restaurantId: string, ownerEmail?: string
 ): Promise<RestaurantAccessResult> => {
   try {
     console.log(`🎯 V2: Création premier manager pour restaurant ${restaurantId}`);
@@ -271,7 +263,7 @@ export const bootstrapRestaurantManagerV2 = async (
     );
     
     const result = await bootstrapFunc({
-      restaurantId,
+      restaurantId, 
       ownerEmail
     });
 

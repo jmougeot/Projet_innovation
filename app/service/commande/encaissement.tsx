@@ -2,23 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { View, SafeAreaView, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { TicketData, PlatQuantite } from '@/app/firebase/firebaseCommandeOptimized';
-import firebaseCommande from '@/app/firebase/firebaseCommandeOptimized';
+import { TicketData, PlatQuantite, getTicketByTableId, terminerTicket } from '@/app/firebase/ticket';
 import {distributeAmount} from '@/app/manageur/comptabilité/CAService';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { updateMissionsProgressFromDishes } from '@/app/firebase/firebaseMissionOptimized';
 import Head from '@/app/components/Head';
 import Reglage from '@/app/components/reglage';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
-import restaurantStorage from '@/app/asyncstorage/restaurantStorage';
 import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 function Encaissement() {
     const { tableId } = useLocalSearchParams();
     const { restaurantId: CurrentRestaurantId } = useRestaurant();
-    const [idCommande, setIdCommande] = useState<string>("");
+    const [idTicket, setIdTicket] = useState<string>("");
     const [plats, setPlats] = useState<PlatQuantite[]>([]);  
-    const [commandesParTable, setCommandesParTable] = useState<TicketData | null>(null);
+    const [ticketParTable, setTicketParTable] = useState<TicketData | null>(null);
     const [platsSelectionnes, setPlatsSelectionnes] = useState<PlatQuantite[]>([]);
     const [platsEncaisses, setPlatsEncaisses] = useState<PlatQuantite[]>([]);
     const [totalSelectionnes, setTotalSelectionnes] = useState<number>(0);
@@ -37,38 +35,31 @@ function Encaissement() {
         }
     }, []);
 
-    // Fetch commande by tableId when component mounts or tableId changes
+    // Fetch ticket by tableId when component mounts or tableId changes
     useEffect(() => {
-        const fetchCommande = async () => {
+        const fetchTicket = async () => {
             try {
-                console.log(`🔍 [ENCAISSEMENT DEBUG] Recherche commande pour table: ${tableId}`);
+                console.log(`🔍 [ENCAISSEMENT DEBUG] Recherche ticket pour table: ${tableId}`);
                 
-                // Exécuter le diagnostic pour comprendre ce qui se passe
-                if (CurrentRestaurantId
-                ) {
-                    await firebaseCommande.diagnosticCommandesByTable(Number(tableId), CurrentRestaurantId);
-                }
+                const ticket = await getTicketByTableId(Number(tableId), CurrentRestaurantId || '');
+                console.log(`🔍 [ENCAISSEMENT DEBUG] Ticket trouvé:`, ticket);
                 
-                const commande = await firebaseCommande.getCommandeByTableId(Number(tableId), CurrentRestaurantId || '');
-                console.log(`🔍 [ENCAISSEMENT DEBUG] Commande trouvée:`, commande);
-                
-                if (commande) {
-                    setCommandesParTable(commande);
-                    setPlats(commande.plats);
-                    setIdCommande(commande.id);
-                    console.log(`✅ [ENCAISSEMENT DEBUG] ID commande défini: ${commande.id}`);
+                if (ticket) {
+                    setTicketParTable(ticket);
+                    setPlats(ticket.plats);
+                    setIdTicket(ticket.id);
+                    console.log(`✅ [ENCAISSEMENT DEBUG] ID ticket défini: ${ticket.id}`);
                 } else {
-                    console.log(`❌ [ENCAISSEMENT DEBUG] Aucune commande trouvée pour la table ${tableId}`);
-                    alert(`Aucune commande active trouvée pour la table ${tableId}. Vérifiez qu'une commande a été créée pour cette table.`);
+                    console.log(`❌ [ENCAISSEMENT DEBUG] Aucun ticket trouvé pour la table ${tableId}`);
+                    alert(`Aucun ticket actif trouvé pour la table ${tableId}. Vérifiez qu'un ticket a été créé pour cette table.`);
                 }
             } catch (error) {
-                console.error("💰 [ENCAISSEMENT ERROR] Erreur lors du chargement de la commande:", error);
-                alert("Erreur lors du chargement de la commande");
+                console.error("💰 [ENCAISSEMENT ERROR] Erreur lors du chargement du ticket:", error);
+                alert("Erreur lors du chargement du ticket");
             }
         };
-        
         if (tableId && CurrentRestaurantId) {
-            fetchCommande();
+            fetchTicket();
         }
     }, [tableId, CurrentRestaurantId]);
 
@@ -143,7 +134,7 @@ function Encaissement() {
                 return;
             }
             
-            const montantTotal = commandesParTable ? commandesParTable.totalPrice : 0;
+            const montantTotal = ticketParTable ? ticketParTable.totalPrice : 0;
             
             if (montantTotal > 0) {
                 await distributeAmount(currentUserId, montantTotal);
@@ -152,16 +143,16 @@ function Encaissement() {
             
             // Mettre à jour la progression des missions basée sur les plats encaissés
             let missionMessage = '';
-            if (commandesParTable && commandesParTable.plats.length > 0) {
+            if (ticketParTable && ticketParTable.plats.length > 0) {
                 try {
                     if (!CurrentRestaurantId) {
                         console.warn('💰 [ENCAISSEMENT WARNING] Aucun restaurant sélectionné, mise à jour des missions ignorée');
                         missionMessage = `\n⚠️ Aucun restaurant sélectionné, missions non mises à jour.`;
                     } else {
                         console.log(`💰 [ENCAISSEMENT DEBUG] Début mise à jour missions pour userId: ${currentUserId} et restaurant: ${CurrentRestaurantId}`);
-                        console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, commandesParTable.plats.map(p => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
+                        console.log(`💰 [ENCAISSEMENT DEBUG] Plats à traiter:`, ticketParTable.plats.map((p: PlatQuantite) => ({ name: p.plat.name, id: p.plat.id, quantite: p.quantite })));
                         
-                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, commandesParTable.plats, CurrentRestaurantId);
+                        const missionUpdateResult = await updateMissionsProgressFromDishes(currentUserId, ticketParTable.plats, CurrentRestaurantId);
                         
                         console.log(`💰 [ENCAISSEMENT DEBUG] Résultat mise à jour missions:`, missionUpdateResult);
                         
@@ -187,26 +178,26 @@ function Encaissement() {
             }
             
             // Replace ID usage with fresh lookup if needed
-            // Ensure we have the correct Firebase ID for the command
-            let commandeIdToUse = idCommande;
-            if (!commandeIdToUse) {
-                const fetchedCommande = await firebaseCommande.getCommandeByTableId(Number(tableId), CurrentRestaurantId || '');
-                if (!fetchedCommande) {
-                    alert('Erreur: Aucune commande active trouvée pour cette table.');
+            // Ensure we have the correct Firebase ID for the ticket
+            let ticketIdToUse = idTicket;
+            if (!ticketIdToUse) {
+                const fetchedTicket = await getTicketByTableId(Number(tableId), CurrentRestaurantId || '');
+                if (!fetchedTicket) {
+                    alert('Erreur: Aucun ticket actif trouvé pour cette table.');
                     return;
                 }
-                commandeIdToUse = fetchedCommande.id;
-                setIdCommande(commandeIdToUse);
+                ticketIdToUse = fetchedTicket.id;
+                setIdTicket(ticketIdToUse);
             }
              
-            console.log(`💰 [ENCAISSEMENT] Finalisation commande ID: ${commandeIdToUse} pour table ${tableId}`);
+            console.log(`💰 [ENCAISSEMENT] Finalisation ticket ID: ${ticketIdToUse} pour table ${tableId}`);
             
             if (!CurrentRestaurantId) {
                 alert('Erreur: Aucun restaurant sélectionné.');
                 return;
             }
             
-            await firebaseCommande.terminerCommande(commandeIdToUse, CurrentRestaurantId);
+            await terminerTicket(ticketIdToUse, CurrentRestaurantId);
             
             // Afficher le message de succès avec les informations sur les missions
             alert(`Encaissement réussi !${missionMessage}`);
@@ -281,9 +272,9 @@ function Encaissement() {
                             </View>
                         )}
                     </ScrollView>
-                    {commandesParTable && commandesParTable.totalPrice > 0 && (
+                    {ticketParTable && ticketParTable.totalPrice > 0 && (
                         <View style={styles.totalSection}>
-                            <Text style={styles.totalText}>Total: {commandesParTable.totalPrice - totalSelectionnes - totalEncaisses} €</Text>
+                            <Text style={styles.totalText}>Total: {ticketParTable.totalPrice - totalSelectionnes - totalEncaisses} €</Text>
                         </View>
                     )}
                 </View>
@@ -335,7 +326,7 @@ function Encaissement() {
                     <View style={styles.encaissementSummary}>
                         <Text style={styles.encaissementLabel}>Restant: </Text>
                         <Text style={styles.encaissementValue}>
-                            {commandesParTable ? (commandesParTable.totalPrice - totalEncaisses) : 0} €
+                            {ticketParTable ? (ticketParTable.totalPrice - totalEncaisses) : 0} €
                         </Text>
                     </View>
                 </View>

@@ -5,13 +5,12 @@ import {Plat, get_plats} from '@/app/firebase/firebaseMenu';
 import { auth } from '@/app/firebase/firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFonts } from 'expo-font';
-import { createTicket, TicketData, PlatQuantite, getTicketByTableId, updateTicket} from '@/app/firebase/firebaseCommandeOptimized';
+import { createTicket, TicketData, PlatQuantite, getTicketByTableId, updateTicket} from '@/app/firebase/ticket';
 import Reglage from '@/app/components/reglage';
 import { getMissionPlatsForUser } from '@/app/firebase/firebaseMissionOptimized';
 import { PlatItem } from '@/app/service/components/Plats';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { getPlanDeSalleMenuItems } from '../components/ServiceNavigation';
-import RestaurantStorgae from '@/app/asyncstorage/restaurantStorage';
 import { useRestaurant } from '@/app/contexts/RestaurantContext';
 
 

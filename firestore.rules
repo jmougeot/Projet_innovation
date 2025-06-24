@@ -1,8 +1,5 @@
 rules_version = '2';
 
-// 🔐 Règles de Sécurité Firestore pour l'Application Restaurant
-// Ces règles complètent les Firebase Functions pour un contrôle d'accès complet
-
 service cloud.firestore {
   match /databases/{database}/documents {
     
@@ -37,13 +34,6 @@ service cloud.firestore {
              request.auth.token.superAdmin == true;
     }
     
-    // ⏰ Vérifier si l'accès n'est pas expiré via userAccess
-    function isAccessValid(restaurantId) {
-      return hasRestaurantAccess(restaurantId) &&
-             // Vérification de l'expiration via userAccess
-             (get(/databases/$(database)/documents/restaurants/$(restaurantId)/userAccess/$(request.auth.uid)).data.expiresAt == null ||
-              request.time.toMillis() < get(/databases/$(database)/documents/restaurants/$(restaurantId)/userAccess/$(request.auth.uid)).data.expiresAt);
-    }
     
     // =============== COLLECTIONS PRINCIPALES ===============
     
@@ -52,7 +42,7 @@ service cloud.firestore {
     match /restaurants/{restaurantId} {
       allow read: if isAuthenticated() && hasRestaurantAccess(restaurantId);
       allow write: if false;
-      allow create: if false;
+      allow create: if isAuthenticated;
       allow update: if false;
       allow delete: if false;
       
@@ -73,21 +63,20 @@ service cloud.firestore {
       
       // 📋 MENUS : Utilisateurs avec accès au restaurant
       match /menus/{menuId} {
-        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
-        allow write: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow read: if hasRestaurantAccess(restaurantId);
+        allow write: if hasRestaurantAccess(restaurantId);
+
       }
       
       // 🎫 TICKETS : Gestion des tickets avec conditions sur le statut
       match /tickets/{ticketId} {
-        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow read: if hasRestaurantAccess(restaurantId);
         
         // Création : Utilisateurs autorisés
-        allow create: if hasRestaurantAccess(restaurantId) && 
-                         isAccessValid(restaurantId)
+        allow create: if hasRestaurantAccess(restaurantId);
         
         // Modification : INTERDITE si le ticket est inactif (active: false)
-        allow update: if hasRestaurantAccess(restaurantId) && 
-                         isAccessValid(restaurantId) && resource.data.active == true;
+        allow update: if hasRestaurantAccess(restaurantId) && resource.data.active == true;
                                 
         // Suppression : INTERDITE
         allow delete: if false
@@ -95,38 +84,32 @@ service cloud.firestore {
       
       // 📊 STOCK : Utilisateurs avec accès au restaurant
       match /stock/{itemId} {
-        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
-        allow write: if hasRestaurantAccess(restaurantId) && 
-                        isAccessValid(restaurantId) &&
-                        (hasRole(restaurantId, 'chef') || isManager(restaurantId));
+        allow read: if hasRestaurantAccess(restaurantId);
+        allow write: if hasRestaurantAccess(restaurantId);
       }
       
       // 🧹 MISSIONS : Utilisateurs avec accès au restaurant
       match /missions/{missionId} {
-        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
-        allow create: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId) && isManager(restaurantId);
-        allow update: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
-        allow delete: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
+        allow read: if hasRestaurantAccess(restaurantId);
+        allow create: if hasRestaurantAccess(restaurantId) && isManager(restaurantId);
+        allow update: if hasRestaurantAccess(restaurantId);
+        allow delete: if hasRestaurantAccess(restaurantId);
       }
       
       // 💰 COMPTABILITÉ : Managers uniquement
       match /accounting/{docId} {
-        allow read, write: if hasRestaurantAccess(restaurantId) && 
-                             isAccessValid(restaurantId) &&
-                             isManager(restaurantId);
+        allow read, write: if hasRestaurantAccess(restaurantId) && isManager(restaurantId);
       }
       
       // 🔧 CONFIGURATION : Managers uniquement
       match /settings/{settingId} {
-        allow read: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);
-        allow write: if hasRestaurantAccess(restaurantId) && 
-                        isAccessValid(restaurantId) &&
-                        isManager(restaurantId);
+        allow read: if hasRestaurantAccess(restaurantId);
+        allow write: if hasRestaurantAccess(restaurantId) && isManager(restaurantId);
       }
       
       // ❌ PROTECTION GLOBALE : Toute autre sous-collection
       match /{path=**} {
-        allow read write: if hasRestaurantAccess(restaurantId) && isAccessValid(restaurantId);                       
+        allow read, write: if hasRestaurantAccess(restaurantId);                       
       }
     }
     
@@ -135,7 +118,7 @@ service cloud.firestore {
     // 👤 USERS : Données personnelles des utilisateurs
     match /users/{userId} {
       // Lecture : Propriétaire ou super-admin
-      allow write update read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
+      allow write, read, update: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin());
     }
     
     // =============== COLLECTIONS DE LOGS ET AUDIT ===============
@@ -171,7 +154,7 @@ service cloud.firestore {
       allow read, write: if false;
     }
   }
-}
+
 
 // =============== COMMENTAIRES DE SÉCURITÉ ===============
 
@@ -246,4 +229,3 @@ restaurants/{restaurantId}/userAccess/{userId} {
   grantedAt: timestamp,
   grantedBy: string
 }
-*/

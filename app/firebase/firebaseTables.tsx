@@ -10,6 +10,7 @@ import {
   orderBy, 
   getDoc,
 } from 'firebase/firestore';
+import { deleteTicket} from '@/app/firebase/ticket/crud'
 import { getRealtimeTablesCache } from './firebaseRealtimeCache';
 
 export interface Table {
@@ -257,7 +258,9 @@ export const deleteTable = async (tableId: number, roomId: string, restaurantId:
     const filteredTables = currentTables.filter(table => table.id !== tableId);
     
     // Update the room document with the filtered tables array
+    await deleteTicket(tableId.toString(), restaurantId); // Delete associated tickets if any
     await updateDoc(roomDocRef, { tables: filteredTables });
+    
     console.log(`✅ Table ${tableId} supprimée avec succès de la salle ${roomId}`);
     
     // Clear cache to force reload

@@ -253,8 +253,7 @@ export const setRestaurantAccessV2 = onCall({
     await getFirestore().runTransaction(async (transaction) => {
       // 1. ✅ Source de vérité : Document dédié dans sous-collection
       const userAccessRef = getFirestore()
-        .collection('restaurants')
-        .doc(restaurantId)
+        .collection('restaurants').doc(restaurantId)
         .collection('userAccess')
         .doc(userId);
 
