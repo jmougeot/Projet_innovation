@@ -54,17 +54,6 @@ export {
 } from './firebaseStock';
 export type { StockData, AddStockData } from './firebaseStock';
 
-// Table management
-export { 
-  getTables, 
-  saveTable, 
-  updateTables, 
-  updateTablePosition, 
-  updateTableStatus, 
-  deleteTable,  
-} from './firebaseTables';
-export type { Table } from './room&table/types';
-
 // Analytics and reporting
 export { 
   calculateRevenue, 
@@ -124,7 +113,6 @@ export { default as firebaseAuth } from './firebaseAuth';
 export { default as firebaseMenu } from './firebaseMenu';
 export { default as firebaseticket } from './ticket/index';
 export { default as firebaseStock } from './firebaseStock';
-export { default as firebaseTables } from './firebaseTables';
 export { default as firebaseRoomTable } from './room&table/index';
 export { default as firebaseUser } from './firebaseUser';
 export { default as firebaseAnalytics } from './firebaseAnalytics';

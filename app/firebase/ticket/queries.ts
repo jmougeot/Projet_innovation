@@ -22,6 +22,32 @@ import {
   setLastTicketsActifsCacheUpdate,
   logCacheStatus
 } from './cache';
+import { startTicketsRealtimeSync, getTicketListenersStatus } from './realtime';
+
+// Variable pour s'assurer qu'on démarre la sync une seule fois par restaurant
+let syncStartedForRestaurants = new Set<string>();
+
+/**
+ * 🚀 Auto-démarrage de la synchronisation temps réel des tickets
+ */
+const ensureTicketsRealtimeSyncStarted = async (restaurantId: string) => {
+  const status = getTicketListenersStatus();
+  
+  // Si déjà démarré pour ce restaurant, ne rien faire
+  if (syncStartedForRestaurants.has(restaurantId) && status.isActive) {
+    return;
+  }
+  
+  try {
+    console.log(`🚀 Auto-démarrage de la synchronisation tickets pour ${restaurantId}`);
+    await startTicketsRealtimeSync(restaurantId);
+    syncStartedForRestaurants.add(restaurantId);
+    console.log(`✅ Synchronisation tickets auto-démarrée pour ${restaurantId}`);
+  } catch (error) {
+    console.warn(`⚠️ Impossible de démarrer la sync tickets pour ${restaurantId}:`, error);
+    // Continue sans sync (fallback sur cache statique)
+  }
+};
 
 // ====== FONCTIONS DE REQUÊTE ET RECHERCHE ======
 
@@ -30,6 +56,9 @@ import {
  */
 export const getTicketsActifs = async (restaurantId: string, useCache = true): Promise<TicketData[]> => {
   try {
+    // 🚀 Auto-démarrer la synchronisation temps réel si pas encore active
+    await ensureTicketsRealtimeSyncStarted(restaurantId);
+
     const now = Date.now();
     const ticketsActifsCache = getTicketsActifsCache();
     const lastTicketsActifsCacheUpdate = getLastTicketsActifsCacheUpdate();

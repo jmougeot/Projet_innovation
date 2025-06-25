@@ -45,7 +45,9 @@ export interface TicketData {
   chainIndex?: number; // Index dans la chaîne de hachage
   previousHash?: string; // Hash du ticket précédent dans la chaîne
   deleted?: boolean; // Indique si le ticket a été supprimé
-  platsdeleted? : PlatQuantite[]; // Plats supprimés du ticket
+  modified?: boolean; // Indique si le ticket a été modifié (plats ajoutés/supprimés)
+  platsdeleted?: PlatQuantite[]; // Plats supprimés du ticket (historique)
+  dateModification?: Timestamp | Date; // Date de la dernière modification
 }
 
 // Interface for ticket creation
@@ -54,4 +56,25 @@ export interface CreateTicketData {
   plats: PlatQuantite[];
   totalPrice: number;
   tableId: number;
+}
+
+// ====== TYPES POUR GESTION DES MODIFICATIONS ======
+
+export interface TicketModification {
+  type: 'plat_ajoute' | 'plat_supprime' | 'plat_modifie' | 'quantite_changee';
+  timestamp: Timestamp | Date;
+  employeeId?: string;
+  platData?: PlatQuantite;
+  ancienneQuantite?: number;
+  nouvelleQuantite?: number;
+}
+
+export interface UpdateTicketData {
+  plats?: PlatQuantite[];
+  totalPrice?: number;
+  status?: 'en_attente' | 'en_preparation' | 'prete' | 'servie' | 'encaissee';
+  estimatedTime?: number;
+  notes?: string;
+  // Champs automatiques gérés par le système
+  trackModifications?: boolean; // Si true, track les changements de plats
 }

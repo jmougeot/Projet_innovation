@@ -9,8 +9,7 @@ export * from './utils/table.utils';
 
 // Components
 export { TableShapeRenderer } from './components/TableShapeRenderer';
-export { TableShapePreview } from './components/TableShapePreview';
-export { TableViewWithShapeRenderer } from './components/TableViewWithShapeRenderer';
+export { TableShapePreview } from './components/TableComponent';
 export { default as TableComponent } from './components/TableComponent';
 export { default } from './components/TableComponent';
 

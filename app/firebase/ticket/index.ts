@@ -24,6 +24,18 @@ export * from './utils';
 // Vérifications de salle
 export * from './roomCheck';
 
+// Synchronisation temps réel
+export * from './realtime';
+
+// Gestion des modifications
+export * from './modifications';
+
+// Helpers utilitaires
+export * from './ticketHelpers';
+
+
+
+
 // Export par défaut pour compatibilité
 import { createTicket, terminerTicket } from './crud';
 import { getTicketsActifs, listenToTicketsActifs, getTicketsByStatus, getTicketsTermines, getTicketByTableId } from './queries';

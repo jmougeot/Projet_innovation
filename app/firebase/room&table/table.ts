@@ -12,13 +12,42 @@ import {
 import { db } from '../firebaseConfig';
 import { Table } from './types';
 import { deleteTicket } from '../ticket/crud';
+import { 
+  getTablesCache, 
+  setTablesCache, 
+  addTableToCache, 
+  updateTableInCache, 
+  removeTableFromCache,
+  clearTablesCache as clearTablesCacheUtil
+} from './cache';
+import { startRealtimeSync, getListenersStatus } from './realtime';
 
 const RESTAURANTS_COLLECTION = 'restaurants';
 
-// Cache local pour optimiser les performances
-let tablesCache: Map<string, Table[]> = new Map(); // Cache par roomId
-let tablesCacheTimestamps: Map<string, number> = new Map(); // Timestamps par roomId
-const CACHE_DURATION = 300000; // 5 minutes
+// Variable pour s'assurer qu'on démarre la sync une seule fois par restaurant
+let syncStartedForRestaurants = new Set<string>();
+
+/**
+ * 🚀 Auto-démarrage de la synchronisation temps réel
+ */
+const ensureRealtimeSyncStarted = async (restaurantId: string) => {
+  const status = getListenersStatus();
+  
+  // Si déjà démarré pour ce restaurant, ne rien faire
+  if (syncStartedForRestaurants.has(restaurantId) && status.isActive) {
+    return;
+  }
+  
+  try {
+    console.log(`🚀 Auto-démarrage de la synchronisation pour ${restaurantId}`);
+    await startRealtimeSync(restaurantId);
+    syncStartedForRestaurants.add(restaurantId);
+    console.log(`✅ Synchronisation auto-démarrée pour ${restaurantId}`);
+  } catch (error) {
+    console.warn(`⚠️ Impossible de démarrer la sync pour ${restaurantId}:`, error);
+    // Continue sans sync (fallback sur cache statique)
+  }
+};
 
 // Helper functions to get collection references
 const getRestaurantRef = (restaurantId: string) => {
@@ -26,25 +55,28 @@ const getRestaurantRef = (restaurantId: string) => {
 };
 
 const getRoomsCollectionRef = (restaurantId: string) => {
-  return collection(getRestaurantRef(restaurantId), 'rooms');
+  return collection(db, RESTAURANTS_COLLECTION, restaurantId, 'rooms');
 };
 
 const getRoomDocRef = (restaurantId: string, roomId: string) => {
-  return doc(getRoomsCollectionRef(restaurantId), roomId);
+  return doc(db, RESTAURANTS_COLLECTION, restaurantId, 'rooms', roomId);
 };
 
 /**
- * Récupère toutes les tables d'une salle
+ * Récupère toutes les tables d'une salle avec cache intelligent
  */
 export const getAllTables = async (roomId: string, useCache = true, restaurantId: string): Promise<Table[]> => {
   try {
-    const now = Date.now();
-    const cachedTables = tablesCache.get(roomId);
-    const cacheTimestamp = tablesCacheTimestamps.get(roomId) || 0;
-    
-    if (useCache && cachedTables && (now - cacheTimestamp) < CACHE_DURATION) {
-      console.log(`🪑 Tables chargées depuis le cache local pour la salle ${roomId}`);
-      return cachedTables;
+    // 🚀 Auto-démarrer la synchronisation temps réel si pas encore active
+    await ensureRealtimeSyncStarted(restaurantId);
+
+    // Vérifier le cache d'abord
+    if (useCache) {
+      const cachedTables = getTablesCache(roomId);
+      if (cachedTables) {
+        console.log(`🪑 ${cachedTables.length} tables chargées depuis le cache pour la salle ${roomId}`);
+        return cachedTables;
+      }
     }
 
     console.log(`🔄 Chargement des tables depuis Firebase pour la salle ${roomId}`);
@@ -53,12 +85,12 @@ export const getAllTables = async (roomId: string, useCache = true, restaurantId
     
     let tables: Table[] = [];
     if (snapshot.exists()) {
-      const roomData = snapshot.data();
+      const roomData = snapshot.data() as any;
       tables = roomData.tables || [];
     }
 
-    tablesCache.set(roomId, tables);
-    tablesCacheTimestamps.set(roomId, now);
+    // Mettre à jour le cache
+    setTablesCache(roomId, tables);
     console.log(`✅ ${tables.length} tables chargées et mises en cache pour la salle ${roomId}`);
 
     return tables;
@@ -66,7 +98,7 @@ export const getAllTables = async (roomId: string, useCache = true, restaurantId
     console.error(`❌ Erreur lors du chargement des tables pour la salle ${roomId}:`, error);
     
     // Return cache as fallback if available
-    const cachedTables = tablesCache.get(roomId);
+    const cachedTables = getTablesCache(roomId);
     if (cachedTables) {
       console.log(`🔄 Utilisation du cache de secours pour les tables de la salle ${roomId}`);
       return cachedTables;
@@ -77,7 +109,7 @@ export const getAllTables = async (roomId: string, useCache = true, restaurantId
 };
 
 /**
- * Ajoute une nouvelle table à une salle
+ * Ajoute une nouvelle table à une salle avec mise à jour du cache
  */
 export const addTable = async (table: Table, roomId: string, restaurantId: string): Promise<void> => {
   try {
@@ -85,17 +117,18 @@ export const addTable = async (table: Table, roomId: string, restaurantId: strin
     
     // Get current room data
     const roomSnapshot = await getDoc(roomDocRef);
-    const currentTables: Table[] = roomSnapshot.exists() ? (roomSnapshot.data().tables || []) : [];
+    const currentTables: Table[] = roomSnapshot.exists() ? (roomSnapshot.data()?.tables || []) : [];
     
     // Add the new table
     const updatedTables = [...currentTables, table];
     
     // Update the room document with the new tables array
     await updateDoc(roomDocRef, { tables: updatedTables });
-    console.log(`✅ Table "${table.numero}" ajoutée avec succès dans la salle ${roomId}`);
     
-    // Clear cache to force reload
-    clearTableCache(roomId);
+    // Ajouter au cache
+    addTableToCache(roomId, table);
+    
+    console.log(`✅ Table "${table.numero}" ajoutée avec succès dans la salle ${roomId}`);
   } catch (error) {
     console.error("❌ Erreur lors de l'ajout de la table:", error);
     throw error;
@@ -103,7 +136,7 @@ export const addTable = async (table: Table, roomId: string, restaurantId: strin
 };
 
 /**
- * Met à jour une table existante
+ * Met à jour une table existante avec mise à jour du cache
  */
 export const updateTable = async (tableId: number, tableData: Partial<Table>, roomId: string, restaurantId: string): Promise<void> => {
   try {
@@ -116,7 +149,7 @@ export const updateTable = async (tableId: number, tableData: Partial<Table>, ro
       return;
     }
     
-    const currentTables: Table[] = roomSnapshot.data().tables || [];
+    const currentTables: Table[] = roomSnapshot.data()?.tables || [];
     const tableIndex = currentTables.findIndex(table => table.id === tableId);
     
     if (tableIndex === -1) {
@@ -135,10 +168,11 @@ export const updateTable = async (tableId: number, tableData: Partial<Table>, ro
     
     // Update the room document with the modified tables array
     await updateDoc(roomDocRef, { tables: updatedTables });
-    console.log(`✅ Table ${tableId} mise à jour avec succès dans la salle ${roomId}`);
     
-    // Clear cache to force reload
-    clearTableCache(roomId);
+    // Mettre à jour le cache
+    updateTableInCache(roomId, tableId, filteredTableData);
+    
+    console.log(`✅ Table ${tableId} mise à jour avec succès dans la salle ${roomId}`);
   } catch (error) {
     console.error("❌ Erreur lors de la mise à jour de la table:", error);
     throw error;
@@ -146,7 +180,7 @@ export const updateTable = async (tableId: number, tableData: Partial<Table>, ro
 };
 
 /**
- * Supprime une table d'une salle
+ * Supprime une table d'une salle avec mise à jour du cache
  */
 export const deleteTable = async (tableId: number, roomId: string, restaurantId: string): Promise<void> => {
   try {
@@ -159,17 +193,17 @@ export const deleteTable = async (tableId: number, roomId: string, restaurantId:
       return;
     }
     
-    const currentTables: Table[] = roomSnapshot.data().tables || [];
+    const currentTables: Table[] = roomSnapshot.data()?.tables || [];
     const filteredTables = currentTables.filter(table => table.id !== tableId);
     
     // Update the room document with the filtered tables array
     await deleteTicket(tableId.toString(), restaurantId); // Delete associated tickets if any
     await updateDoc(roomDocRef, { tables: filteredTables });
     
-    console.log(`✅ Table ${tableId} supprimée avec succès de la salle ${roomId}`);
+    // Supprimer du cache
+    removeTableFromCache(roomId, tableId);
     
-    // Clear cache to force reload
-    clearTableCache(roomId);
+    console.log(`✅ Table ${tableId} supprimée avec succès de la salle ${roomId}`);
   } catch (error) {
     console.error("❌ Erreur lors de la suppression de la table:", error);
     throw error;
@@ -198,37 +232,19 @@ export const getTableById = async (tableId: number, roomId: string, restaurantId
 };
 
 /**
- * Vide le cache des tables
+ * Vide le cache des tables (utilise la fonction du module cache)
  */
 export const clearTableCache = (roomId?: string) => {
-  if (roomId) {
-    tablesCache.delete(roomId);
-    tablesCacheTimestamps.delete(roomId);
-    console.log(`🗑️ Cache des tables vidé pour la salle ${roomId}`);
-  } else {
-    tablesCache.clear();
-    tablesCacheTimestamps.clear();
-    console.log('🗑️ Cache des tables vidé pour toutes les salles');
-  }
+  clearTablesCacheUtil(roomId);
 };
 
 /**
- * Obtient les informations sur le cache des tables
+ * Obtient les informations sur le cache des tables (utilise la fonction du module cache)
  */
-export const getTablesCacheInfo = () => {
-  const roomIds = Array.from(tablesCache.keys());
-  const cacheInfo = roomIds.map(roomId => ({
-    roomId,
-    tablesCount: tablesCache.get(roomId)?.length || 0,
-    cacheAge: Date.now() - (tablesCacheTimestamps.get(roomId) || 0),
-    isExpired: (Date.now() - (tablesCacheTimestamps.get(roomId) || 0)) > CACHE_DURATION
-  }));
-  
-  return {
-    totalCachedRooms: roomIds.length,
-    cacheInfo,
-    cacheDuration: CACHE_DURATION
-  };
+export const getTablesInfo = () => {
+  // Importer la fonction depuis le module cache
+  const { getTablesCacheInfo } = require('./cache');
+  return getTablesCacheInfo();
 };
 
 /**

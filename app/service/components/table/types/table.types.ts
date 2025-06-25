@@ -13,23 +13,6 @@ export interface TableShapeRendererProps {
   backgroundColor?: string;
 }
 
-// Interface pour les propriétés du TableViewWithShapeRenderer
-export interface TableViewBaseProps {
-  title: string;
-  loading: boolean;
-  tables?: TableType[]; // Made optional since it's not used in the component
-  customMenuItems?: {
-    label: string;
-    onPress: () => void;
-    isLogout?: boolean;
-  }[];
-  children: React.ReactNode;
-  showLegend?: boolean;
-  enableEditMode?: boolean;
-  isEditMode?: boolean;
-  onEditModeToggle?: (enabled: boolean) => void;
-}
-
 // Interface pour les props du composant modal
 export interface TableComponentProps {
   visible: boolean;
