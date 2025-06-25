@@ -39,9 +39,7 @@ export type { Plat } from './firebaseMenu';
 export type { 
   PlatQuantite, 
   TicketData, 
-  CreateTicketData,
-  ChainTicketData,
-  TicketChainInfo
+  CreateTicketData
 } from './ticket';
 
 // Stock management

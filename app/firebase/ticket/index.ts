@@ -1,4 +1,4 @@
-// ====== EXPORTS CENTRALISÉS ======
+// ====== EXPORTS CENTRALISÉS BLOCKCHAIN ======
 
 // Types et interfaces
 export * from './types';
@@ -6,16 +6,19 @@ export * from './types';
 // Configuration
 export * from './config';
 
-// Cache
+// Cache intelligent
 export * from './cache';
 
 // Fonctions de hachage
 export * from './hash';
 
-// Opérations CRUD
+// 🔗 Blockchain et Fork System (PRINCIPAL)
+export * from './blockchain';
+
+// Opérations CRUD (avec blockchain - plus d'updateDoc)
 export * from './crud';
 
-// Requêtes et recherches
+// Requêtes et recherches (mise à jour pour blockchain)
 export * from './queries';
 
 // Utilitaires métier
@@ -27,65 +30,49 @@ export * from './roomCheck';
 // Synchronisation temps réel
 export * from './realtime';
 
-// Gestion des modifications
+// Gestion des modifications et tracking
 export * from './modifications';
 
-// Helpers utilitaires
-export * from './ticketHelpers';
-
-
-
-
-// Export par défaut pour compatibilité
-import { createTicket, terminerTicket } from './crud';
-import { getTicketsActifs, listenToTicketsActifs, getTicketsByStatus, getTicketsTermines, getTicketByTableId } from './queries';
-import { ticketEncaisse, updateStatusPlat, changeStatusTicket } from './utils';
-import { updateTicket } from './crud';
-import { calculateTicketHash, getLastTerminatedTicketHash } from './hash';
+// 🔗 Export par défaut BLOCKCHAIN (fonctions principales seulement)
 import { 
-  clearTicketsCache, 
-  clearTableCache, 
-  getTicketsCacheInfo, 
-  getTableCacheInfo, 
-  logCacheStatus,
-  updateTicketInCache,
-  addTicketToCache,
-  removeTicketFromCache,
-  updateTableCacheWithTicket,
-  invalidateCacheSelectively
-} from './cache';
+  createTicket, 
+  updateTicket, 
+  terminerTicket, 
+  deleteTicket,
+  getTicketActif,
+  getTicketHistorique
+} from './crud';
+import { 
+  createTicketFork,
+  getTicketChain,
+  getBlockchainStats,
+  updateTicketWithFork,
+  createMainChainTicket
+} from './blockchain';
+import { getTicketsActifs, getTicketByTableId } from './queries';
+import { ticketEncaisse, updateStatusPlat } from './utils';
 
 export default {
-  // Fonctions principales tickets
-  createTicket,
-  terminerTicket,
-  getTicketsActifs,
-  listenToTicketsActifs,
-  getTicketsByStatus,
-  getTicketsTermines,
+  // 🔗 FONCTIONS BLOCKCHAIN PRINCIPALES
+  createTicket,          // Crée un nouveau bloc principal
+  updateTicket,          // Crée un fork au lieu d'update
+  terminerTicket,        // Fork de finalisation
+  deleteTicket,          // Fork de suppression
+  getTicketActif,        // Récupère le ticket actif (peut être un fork)
+  getTicketHistorique,   // Récupère toute la chaîne
   
-  // Fonctions de gestion
-  getTicketByTableId,
-  ticketEncaisse,
-  updateTicket,
-  updateStatusPlat,
-  changeStatusTicket,
+  // 🔀 FONCTIONS BLOCKCHAIN AVANCÉES
+  createTicketFork,      // Crée un fork explicitement
+  updateTicketWithFork,  // Version détaillée du fork
+  getTicketChain,        // Analyse complète de la chaîne
+  getBlockchainStats,    // Statistiques de la blockchain
+  createMainChainTicket, // Crée un bloc principal
   
-  // Fonctions de hachage et intégrité
-  calculateTicketHash,
-  getLastTerminatedTicketHash,
+  // 📊 REQUÊTES (compatibles blockchain)
+  getTicketsActifs,      // Récupère tous les tickets actifs (inclut forks)
+  getTicketByTableId,    // Récupère le ticket actif d'une table
   
-  // Utilitaires cache
-  clearTicketsCache,
-  clearTableCache,
-  getTicketsCacheInfo,
-  getTableCacheInfo,
-  logCacheStatus,
-  
-  // Nouvelles fonctions de cache intelligent
-  updateTicketInCache,
-  addTicketToCache,
-  removeTicketFromCache,
-  updateTableCacheWithTicket,
-  invalidateCacheSelectively,
+  // 🛠️ UTILITAIRES MÉTIER
+  ticketEncaisse,        // Encaisse via fork
+  updateStatusPlat,      // Met à jour un plat via fork
 };

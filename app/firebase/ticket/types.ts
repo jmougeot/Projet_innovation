@@ -1,7 +1,7 @@
 import { Timestamp } from "firebase/firestore";
 import { Plat } from "../firebaseMenu";
 
-// ====== INTERFACES OPTIMISÉES ======
+// ====== INTERFACES BLOCKCHAIN OPTIMISÉES ======
 
 export interface PlatQuantite {
   plat: Plat;
@@ -9,21 +9,6 @@ export interface PlatQuantite {
   status: 'en_attente' | 'en_preparation' | 'pret' | 'servi' | 'envoye';
   tableId: number;
   mission?: string;
-}
-
-export interface ChainTicketData { 
-  hash : string;
-  previousHash: string;
-  chainIndex : number;
-  merkleRoot : string
-}
-
-export interface TicketChainInfo {
-  restaurantId: string;
-  lastHash: string;
-  lastIndex: number;
-  totalTickets: number;
-  lastUpdate: number;
 }
 
 export interface TicketData {
@@ -48,6 +33,43 @@ export interface TicketData {
   modified?: boolean; // Indique si le ticket a été modifié (plats ajoutés/supprimés)
   platsdeleted?: PlatQuantite[]; // Plats supprimés du ticket (historique)
   dateModification?: Timestamp | Date; // Date de la dernière modification
+
+  // ====== CHAMPS BLOCKCHAIN FORK ======
+  blockType?: 'main' | 'fork';           // Type de bloc dans la chaîne
+  parentTicketId?: string;                // ID du ticket parent (pour les forks)
+  mainChainHash?: string;                 // Hash du bloc principal référencé
+  forkReason?: 'modification' | 'correction' | 'annulation'; // Raison du fork
+  forkTimestamp?: Timestamp | Date;       // Quand le fork a été créé
+  isOrphan?: boolean;                     // Si c'est un bloc orphelin
+  forkDepth?: number;                     // Profondeur du fork (nombre de modifications)
+  originalTicketData?: Partial<TicketData>; // Données du ticket original (avant modification)
+  replacedByFork?: string;                // ID du fork qui remplace ce ticket
+  lastDirectModification?: Timestamp | Date; // Dernière modification directe (si forcée)
+}
+
+// ====== INTERFACES BLOCKCHAIN ======
+
+export interface BlockchainTicketInfo {
+  mainChainLength: number;
+  forksCount: number;
+  orphanedTickets: string[];
+  lastMainBlockHash: string;
+  totalActiveTickets: number;
+}
+
+export interface TicketChainData {
+  mainTicket: TicketData;
+  forks: TicketData[];
+  chainDepth: number;
+  activeTicket: TicketData; // Le ticket actuellement actif (main ou fork)
+}
+
+export interface ForkCreationData {
+  originalTicketId: string;
+  restaurantId: string;
+  updateData: UpdateTicketData;
+  employeeId?: string;
+  forkReason?: 'modification' | 'correction' | 'annulation';
 }
 
 // Interface for ticket creation
@@ -75,6 +97,13 @@ export interface UpdateTicketData {
   status?: 'en_attente' | 'en_preparation' | 'prete' | 'servie' | 'encaissee';
   estimatedTime?: number;
   notes?: string;
+  active?: boolean; // Pour les fork de finalisation
+  dureeTotal?: number; // Pour les tickets terminés
+  chainIndex?: number; // Pour la blockchain
+  previousHash?: string; // Pour la blockchain
+  hashe?: string; // Hash du ticket
+  satisfaction?: number; // Note de satisfaction
+  dateTerminee?: Date | any; // Date de fin
   // Champs automatiques gérés par le système
   trackModifications?: boolean; // Si true, track les changements de plats
 }

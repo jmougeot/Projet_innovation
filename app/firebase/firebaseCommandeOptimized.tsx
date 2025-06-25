@@ -10,8 +10,6 @@ import ticketModule, {
   TicketData,
   PlatQuantite,
   CreateTicketData,
-  ChainTicketData,
-  TicketChainInfo,
   
   // Fonctions principales
   createTicket,
@@ -44,9 +42,7 @@ import ticketModule, {
 export type {
   TicketData,
   PlatQuantite,
-  CreateTicketData,
-  ChainTicketData,
-  TicketChainInfo
+  CreateTicketData
 };
 
 // Re-export des fonctions pour compatibilité
