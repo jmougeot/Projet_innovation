@@ -7,14 +7,21 @@ import {
   where, 
   orderBy, 
   limit, 
-  serverTimestamp,
-  updateDoc
+  serverTimestamp
 } from 'firebase/firestore';
 import { TicketData, UpdateTicketData, TicketChainData, BlockchainTicketInfo } from './types';
 import { getTicketsCollectionRef } from './config';
 import { analyzeTicketChanges } from './modifications';
 import { updateTicketInCache, addTicketToCache } from './cache';
 import { startTicketsRealtimeSync } from './realtime';
+import { 
+  addOperationToGlobalChain,
+  getTicketHead,
+  getAllTicketHeads,
+  getTicketHistory,
+  verifyGlobalChain,
+  verifyTicket
+} from './globalChain';
 
 // ====== OPTIMISATIONS POUR ACCÈS RAPIDE AUX BOUTS DE BRANCHES ======
 
@@ -23,49 +30,52 @@ let branchTipsCache: Map<string, { ticketId: string, lastUpdate: number, chainDe
 const BRANCH_TIPS_CACHE_DURATION = 30000; // 30 secondes
 
 /**
- * 🚀 OPTIMISATION - Récupère tous les bouts de branches actifs (1 seule requête)
- * Cette fonction remplace plusieurs requêtes individuelles par une seule requête optimisée
+ * 🚀 NOUVELLE ARCHITECTURE - Récupère tous les heads via la chaîne globale
+ * Utilise l'index des ticket_heads pour un accès O(1)
  */
 export const getAllActiveBranchTips = async (restaurantId: string): Promise<TicketData[]> => {
   try {
-    console.log('🚀 [getAllActiveBranchTips] Récupération optimisée des bouts de branches actifs');
+    console.log('🚀 [getAllActiveBranchTips] Récupération via chaîne globale');
 
-    const ticketsRef = getTicketsCollectionRef(restaurantId);
+    // 1. Récupérer tous les heads depuis l'architecture hybride
+    const headBlocks = await getAllTicketHeads(restaurantId);
     
-    // 🔥 UNE SEULE REQUÊTE pour tous les tickets actifs (bouts de branches)
-    const activeTipsQuery = query(
-      ticketsRef,
-      where('active', '==', true),
-      orderBy('forkDepth', 'desc'), // Les forks en premier (bout de branche)
-      orderBy('timestamp', 'desc')   // Plus récents en premier
-    );
+    if (headBlocks.length === 0) {
+      return [];
+    }
 
-    const activeTipsSnap = await getDocs(activeTipsQuery);
-    const branchTips: TicketData[] = [];
+    // 2. Pour chaque head, récupérer le ticket correspondant
+    const tickets: TicketData[] = [];
+    const ticketsRef = getTicketsCollectionRef(restaurantId);
 
-    activeTipsSnap.forEach(docSnap => {
-      const ticketData = { id: docSnap.id, ...docSnap.data() } as TicketData;
-      branchTips.push(ticketData);
-    });
-
-    // 💾 Mettre à jour le cache des bouts de branches
-    const now = Date.now();
-    branchTips.forEach(ticket => {
-      const mainChainId = ticket.parentTicketId || ticket.id;
-      branchTipsCache.set(mainChainId, {
-        ticketId: ticket.id,
-        lastUpdate: now,
-        chainDepth: ticket.forkDepth || 0
-      });
-    });
+    for (const headBlock of headBlocks) {
+      try {
+        // Le head contient les données du ticket dans block.data
+        const ticketData = headBlock.data as TicketData;
+        
+        // Vérifier que le ticket existe toujours dans Firebase
+        const ticketRef = doc(ticketsRef, headBlock.ticketId);
+        const ticketSnap = await getDoc(ticketRef);
+        
+        if (ticketSnap.exists()) {
+          // Fusionner les données du head avec celles de Firebase
+          const currentTicket = { id: headBlock.ticketId, ...ticketSnap.data() } as TicketData;
+          tickets.push(currentTicket);
+        } else {
+          console.warn('⚠️ [getAllActiveBranchTips] Ticket head sans document:', headBlock.ticketId);
+        }
+      } catch (error) {
+        console.error('❌ [getAllActiveBranchTips] Erreur traitement head:', error);
+      }
+    }
 
     console.log('🚀 [getAllActiveBranchTips] ✅', {
-      branchTipsFound: branchTips.length,
-      cacheUpdated: branchTipsCache.size,
-      queryCount: 1 // Une seule requête !
+      headsFound: headBlocks.length,
+      ticketsRecovered: tickets.length,
+      queryCount: Math.ceil(headBlocks.length / 10) + 1 // Estimation des requêtes
     });
 
-    return branchTips;
+    return tickets;
 
   } catch (error) {
     console.error('❌ [getAllActiveBranchTips] Erreur:', error);
@@ -74,7 +84,7 @@ export const getAllActiveBranchTips = async (restaurantId: string): Promise<Tick
 };
 
 /**
- * ⚡ ULTRA-RAPIDE - Récupère le bout d'une branche spécifique (avec cache intelligent)
+ * ⚡ ARCHITECTURE HYBRIDE - Récupère le head d'une branche via l'index
  */
 export const getBranchTip = async (
   mainChainTicketId: string,
@@ -82,79 +92,34 @@ export const getBranchTip = async (
   useCache = true
 ): Promise<TicketData> => {
   try {
-    const now = Date.now();
+    console.log('⚡ [getBranchTip] Récupération via architecture hybride:', mainChainTicketId);
+
+    // 1. Récupérer le head depuis la chaîne globale
+    const headBlock = await getTicketHead(restaurantId, mainChainTicketId);
     
-    // 💾 Vérifier le cache en premier
-    if (useCache && branchTipsCache.has(mainChainTicketId)) {
-      const cached = branchTipsCache.get(mainChainTicketId)!;
-      
-      if (now - cached.lastUpdate < BRANCH_TIPS_CACHE_DURATION) {
-        console.log('⚡ [getBranchTip] CACHE HIT:', mainChainTicketId, '-> ticket', cached.ticketId);
-        
-        // Récupérer depuis le cache local ou Firebase (1 seule lecture)
-        const ticketRef = doc(getTicketsCollectionRef(restaurantId), cached.ticketId);
-        const ticketSnap = await getDoc(ticketRef);
-        
-        if (ticketSnap.exists()) {
-          return { id: cached.ticketId, ...ticketSnap.data() } as TicketData;
-        }
-      }
+    if (!headBlock) {
+      throw new Error(`Aucun head trouvé pour le ticket ${mainChainTicketId}`);
     }
 
-    console.log('⚡ [getBranchTip] CACHE MISS - Recherche optimisée:', mainChainTicketId);
-    
+    // 2. Récupérer le ticket correspondant
     const ticketsRef = getTicketsCollectionRef(restaurantId);
+    const ticketRef = doc(ticketsRef, headBlock.ticketId);
+    const ticketSnap = await getDoc(ticketRef);
     
-    // 🔍 Requête optimisée : chercher le fork actif le plus profond OU le ticket principal
-    const branchTipQuery = query(
-      ticketsRef,
-      where('active', '==', true),
-      where('parentTicketId', 'in', [mainChainTicketId, null]), // Parent OU ticket principal
-      orderBy('forkDepth', 'desc'), // Le plus profond en premier
-      limit(1) // Seulement le bout de la branche
-    );
-
-    let branchTipSnap = await getDocs(branchTipQuery);
-    
-    // Si aucun fork actif trouvé, récupérer le ticket principal
-    if (branchTipSnap.empty) {
-      const mainTicketRef = doc(ticketsRef, mainChainTicketId);
-      const mainTicketSnap = await getDoc(mainTicketRef);
-      
-      if (mainTicketSnap.exists()) {
-        const mainTicket = { id: mainChainTicketId, ...mainTicketSnap.data() } as TicketData;
-        
-        // Mettre à jour le cache
-        branchTipsCache.set(mainChainTicketId, {
-          ticketId: mainChainTicketId,
-          lastUpdate: now,
-          chainDepth: 0
-        });
-        
-        return mainTicket;
-      }
-      
-      throw new Error(`Ticket ${mainChainTicketId} introuvable`);
+    if (!ticketSnap.exists()) {
+      throw new Error(`Ticket ${headBlock.ticketId} introuvable`);
     }
 
-    const branchTipDoc = branchTipSnap.docs[0];
-    const branchTip = { id: branchTipDoc.id, ...branchTipDoc.data() } as TicketData;
+    const ticket = { id: headBlock.ticketId, ...ticketSnap.data() } as TicketData;
 
-    // 💾 Mettre à jour le cache
-    branchTipsCache.set(mainChainTicketId, {
-      ticketId: branchTip.id,
-      lastUpdate: now,
-      chainDepth: branchTip.forkDepth || 0
-    });
-
-    console.log('⚡ [getBranchTip] ✅ Bout de branche trouvé:', {
+    console.log('⚡ [getBranchTip] ✅ Head trouvé:', {
       mainChainId: mainChainTicketId,
-      branchTipId: branchTip.id,
-      chainDepth: branchTip.forkDepth || 0,
-      isFork: branchTip.blockType === 'fork'
+      headTicketId: ticket.id,
+      operation: headBlock.operation,
+      sequenceId: headBlock.sequenceId
     });
 
-    return branchTip;
+    return ticket;
 
   } catch (error) {
     console.error('❌ [getBranchTip] Erreur:', error);
@@ -163,97 +128,39 @@ export const getBranchTip = async (
 };
 
 /**
- * 🔄 BATCH - Récupère les bouts de plusieurs branches en une fois (ultra-optimisé)
+ * 🔄 NOUVELLE ARCHITECTURE - Récupère les bouts de plusieurs branches via chaîne globale
  */
 export const getBatchBranchTips = async (
   mainChainTicketIds: string[],
   restaurantId: string
 ): Promise<Map<string, TicketData>> => {
   try {
-    console.log('🔄 [getBatchBranchTips] Récupération batch de', mainChainTicketIds.length, 'bouts de branches');
+    console.log('🔄 [getBatchBranchTips] Récupération batch via chaîne globale:', mainChainTicketIds.length);
 
-    const uncachedIds: string[] = [];
-    const now = Date.now();
-
-    // 1️⃣ Vérifier le cache pour tous les IDs
-    mainChainTicketIds.forEach(id => {
-      if (branchTipsCache.has(id)) {
-        const cached = branchTipsCache.get(id)!;
-        if (now - cached.lastUpdate < BRANCH_TIPS_CACHE_DURATION) {
-          // On récupérera ces tickets en batch
-          return;
-        }
-      }
-      uncachedIds.push(id);
-    });
-
-    // 2️⃣ Si tous sont en cache, récupération batch des tickets
-    if (uncachedIds.length === 0) {
-      console.log('🔄 [getBatchBranchTips] Tous en cache - récupération batch');
-      
-      const cachedTicketIds = mainChainTicketIds.map(id => branchTipsCache.get(id)!.ticketId);
-      const batchResults = await getBatchTicketsByIds(cachedTicketIds, restaurantId);
-      
-      mainChainTicketIds.forEach(mainId => {
-        const cachedInfo = branchTipsCache.get(mainId)!;
-        const ticket = batchResults.get(cachedInfo.ticketId);
-        if (ticket) {
-          results.set(mainId, ticket);
-        }
-      });
-
-      return results;
-    }
-
-    // 3️⃣ Requête optimisée pour les non-cachés + mise à jour cache
+    const results = new Map<string, TicketData>();
     const ticketsRef = getTicketsCollectionRef(restaurantId);
-    
-    // Récupérer tous les tickets actifs qui pourraient être des bouts de branches
-    const allActiveTipsQuery = query(
-      ticketsRef,
-      where('active', '==', true),
-      where('parentTicketId', 'in', [...uncachedIds, null])
-    );
 
-    const allActiveTipsSnap = await getDocs(allActiveTipsQuery);
-    
-    // Traiter les résultats et identifier les bouts de branches
-    const ticketsByMainChain = new Map<string, TicketData[]>();
-    
-    allActiveTipsSnap.forEach(docSnap => {
-      const ticket = { id: docSnap.id, ...docSnap.data() } as TicketData;
-      const mainChainId = ticket.parentTicketId || ticket.id;
-      
-      if (!ticketsByMainChain.has(mainChainId)) {
-        ticketsByMainChain.set(mainChainId, []);
-      }
-      ticketsByMainChain.get(mainChainId)!.push(ticket);
-    });
-
-    // Identifier le bout de chaque branche (ticket avec forkDepth le plus élevé)
-    uncachedIds.forEach(mainChainId => {
-      const chainTickets = ticketsByMainChain.get(mainChainId) || [];
-      
-      if (chainTickets.length > 0) {
-        const branchTip = chainTickets.reduce((tip, ticket) => 
-          (ticket.forkDepth || 0) > (tip.forkDepth || 0) ? ticket : tip
-        );
+    // Utiliser la nouvelle architecture pour récupérer chaque head
+    for (const mainChainId of mainChainTicketIds) {
+      try {
+        const headBlock = await getTicketHead(restaurantId, mainChainId);
         
-        results.set(mainChainId, branchTip);
-        
-        // Mettre à jour le cache
-        branchTipsCache.set(mainChainId, {
-          ticketId: branchTip.id,
-          lastUpdate: now,
-          chainDepth: branchTip.forkDepth || 0
-        });
+        if (headBlock) {
+          const ticketRef = doc(ticketsRef, headBlock.ticketId);
+          const ticketSnap = await getDoc(ticketRef);
+          
+          if (ticketSnap.exists()) {
+            const ticket = { id: headBlock.ticketId, ...ticketSnap.data() } as TicketData;
+            results.set(mainChainId, ticket);
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ [getBatchBranchTips] Erreur pour ticket:', mainChainId, error);
       }
-    });
+    }
 
     console.log('🔄 [getBatchBranchTips] ✅', {
       requested: mainChainTicketIds.length,
-      cacheHits: mainChainTicketIds.length - uncachedIds.length,
-      cacheMisses: uncachedIds.length,
       found: results.size
     });
 
@@ -317,7 +224,7 @@ export const getBranchTipsCacheStats = () => {
 // ====== FONCTIONS BLOCKCHAIN POUR FORK ======
 
 /**
- * 🔀 Crée un fork (ticket orphelin) lors d'une modification
+ * 🔀 Crée un fork via la chaîne globale hybride
  */
 export const createTicketFork = async (
   originalTicketId: string,
@@ -327,7 +234,7 @@ export const createTicketFork = async (
   forkReason: 'modification' | 'correction' | 'annulation' = 'modification'
 ): Promise<string> => {
   try {
-    console.log('🔀 [createTicketFork] Création d\'un fork pour ticket:', originalTicketId);
+    console.log('🔀 [createTicketFork] Création fork via chaîne globale:', originalTicketId);
 
     // 🚀 Auto-démarrer la synchronisation temps réel si pas encore active
     startTicketsRealtimeSync(restaurantId);
@@ -352,7 +259,7 @@ export const createTicketFork = async (
       prixChange: changes.prixChange
     });
 
-    // 3. Créer les données du fork
+    // 3. Créer les données du fork (ticket modifié)
     const forkTicketData: Omit<TicketData, 'id'> = {
       ...originalTicket,           // Copier toutes les données originales
       ...updateData,               // Appliquer les modifications
@@ -360,61 +267,43 @@ export const createTicketFork = async (
       // ====== MÉTADONNÉES DU FORK ======
       blockType: 'fork',
       parentTicketId: originalTicketId,
-      mainChainHash: originalTicket.hashe || '', // Hash du bloc principal référencé
       forkReason,
       forkTimestamp: serverTimestamp() as any,
-      isOrphan: true,
       forkDepth: (originalTicket.forkDepth || 0) + 1,
-      originalTicketData: {
-        plats: originalTicket.plats,
-        totalPrice: originalTicket.totalPrice,
-        status: originalTicket.status,
-        notes: originalTicket.notes
-      },
       
       // ====== TRACKING DES MODIFICATIONS ======
       modified: true,
       dateModification: serverTimestamp() as any,
-      platsdeleted: changes.platsSupprimees.length > 0 ? [
-        ...(originalTicket.platsdeleted || []),
-        ...changes.platsSupprimees.map(plat => ({
-          ...plat,
-          dateSupression: serverTimestamp(),
-          supprimePar: employeeId
-        } as any))
-      ] : originalTicket.platsdeleted,
-      
-      // ====== NOUVEL ID ET HACHAGE ======
-      active: true, // Le fork devient le ticket actif
       employeeId: employeeId || originalTicket.employeeId,
       timestamp: serverTimestamp() as any
     };
 
-    // 4. Calculer le hash du fork (basique pour l'instant)
-    const forkHash = generateTicketHash(forkTicketData, originalTicketId);
-    forkTicketData.hashe = forkHash;
-
-    // 5. Créer le document fork dans Firebase
+    // 4. Créer le document fork dans Firebase
     const forkRef = await addDoc(getTicketsCollectionRef(restaurantId), forkTicketData);
 
-    console.log('🔀 [createTicketFork] Fork créé avec succès:', {
+    // 5. ⭐ NOUVEAU : Ajouter l'opération à la chaîne globale
+    const sequenceId = await addOperationToGlobalChain(
+      restaurantId,
+      originalTicketId, // ID du ticket principal (pas du fork)
+      'update',
+      {
+        forkTicketId: forkRef.id,
+        originalTicketId,
+        changes,
+        forkReason,
+        updateData,
+        employeeId
+      }
+    );
+
+    console.log('🔀 [createTicketFork] Fork et séquence créés:', {
       forkId: forkRef.id,
       parentId: originalTicketId,
-      forkHash: forkHash.substring(0, 8) + '...',
-      forkDepth: forkTicketData.forkDepth
+      sequenceId,
+      operation: 'update'
     });
 
-    // 6. Mettre à jour le cache pour marquer l'original comme inactif (pas d'updateDoc!)
-    const originalTicketInCache = {
-      ...originalTicket,
-      active: false,
-      replacedByFork: forkRef.id,
-      forkTimestamp: new Date()
-    };
-    
-    updateTicketInCache(originalTicketInCache);
-
-    // 7. Ajouter le fork au cache
+    // 6. Mettre à jour les caches
     const newForkTicket: TicketData = {
       id: forkRef.id,
       ...forkTicketData
@@ -422,14 +311,7 @@ export const createTicketFork = async (
     
     addTicketToCache(newForkTicket);
 
-    // 8. Mettre à jour le ticket original dans le cache
-    updateTicketInCache({
-      ...originalTicket,
-      active: false,
-      replacedByFork: forkRef.id
-    });
-
-    console.log('✅ [createTicketFork] Ticket original marqué comme remplacé par fork');
+    console.log('✅ [createTicketFork] Fork créé via chaîne globale');
 
     return forkRef.id;
 
@@ -529,14 +411,9 @@ export const getBlockchainStats = async (restaurantId: string): Promise<Blockcha
     const forksSnap = await getDocs(forksQuery);
     const forksCount = forksSnap.size;
 
-    // Compter les tickets actifs
-    const activeTicketsQuery = query(
-      ticketsRef,
-      where('active', '==', true)
-    );
-
-    const activeTicketsSnap = await getDocs(activeTicketsQuery);
-    const totalActiveTickets = activeTicketsSnap.size;
+    // ✅ NOUVELLE ARCHITECTURE : Compter via la chaîne globale
+    const headBlocks = await getAllTicketHeads(restaurantId);
+    const totalActiveTickets = headBlocks.length;
 
     // Récupérer les tickets orphelins
     const orphanedTickets: string[] = [];
@@ -590,17 +467,31 @@ export const getActiveTicket = async (
   restaurantId: string
 ): Promise<TicketData> => {
   try {
-    console.log('🎯 [getActiveTicket] Recherche du ticket actif pour:', originalTicketId);
+    console.log('🎯 [getActiveTicket] Recherche du ticket actif via chaîne globale:', originalTicketId);
 
-    const chain = await getTicketChain(originalTicketId, restaurantId);
+    // ⭐ NOUVEAU : Utiliser la chaîne globale pour récupérer le head
+    const currentHead = await getTicketHead(restaurantId, originalTicketId);
+    if (!currentHead) {
+      throw new Error('Ticket introuvable dans la chaîne globale');
+    }
+
+    // Récupérer les données du ticket head
+    const ticketRef = doc(getTicketsCollectionRef(restaurantId), currentHead.ticketId);
+    const ticketSnap = await getDoc(ticketRef);
     
-    console.log('🎯 [getActiveTicket] Ticket actif trouvé:', {
-      activeId: chain.activeTicket.id,
-      isMainTicket: chain.activeTicket.id === originalTicketId,
-      isFork: chain.activeTicket.blockType === 'fork'
+    if (!ticketSnap.exists()) {
+      throw new Error('Données du ticket head introuvables');
+    }
+
+    const ticketData = { id: currentHead.ticketId, ...ticketSnap.data() } as TicketData;
+
+    console.log('🎯 [getActiveTicket] Ticket actif trouvé via chaîne globale:', {
+      activeId: ticketData.id,
+      sequenceId: currentHead.sequenceId,
+      operation: currentHead.operation
     });
 
-    return chain.activeTicket;
+    return ticketData;
 
   } catch (error) {
     console.error('❌ [getActiveTicket] Erreur:', error);
@@ -663,14 +554,14 @@ const generateTicketHash = (ticketData: Omit<TicketData, 'id'>, parentId: string
 };
 
 /**
- * 🎯 Crée un nouveau ticket (bloc principal de la chaîne)
+ * 🎯 Crée un nouveau ticket via la chaîne globale hybride
  */
 export const createMainChainTicket = async (
   ticketData: Omit<TicketData, 'id'>, 
   restaurantId: string
 ): Promise<string> => {
   try {
-    console.log('🎯 [createMainChainTicket] Création nouveau bloc chaîne principale');
+    console.log('🎯 [createMainChainTicket] Création nouveau ticket via chaîne globale');
     
     // 🚀 Auto-démarrer la synchronisation temps réel si pas encore active
     startTicketsRealtimeSync(restaurantId);
@@ -679,18 +570,17 @@ export const createMainChainTicket = async (
       throw new Error("Données de ticket incomplètes");
     }
 
-    // ====== DONNÉES DU NOUVEAU BLOC PRINCIPAL ======
+    // ====== DONNÉES DU NOUVEAU TICKET ======
     const mainChainTicketData = {
       ...ticketData,
-      active: true,
       status: 'en_attente' as const,
       dateCreation: serverTimestamp(),
       timestamp: serverTimestamp(),
       
       // ====== MÉTADONNÉES BLOCKCHAIN ======
       blockType: 'main' as const, // 🔗 Bloc principal dans la chaîne
-      isOrphan: false,
-      forkDepth: 0
+      forkDepth: 0,
+      modified: false
     };
 
     // Filtrer les valeurs undefined
@@ -701,6 +591,20 @@ export const createMainChainTicket = async (
     // ✅ CRÉER dans la collection restaurant/tickets
     const docRef = await addDoc(getTicketsCollectionRef(restaurantId), filteredTicketData);
     
+    // ⭐ NOUVEAU : Ajouter l'opération à la chaîne globale
+    const sequenceId = await addOperationToGlobalChain(
+      restaurantId,
+      docRef.id, // ID du ticket principal
+      'create',
+      {
+        ticketId: docRef.id,
+        tableId: ticketData.tableId,
+        plats: ticketData.plats,
+        totalPrice: ticketData.totalPrice,
+        employeeId: ticketData.employeeId
+      }
+    );
+
     // Créer l'objet ticket complet pour le cache
     const newTicket: TicketData = {
       id: docRef.id,
@@ -710,15 +614,112 @@ export const createMainChainTicket = async (
     // Ajouter au cache
     addTicketToCache(newTicket);
     
-    console.log('✅ [createMainChainTicket] Nouveau bloc principal créé:', {
+    console.log('✅ [createMainChainTicket] Ticket et séquence créés:', {
       ticketId: docRef.id,
-      blockType: 'main',
+      sequenceId,
+      operation: 'create',
       tableId: ticketData.tableId
     });
     
     return docRef.id;
   } catch (error) {
     console.error("❌ [createMainChainTicket] Erreur lors de la création:", error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ Valide un ticket via la chaîne globale hybride
+ */
+export const validateTicket = async (
+  ticketId: string,
+  restaurantId: string,
+  employeeId: string,
+  paymentMethod: 'especes' | 'carte' | 'cheque' | 'virement' = 'especes'
+): Promise<void> => {
+  try {
+    console.log('✅ [validateTicket] Validation ticket via chaîne globale:', ticketId);
+
+    // 🚀 Auto-démarrer la synchronisation temps réel si pas encore active
+    startTicketsRealtimeSync(restaurantId);
+
+    // 1. Récupérer le ticket à valider via la chaîne globale
+    const currentHead = await getTicketHead(restaurantId, ticketId);
+    if (!currentHead) {
+      throw new Error('Ticket introuvable dans la chaîne');
+    }
+
+    // 2. Récupérer les données complètes du ticket
+    const ticketRef = doc(getTicketsCollectionRef(restaurantId), currentHead.ticketId);
+    const ticketSnap = await getDoc(ticketRef);
+    
+    if (!ticketSnap.exists()) {
+      throw new Error('Données du ticket introuvables');
+    }
+
+    const ticketData = { id: currentHead.ticketId, ...ticketSnap.data() } as TicketData;
+
+    // 3. Vérifier que le ticket peut être validé
+    if (ticketData.status === 'encaissee') {
+      console.log('⚠️ [validateTicket] Ticket déjà validé');
+      return;
+    }
+
+    // 4. Créer les données de validation
+    const validationData: Partial<TicketData> = {
+      status: 'encaissee',
+      dateTerminee: serverTimestamp() as any,
+      notes: `Validé par ${employeeId} - Paiement: ${paymentMethod}`,
+      timestamp: serverTimestamp() as any
+    };
+
+    // 5. Créer un nouveau bloc pour la validation
+    const validatedTicketData: Omit<TicketData, 'id'> = {
+      ...ticketData,
+      ...validationData,
+      blockType: 'fork',
+      parentTicketId: ticketData.parentTicketId || ticketId,
+      modified: true,
+      dateModification: serverTimestamp() as any,
+      employeeId
+    };
+
+    // 6. Créer le nouveau document de validation
+    const validationRef = await addDoc(getTicketsCollectionRef(restaurantId), validatedTicketData);
+
+    // 7. ⭐ NOUVEAU : Ajouter l'opération à la chaîne globale
+    const sequenceId = await addOperationToGlobalChain(
+      restaurantId,
+      ticketId, // ID du ticket principal
+      'terminate',
+      {
+        validationTicketId: validationRef.id,
+        originalTicketId: ticketId,
+        paymentMethod,
+        validatedBy: employeeId,
+        validationData
+      }
+    );
+
+    console.log('✅ [validateTicket] Validation et séquence créées:', {
+      validationId: validationRef.id,
+      ticketId,
+      sequenceId,
+      operation: 'terminate'
+    });
+
+    // 8. Mettre à jour le cache
+    const validatedTicket: TicketData = {
+      id: validationRef.id,
+      ...validatedTicketData
+    } as TicketData;
+    
+    addTicketToCache(validatedTicket);
+
+    console.log('✅ [validateTicket] Ticket validé via chaîne globale');
+
+  } catch (error) {
+    console.error('❌ [validateTicket] Erreur lors de la validation:', error);
     throw error;
   }
 };
@@ -732,6 +733,7 @@ export default {
   getActiveTicket,
   updateTicketWithFork,
   createMainChainTicket,
+  validateTicket,
   
   // 🚀 Optimisations pour accès rapide aux bouts de branches
   getAllActiveBranchTips,

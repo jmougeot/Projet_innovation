@@ -6,15 +6,8 @@ import {
 } from "firebase/firestore";
 import { TicketData, PlatQuantite, UpdateTicketData, TicketChainData } from './types';
 import { getTicketsCollectionRef } from './config';
-import { calculateTicketHash, getLastTerminatedTicketHash } from './hash';
-import {
-  addTicketToCache,
-  updateTicketInCache,
-  removeTicketFromCache,
-} from './cache';
-import { 
-  prepareTicketUpdateWithTracking
-} from './modifications';
+import { calculateTicketHash, getLastTerminatedTicketHash } from './hash'
+
 import { 
   createMainChainTicket, 
   updateTicketWithFork, 

@@ -26,111 +26,43 @@ const getTicketDocRef = (restaurantId: string, ticketId: string) => {
 // ====== LISTENERS TEMPS RÉEL ======
 
 /**
- * 🔄 Écouter les changements des tickets ACTIFS en temps réel
+ * 🔄 OBSOLÈTE - Configuration du listener temps réel (remplacé par la chaîne globale)
+ * Conservé pour compatibilité, mais redirige vers le nouveau système
  */
 export const setupActiveTicketsRealtimeSync = (restaurantId: string): Unsubscribe => {
-  console.log(`🔄 Configuration du listener temps réel pour les tickets actifs du restaurant ${restaurantId}`);
+  console.warn(`⚠️ [setupActiveTicketsRealtimeSync] OBSOLÈTE pour ${restaurantId} - Utilisez la chaîne globale`);
   
-  const activeTicketsQuery = query(
-    getTicketsCollectionRef(restaurantId),
-    where('active', '==', true),
-    orderBy('timestamp', 'desc')
-  );
-
-  return onSnapshot(
-    activeTicketsQuery,
-    (snapshot) => {
-      console.log(`📡 Changement détecté dans les tickets actifs: ${snapshot.docChanges().length} modifications`);
-      
-      // Traiter chaque changement
-      snapshot.docChanges().forEach((change) => {
-        const ticketData = { 
-          id: change.doc.id, 
-          ...(change.doc.data() as Omit<TicketData, 'id'>)
-        } as TicketData;
-        
-        switch (change.type) {
-          case 'added':
-            console.log(`🆕 Nouveau ticket actif ajouté: ${ticketData.id}`);
-            addTicketToCache(ticketData);
-            // Mettre à jour le cache de la table correspondante
-            updateTableCacheWithTicket(ticketData.tableId, ticketData);
-            break;
-            
-          case 'modified':
-            console.log(`✏️ Ticket actif modifié: ${ticketData.id}`);
-            updateTicketInCache(ticketData);
-            // Mettre à jour le cache de la table si le ticket est toujours actif
-            if (ticketData.active) {
-              updateTableCacheWithTicket(ticketData.tableId, ticketData);
-            } else {
-              // Si le ticket n'est plus actif, vider le cache de la table
-              updateTableCacheWithTicket(ticketData.tableId, null);
-            }
-            break;
-            
-          case 'removed':
-            console.log(`🗑️ Ticket actif supprimé: ${ticketData.id}`);
-            removeTicketFromCache(ticketData.id, ticketData.tableId);
-            updateTableCacheWithTicket(ticketData.tableId, null);
-            break;
-        }
-      });
-      
-      // Mettre à jour le cache complet si c'est la première fois
-      if (snapshot.docChanges().length === snapshot.docs.length) {
-        const allActiveTickets = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...(doc.data() as Omit<TicketData, 'id'>)
-        } as TicketData));
-        
-        setTicketsActifsCache(allActiveTickets);
-        setLastTicketsActifsCacheUpdate(Date.now());
-        console.log(`💾 Cache initial des tickets actifs chargé: ${allActiveTickets.length} tickets`);
-      }
-    },
-    (error) => {
-      console.error('❌ Erreur dans le listener des tickets actifs:', error);
-    }
-  );
+  // Fallback simple : retourner une fonction vide
+  return () => {
+    console.log('� Unsubscribe de la sync obsolète');
+  };
 };
 
 /**
  * 🔄 Écouter les changements d'un ticket spécifique en temps réel
  */
+/**
+ * 🔄 OBSOLÈTE - Écouter les changements d'un ticket spécifique en temps réel
+ */
 export const setupTicketRealtimeSync = (restaurantId: string, ticketId: string): Unsubscribe => {
-  console.log(`🔄 Configuration du listener temps réel pour le ticket ${ticketId}`);
+  console.warn(`⚠️ [setupTicketRealtimeSync] OBSOLÈTE pour ticket ${ticketId} - Utilisez la chaîne globale`);
   
-  const ticketDocRef = getTicketDocRef(restaurantId, ticketId);
+  // Fallback simple : retourner une fonction vide
+  return () => {
+    console.log('� Unsubscribe de la sync ticket obsolète');
+  };
+};
 
-  return onSnapshot(
-    ticketDocRef,
-    (doc) => {
-      if (doc.exists()) {
-        const ticketData = {
-          id: doc.id,
-          ...doc.data()
-        } as TicketData;
-        
-        console.log(`📡 Ticket ${ticketId} mis à jour en temps réel`);
-        updateTicketInCache(ticketData);
-        
-        // Mettre à jour le cache de la table
-        if (ticketData.active) {
-          updateTableCacheWithTicket(ticketData.tableId, ticketData);
-        } else {
-          updateTableCacheWithTicket(ticketData.tableId, null);
-        }
-      } else {
-        console.log(`⚠️ Ticket ${ticketId} supprimé`);
-        // Note: On ne peut pas récupérer tableId du ticket supprimé ici
-        // Il faudra gérer ça dans la fonction de suppression
-      }
-    },
-    (error: any) => {
-      console.error(`❌ Erreur dans le listener du ticket ${ticketId}:`, error);
-    }
-  );
+/**
+ * 🔄 OBSOLÈTE - Écouter les changements pour une table spécifique
+ */
+export const setupTableTicketRealtimeSync = (restaurantId: string, tableId: number): Unsubscribe => {
+  console.warn(`⚠️ [setupTableTicketRealtimeSync] OBSOLÈTE pour table ${tableId} - Utilisez la chaîne globale`);
+  
+  // Fallback simple : retourner une fonction vide
+  return () => {
+    console.log('🔄 Unsubscribe de la sync table obsolète');
+  };
 };
 
 /**

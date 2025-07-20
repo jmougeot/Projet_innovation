@@ -59,16 +59,17 @@ export const calculateTicketHash = (ticket: TicketData): string => {
 };
 
 /**
- * Récupère le dernier ticket terminé pour obtenir son hash (chaîne de hachage)
- * @param restaurantId ID du restaurant
- * @returns Le hash du dernier ticket terminé et son index
+ * 🔍 OBSOLÈTE - Récupère le hash du dernier ticket terminé dans la chaîne
+ * Cette fonction est remplacée par l'architecture hybride globalChain.ts
  */
 export const getLastTerminatedTicketHash = async (restaurantId: string): Promise<{ hash: string; index: number } | null> => {
+  console.warn('⚠️ [getLastTerminatedTicketHash] OBSOLÈTE - Utilisez verifyGlobalChain() à la place');
+  
   try {
     const ticketsRef = getTicketsCollectionRef(restaurantId);
     const q = query(
       ticketsRef,
-      where('active', '==', false),
+      where('deleted', '!=', true), // Remplacer active par un critère plus approprié
       orderBy('chainIndex', 'desc'),
       limit(1) 
     );
