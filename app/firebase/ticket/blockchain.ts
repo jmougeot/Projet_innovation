@@ -9,7 +9,7 @@ import {
   limit, 
   serverTimestamp
 } from 'firebase/firestore';
-import { TicketData, UpdateTicketData, TicketChainData, BlockchainTicketInfo } from './types';
+import { TicketData, UpdateTicketData, TicketChainData, BlockchainTicketInfo, PlatQuantite } from './types';
 import { getTicketsCollectionRef } from './config';
 import { analyzeTicketChanges } from './modifications';
 import { updateTicketInCache, addTicketToCache } from './cache';
@@ -18,9 +18,7 @@ import {
   addOperationToGlobalChain,
   getTicketHead,
   getAllTicketHeads,
-  getTicketHistory,
-  verifyGlobalChain,
-  verifyTicket
+  removeTicketHead
 } from './globalChain';
 
 // ====== OPTIMISATIONS POUR ACCÈS RAPIDE AUX BOUTS DE BRANCHES ======
@@ -292,7 +290,7 @@ export const createTicketFork = async (
         changes,
         forkReason,
         updateData,
-        employeeId
+        employeeId: employeeId || 'default' // Fallback si undefined
       }
     );
 
@@ -361,8 +359,8 @@ export const getTicketChain = async (
 
     const chainDepth = Math.max(0, ...forks.map(fork => fork.forkDepth || 0));
 
-    // Déterminer le ticket actif (celui avec active: true)
-    const activeTicket = forks.find(fork => fork.active) || mainTicket;
+    // Déterminer le ticket actif (celui avec le dernier timestamp)
+    const activeTicket = forks.length > 0 ? forks[forks.length - 1] : mainTicket;
 
     console.log('🔗 [getTicketChain] Chaîne récupérée:', {
       mainTicketId: ticketId,
@@ -472,7 +470,7 @@ export const getActiveTicket = async (
     // ⭐ NOUVEAU : Utiliser la chaîne globale pour récupérer le head
     const currentHead = await getTicketHead(restaurantId, originalTicketId);
     if (!currentHead) {
-      throw new Error('Ticket introuvable dans la chaîne globale');
+      throw new Error(`Ticket ${originalTicketId} introuvable ou déjà encaissé (plus de head actif)`);
     }
 
     // Récupérer les données du ticket head
@@ -540,7 +538,7 @@ export const updateTicketWithFork = async (
  */
 const generateTicketHash = (ticketData: Omit<TicketData, 'id'>, parentId: string): string => {
   const hashData = {
-    plats: ticketData.plats?.map(p => ({ id: p.plat.id, qty: p.quantite })) || [],
+    plats: ticketData.plats?.map((p: PlatQuantite) => ({ id: p.plat.id, qty: p.quantite })) || [],
     totalPrice: ticketData.totalPrice,
     status: ticketData.status,
     parentId,
@@ -601,7 +599,7 @@ export const createMainChainTicket = async (
         tableId: ticketData.tableId,
         plats: ticketData.plats,
         totalPrice: ticketData.totalPrice,
-        employeeId: ticketData.employeeId
+        employeeId: ticketData.employeeId || 'default' // Fallback si undefined
       }
     );
 
@@ -673,7 +671,7 @@ export const validateTicket = async (
       timestamp: serverTimestamp() as any
     };
 
-    // 5. Créer un nouveau bloc pour la validation
+    // 5. � BLOCKCHAIN : Créer un nouveau bloc de validation (immutable)
     const validatedTicketData: Omit<TicketData, 'id'> = {
       ...ticketData,
       ...validationData,
@@ -681,34 +679,40 @@ export const validateTicket = async (
       parentTicketId: ticketData.parentTicketId || ticketId,
       modified: true,
       dateModification: serverTimestamp() as any,
-      employeeId
+      employeeId: employeeId || 'default'
     };
 
-    // 6. Créer le nouveau document de validation
+    // Créer le nouveau document de validation (immutable)
     const validationRef = await addDoc(getTicketsCollectionRef(restaurantId), validatedTicketData);
 
-    // 7. ⭐ NOUVEAU : Ajouter l'opération à la chaîne globale
+    // 6. ⭐ NOUVEAU : Ajouter l'opération à la chaîne globale
+    // L'opération 'terminate' est liée au ticket original, mais les métadonnées pointent vers le bloc de validation
     const sequenceId = await addOperationToGlobalChain(
       restaurantId,
-      ticketId, // ID du ticket principal
+      ticketId, // Ticket original pour l'historique et le head
       'terminate',
       {
-        validationTicketId: validationRef.id,
+        validationTicketId: validationRef.id, // Le vrai document à utiliser
         originalTicketId: ticketId,
         paymentMethod,
-        validatedBy: employeeId,
+        validatedBy: employeeId || 'default',
         validationData
       }
     );
 
+    // 7. �️ CORRECTION : Supprimer le head du ticket (plus besoin puisque encaissé)
+    // Le ticket encaissé n'est plus "actif" donc son head doit être supprimé
+    await removeTicketHead(restaurantId, ticketId);
+
     console.log('✅ [validateTicket] Validation et séquence créées:', {
       validationId: validationRef.id,
-      ticketId,
+      originalTicketId: ticketId,
       sequenceId,
-      operation: 'terminate'
+      operation: 'terminate',
+      headRemoved: `Head supprimé pour ticket ${ticketId}`
     });
 
-    // 8. Mettre à jour le cache
+    // 7. Mettre à jour le cache avec le nouveau bloc de validation
     const validatedTicket: TicketData = {
       id: validationRef.id,
       ...validatedTicketData

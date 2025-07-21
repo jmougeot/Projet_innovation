@@ -21,7 +21,7 @@ function Encaissement() {
     const [platsEncaisses, setPlatsEncaisses] = useState<PlatQuantite[]>([]);
     const [totalSelectionnes, setTotalSelectionnes] = useState<number>(0);
     const [totalEncaisses, setTotalEncaisses] = useState<number>(0);
-    const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque'>('carte');
+    const [paymentMethod, setPaymentMethod] = useState<'carte' | 'especes' | 'cheque' | 'virement'>('carte');
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
     useEffect(() => {
@@ -134,11 +134,22 @@ function Encaissement() {
                 return;
             }
             
+            if (!CurrentRestaurantId) {
+                alert('Erreur: Aucun restaurant sélectionné.');
+                return;
+            }
+            
             const montantTotal = ticketParTable ? ticketParTable.totalPrice : 0;
             
             if (montantTotal > 0) {
-                await distributeAmount(currentUserId, montantTotal);
-                console.log(`Montant de ${montantTotal}€ ajouté au CA de l'employé ${currentUserId} et du restaurant`);
+                // 🔧 DIAGNOSTIC : Ajouter des logs pour diagnostiquer le problème
+                console.log(`💰 [ENCAISSEMENT DEBUG] Tentative distribution montant:`);
+                console.log(`💰 [ENCAISSEMENT DEBUG] - Employé ID: ${currentUserId}`);
+                console.log(`💰 [ENCAISSEMENT DEBUG] - Montant: ${montantTotal}€`);
+                console.log(`💰 [ENCAISSEMENT DEBUG] - Restaurant ID: ${CurrentRestaurantId}`);
+                
+                await distributeAmount(currentUserId, montantTotal, CurrentRestaurantId);
+                console.log(`✅ [ENCAISSEMENT SUCCESS] Montant de ${montantTotal}€ ajouté au CA de l'employé ${currentUserId} et du restaurant ${CurrentRestaurantId}`);
             }
             
             // Mettre à jour la progression des missions basée sur les plats encaissés
@@ -192,15 +203,21 @@ function Encaissement() {
              
             console.log(`💰 [ENCAISSEMENT] Finalisation ticket ID: ${ticketIdToUse} pour table ${tableId}`);
             
-            if (!CurrentRestaurantId) {
-                alert('Erreur: Aucun restaurant sélectionné.');
-                return;
-            }
-            
-            await terminerTicket(ticketIdToUse, CurrentRestaurantId);
+            // 🆕 NOUVELLE ARCHITECTURE : Utiliser terminerTicket avec tous les paramètres
+            await terminerTicket(
+                ticketIdToUse, 
+                CurrentRestaurantId,
+                undefined, // satisfaction (optionnel)
+                undefined, // notes (optionnel) 
+                paymentMethod, // 🎯 NOUVEAU : Utiliser la méthode de paiement sélectionnée
+                currentUserId // 🎯 NOUVEAU : Passer l'employeeId
+            );
             
             // Afficher le message de succès avec les informations sur les missions
-            alert(`Encaissement réussi !${missionMessage}`);
+            const paymentLabel = paymentMethod === 'carte' ? 'Carte bancaire' : 
+                                paymentMethod === 'especes' ? 'Espèces' : 
+                                paymentMethod === 'cheque' ? 'Chèque' : 'Virement';
+            alert(`Encaissement réussi !${missionMessage}\n💳 Méthode: ${paymentLabel}`);
             router.replace('../(tabs)/plan_de_salle');
         } catch (error) {
             console.error("Erreur lors de l'encaissement:", error);
@@ -209,7 +226,7 @@ function Encaissement() {
     };
 
     const renderPaymentMethodButton = (
-        method: 'carte' | 'especes' | 'cheque', 
+        method: 'carte' | 'especes' | 'cheque' | 'virement', 
         icon: keyof typeof MaterialIcons.glyphMap, 
         label: string
     ) => (
@@ -240,6 +257,7 @@ function Encaissement() {
                 {renderPaymentMethodButton('carte', 'credit-card', 'Carte')}
                 {renderPaymentMethodButton('especes', 'attach-money', 'Espèces')}
                 {renderPaymentMethodButton('cheque', 'receipt', 'Chèque')}
+                {renderPaymentMethodButton('virement', 'account-balance', 'Virement')}
             </View>
 
             <View style={styles.sectionsContainer}>
@@ -367,7 +385,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 15,
         borderRadius: 25,
-        flex: 0.3,
+        flex: 0.22,
     },
     activePaymentMethod: {
         backgroundColor: '#EFBC51',

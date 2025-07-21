@@ -80,23 +80,24 @@ export const logCacheStatus = (context?: string) => {
 
 /**
  * Met à jour un ticket spécifique dans le cache au lieu de vider tout le cache
+ * ✅ NOUVELLE ARCHITECTURE - Plus de gestion du booléen active
  */
 export const updateTicketInCache = (updatedTicket: TicketData) => {
   // Mettre à jour le cache global des tickets actifs
   if (ticketsActifsCache) {
     const index = ticketsActifsCache.findIndex(ticket => ticket.id === updatedTicket.id);
     if (index !== -1) {
-      // Si le ticket est maintenant inactif, le retirer du cache des actifs
-      if (!updatedTicket.active) {
+      // Si le ticket est terminé, le retirer du cache des actifs
+      if (updatedTicket.status === 'encaissee') {
         ticketsActifsCache.splice(index, 1);
-        console.log(`🔄 Ticket ${updatedTicket.id} retiré du cache (inactif)`);
+        console.log(`🔄 Ticket ${updatedTicket.id} retiré du cache (terminé)`);
       } else {
         // Sinon, mettre à jour le ticket existant
         ticketsActifsCache[index] = updatedTicket;
         console.log(`🔄 Ticket ${updatedTicket.id} mis à jour dans le cache`);
       }
-    } else if (updatedTicket.active) {
-      // Si c'est un nouveau ticket actif, l'ajouter au cache
+    } else if (updatedTicket.status !== 'encaissee') {
+      // Si c'est un nouveau ticket non terminé, l'ajouter au cache
       ticketsActifsCache.unshift(updatedTicket); // Ajouter au début (plus récent)
       console.log(`🔄 Nouveau ticket ${updatedTicket.id} ajouté au cache`);
     }
@@ -104,33 +105,41 @@ export const updateTicketInCache = (updatedTicket: TicketData) => {
   
   // Mettre à jour le cache par table si le ticket correspond
   if (ticketsByTableCache.has(updatedTicket.tableId)) {
-    if (updatedTicket.active) {
+    if (updatedTicket.status !== 'encaissee') {
       ticketsByTableCache.set(updatedTicket.tableId, updatedTicket);
       ticketsByTableCacheTimestamp.set(updatedTicket.tableId, Date.now());
       console.log(`🔄 Cache table ${updatedTicket.tableId} mis à jour`);
     } else {
-      // Si le ticket n'est plus actif, retirer de ce cache
+      // Si le ticket est terminé, retirer de ce cache
       ticketsByTableCache.set(updatedTicket.tableId, null);
       ticketsByTableCacheTimestamp.set(updatedTicket.tableId, Date.now());
-      console.log(`🔄 Cache table ${updatedTicket.tableId} vidé (ticket inactif)`);
+      console.log(`🔄 Cache table ${updatedTicket.tableId} vidé (ticket terminé)`);
     }
   }
 };
 
 /**
  * Ajoute un nouveau ticket au cache
+ * ✅ NOUVELLE ARCHITECTURE - Plus de gestion du booléen active
  */
 export const addTicketToCache = (newTicket: TicketData) => {
   // Ajouter au cache global des tickets actifs
-  if (ticketsActifsCache && newTicket.active) {
+  if (ticketsActifsCache && newTicket.status !== 'encaissee') {
     ticketsActifsCache.unshift(newTicket); // Ajouter au début (plus récent)
     console.log(`➕ Nouveau ticket ${newTicket.id} ajouté au cache global`);
   }
   
-  // Ajouter au cache par table
-  ticketsByTableCache.set(newTicket.tableId, newTicket);
-  ticketsByTableCacheTimestamp.set(newTicket.tableId, Date.now());
-  console.log(`➕ Nouveau ticket ${newTicket.id} ajouté au cache table ${newTicket.tableId}`);
+  // Ajouter au cache par table SEULEMENT si le ticket n'est pas terminé
+  if (newTicket.status !== 'encaissee') {
+    ticketsByTableCache.set(newTicket.tableId, newTicket);
+    ticketsByTableCacheTimestamp.set(newTicket.tableId, Date.now());
+    console.log(`➕ Nouveau ticket ${newTicket.id} ajouté au cache table ${newTicket.tableId}`);
+  } else {
+    // Si le ticket est terminé, le retirer du cache de la table
+    ticketsByTableCache.set(newTicket.tableId, null);
+    ticketsByTableCacheTimestamp.delete(newTicket.tableId);
+    console.log(`➖ Ticket terminé ${newTicket.id} retiré du cache table ${newTicket.tableId}`);
+  }
 };
 
 /**

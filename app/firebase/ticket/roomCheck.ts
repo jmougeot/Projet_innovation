@@ -50,7 +50,7 @@ const getActiveTicketFromCache = (tableId: number): { ticketId: string; isActive
   if (cachedTicket && (now - cacheTime) < TABLE_CACHE_DURATION) {
     return {
       ticketId: cachedTicket.id,
-      isActive: cachedTicket.active
+      isActive: cachedTicket.status !== 'encaissee'
     };
   }
   
@@ -122,7 +122,7 @@ export const checkActiveTicketsInRoom = async (
           console.log(`💾 Cache miss pour table ${table.id}, requête Firebase...`);
           
           const activeTicket = await getTicketByTableId(table.id, restaurantId, true);
-          if (activeTicket && activeTicket.active) {
+          if (activeTicket && activeTicket.status !== 'encaissee') {
             activeTablesWithTickets.push({
               tableId: table.id,
               tableNumero: table.numero,

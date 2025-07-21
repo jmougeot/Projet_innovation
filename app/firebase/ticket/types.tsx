@@ -31,7 +31,6 @@ export interface TicketData {
   employeeId: string;
   plats: PlatQuantite[];
   totalPrice: number;
-  active: boolean; // Indique si le ticket est actif ou non
   status: 'en_attente' | 'en_preparation' | 'prete' | 'servie' | 'encaissee';
   timestamp: Timestamp | Date;
   tableId: number;

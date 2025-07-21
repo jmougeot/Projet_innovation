@@ -127,42 +127,7 @@ export const getTicketsActifs = async (restaurantId: string): Promise<TicketData
 };
 
 /**
- * 📊 ÉCOUTE TEMPS RÉEL - OBSOLÈTE : Remplacé par la synchronisation temps réel globale
- * Cette fonction est conservée pour compatibilité mais redirige vers le nouveau système
- */
-export const listenToTicketsActifs = (restaurantId: string, callback: (tickets: TicketData[]) => void): Unsubscribe => {
-  console.warn('⚠️ [listenToTicketsActifs] OBSOLÈTE : Utilisez startTicketsRealtimeSync() à la place');
-  
-  // Fallback : utilisation d'un polling simple
-  let isActive = true;
-  
-  const pollTickets = async () => {
-    if (!isActive) return;
-    
-    try {
-      const tickets = await getTicketsActifs(restaurantId);
-      callback(tickets);
-    } catch (error) {
-      console.error('❌ Erreur polling tickets:', error);
-    }
-    
-    // Poll toutes les 5 secondes
-    if (isActive) {
-      setTimeout(pollTickets, 5000);
-    }
-  };
-  
-  // Démarrer le polling
-  pollTickets();
-  
-  // Retourner une fonction d'unsubscribe
-  return () => {
-    isActive = false;
-  };
-};
-
-/**
- * 🔍 NOUVELLE ARCHITECTURE - Récupère un ticket actif par Table ID via chaîne globale
+ *  NOUVELLE ARCHITECTURE - Récupère un ticket actif par Table ID via chaîne globale
  */
 export const getTicketByTableId = async (tableId: number, restaurantId: string, useCache = true): Promise<TicketData | null> => {
   try {
@@ -213,7 +178,7 @@ export const getTicketByTableId = async (tableId: number, restaurantId: string, 
         if (ticketSnap.exists()) {
           const ticketData = { id: headBlock.ticketId, ...ticketSnap.data() } as TicketData;
           
-          // Vérifier le tableId et que le ticket n'est pas terminé
+          // 🔧 CORRECTION : Vérifier le tableId et que le ticket n'est pas terminé
           if (ticketData.tableId === tableId && ticketData.status !== 'encaissee') {
             console.log(`✅ [NOUVELLE ARCHI] Ticket trouvé pour table ${tableId}:`, ticketData.id);
             

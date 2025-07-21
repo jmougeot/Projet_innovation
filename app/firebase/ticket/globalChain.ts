@@ -8,6 +8,7 @@ import {
   limit, 
   where,
   setDoc,
+  deleteDoc,
   serverTimestamp,
   collection
 } from 'firebase/firestore';
@@ -55,7 +56,12 @@ export const addOperationToGlobalChain = async (
     const sequenceNumber = await getNextSequenceNumber(restaurantId);
     const sequenceId = `Séq.${sequenceNumber.toString().padStart(3, '0')}`;
 
-    // 3. Créer le nouveau bloc
+    // 3. Filtrer les valeurs undefined des données
+    const filteredData = Object.fromEntries(
+      Object.entries(data || {}).filter(([_, value]) => value !== undefined)
+    );
+
+    // 4. Créer le nouveau bloc
     const newBlock: GlobalChainBlock = {
       sequenceId,
       ticketId,
@@ -63,7 +69,7 @@ export const addOperationToGlobalChain = async (
       timestamp: serverTimestamp(),
       previousHash,
       hash: '', // Sera calculé
-      data,
+      data: filteredData,
       restaurantId
     };
 
@@ -207,6 +213,25 @@ export const updateTicketHead = async (
 
   } catch (error) {
     console.error('❌ [TicketHead] Erreur mise à jour head:', error);
+    throw error;
+  }
+};
+
+/**
+ * 🗑️ Supprime le head d'un ticket (lors de l'encaissement)
+ */
+export const removeTicketHead = async (
+  restaurantId: string,
+  ticketId: string
+): Promise<void> => {
+  try {
+    const headRef = doc(db, 'restaurants', restaurantId, 'ticket_heads', ticketId);
+    await deleteDoc(headRef);
+
+    console.log('🗑️ [TicketHead] Head supprimé (ticket encaissé):', { ticketId });
+
+  } catch (error) {
+    console.error('❌ [TicketHead] Erreur suppression head:', error);
     throw error;
   }
 };

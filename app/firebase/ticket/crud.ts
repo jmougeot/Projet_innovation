@@ -1,18 +1,12 @@
-import {
-  addDoc,
-  doc,
-  getDoc,
-  serverTimestamp,
-} from "firebase/firestore";
-import { TicketData, PlatQuantite, UpdateTicketData, TicketChainData } from './types';
-import { getTicketsCollectionRef } from './config';
-import { calculateTicketHash, getLastTerminatedTicketHash } from './hash'
+
+import { TicketData, UpdateTicketData, TicketChainData } from './types';
 
 import { 
   createMainChainTicket, 
   updateTicketWithFork, 
   getActiveTicket,
-  getTicketChain 
+  getTicketChain,
+  validateTicket
 } from './blockchain';
 
 // ====== FONCTIONS PRINCIPALES CRUD BLOCKCHAIN ======
@@ -34,64 +28,47 @@ export const createTicket = async (ticketData: Omit<TicketData, 'id'>, restauran
 };
 
 /**
- * 🏁 TERMINER TICKET - Crée un fork pour marquer le ticket comme terminé (BLOCKCHAIN)
+ * 🏁 TERMINER TICKET - Utilise la nouvelle architecture hybride (validateTicket)
  */
 export const terminerTicket = async (
   ticketId: string, 
   restaurantId: string, 
   satisfaction?: number, 
-  notes?: string
+  notes?: string,
+  paymentMethod: 'especes' | 'carte' | 'cheque' | 'virement' = 'especes',
+  employeeId?: string
 ): Promise<void> => {
   try {
-    console.log(`🏁 [terminerTicket] Finalisation ticket via fork: ${ticketId}`);
+    console.log(`🏁 [terminerTicket] Finalisation ticket via nouvelle architecture: ${ticketId}`);
     
-    // Récupérer le ticket actuellement actif (peut être un fork)
-    const activeTicket = await getActiveTicket(ticketId, restaurantId);
-    
-    const dateCreation = activeTicket.dateCreation instanceof Date 
-      ? activeTicket.dateCreation.getTime() 
-      : activeTicket.dateCreation?.toMillis ? activeTicket.dateCreation.toMillis() 
-      : Date.now();
-    
-    // Récupérer les informations de la chaîne de hachage
-    const lastTicketHash = await getLastTerminatedTicketHash(restaurantId);
-    const chainIndex = lastTicketHash ? lastTicketHash.index + 1 : 1;
-    const previousHash = lastTicketHash ? lastTicketHash.hash : '';
-    
-    // Préparer les données de mise à jour pour le fork de finalisation
-    const updateDataForTermination: UpdateTicketData = {
-      active: false,
-      status: 'encaissee',
-      dureeTotal: Date.now() - dateCreation,
-      chainIndex: chainIndex,
-      previousHash: previousHash,
-      // Only include satisfaction and notes if defined
-      ...(satisfaction !== undefined && { satisfaction }),
-      ...(notes !== undefined && { notes })
-    };
-    
-    // Créer le ticket avec les nouvelles données pour calculer le hash
-    const ticketForHash = { ...activeTicket, ...updateDataForTermination };
-    const ticketHash = calculateTicketHash(ticketForHash);
-    
-    // Ajouter le hash aux données de mise à jour
-    updateDataForTermination.hashe = ticketHash;
-    
-    // Créer un fork de finalisation au lieu d'un updateDoc
-    const finalForkId = await updateTicketWithFork(
-      activeTicket.id,
+    // ✅ NOUVELLE ARCHITECTURE : Utiliser validateTicket au lieu de l'ancien système
+    await validateTicket(
+      ticketId,
       restaurantId,
-      updateDataForTermination,
-      activeTicket.employeeId,
-      'correction' // Fork de finalisation
+      employeeId || 'default',
+      paymentMethod
     );
     
-    console.log('✅ [terminerTicket] Ticket terminé via fork:', { 
-      originalTicketId: ticketId,
-      finalForkId, 
-      hash: ticketHash, 
-      chainIndex, 
-      previousHash: previousHash || 'GENESIS' 
+    // Si satisfaction ou notes sont fournis, créer un fork supplémentaire pour les ajouter
+    if (satisfaction !== undefined || notes !== undefined) {
+      const updateData: UpdateTicketData = {};
+      if (satisfaction !== undefined) updateData.satisfaction = satisfaction;
+      if (notes !== undefined) updateData.notes = notes;
+      
+      await updateTicketWithFork(
+        ticketId,
+        restaurantId,
+        updateData,
+        employeeId || 'default',
+        'correction'
+      );
+    }
+    
+    console.log('✅ [terminerTicket] Ticket terminé via nouvelle architecture:', {
+      ticketId,
+      paymentMethod,
+      satisfaction,
+      notes
     });
     
   } catch (error) {
@@ -155,8 +132,7 @@ export const deleteTicket = async (
       ticketId,
       restaurantId,
       {
-        active: false,
-        status: 'encaissee', // Statut final
+        status: 'encaissee', // Statut final pour suppression
         notes: 'Ticket supprimé' // Indiquer la suppression
       },
       employeeId,

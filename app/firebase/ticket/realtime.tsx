@@ -26,47 +26,8 @@ const getTicketDocRef = (restaurantId: string, ticketId: string) => {
 // ====== LISTENERS TEMPS RÉEL ======
 
 /**
- * 🔄 OBSOLÈTE - Configuration du listener temps réel (remplacé par la chaîne globale)
- * Conservé pour compatibilité, mais redirige vers le nouveau système
- */
-export const setupActiveTicketsRealtimeSync = (restaurantId: string): Unsubscribe => {
-  console.warn(`⚠️ [setupActiveTicketsRealtimeSync] OBSOLÈTE pour ${restaurantId} - Utilisez la chaîne globale`);
-  
-  // Fallback simple : retourner une fonction vide
-  return () => {
-    console.log('� Unsubscribe de la sync obsolète');
-  };
-};
-
-/**
- * 🔄 Écouter les changements d'un ticket spécifique en temps réel
- */
-/**
- * 🔄 OBSOLÈTE - Écouter les changements d'un ticket spécifique en temps réel
- */
-export const setupTicketRealtimeSync = (restaurantId: string, ticketId: string): Unsubscribe => {
-  console.warn(`⚠️ [setupTicketRealtimeSync] OBSOLÈTE pour ticket ${ticketId} - Utilisez la chaîne globale`);
-  
-  // Fallback simple : retourner une fonction vide
-  return () => {
-    console.log('� Unsubscribe de la sync ticket obsolète');
-  };
-};
-
-/**
- * 🔄 OBSOLÈTE - Écouter les changements pour une table spécifique
- */
-export const setupTableTicketRealtimeSync = (restaurantId: string, tableId: number): Unsubscribe => {
-  console.warn(`⚠️ [setupTableTicketRealtimeSync] OBSOLÈTE pour table ${tableId} - Utilisez la chaîne globale`);
-  
-  // Fallback simple : retourner une fonction vide
-  return () => {
-    console.log('🔄 Unsubscribe de la sync table obsolète');
-  };
-};
-
-/**
- * 🔄 Écouter les changements des tickets d'une table spécifique en temps réel
+ * ✅ NOUVELLE ARCHITECTURE - Écouter les changements des tickets d'une table via chaîne globale
+ * Remplace l'ancien système where('active', '==', true)
  */
 export const setupTableTicketsRealtimeSync = (restaurantId: string, tableId: number): Unsubscribe => {
   console.log(`🔄 Configuration du listener temps réel pour les tickets de la table ${tableId}`);
@@ -74,14 +35,14 @@ export const setupTableTicketsRealtimeSync = (restaurantId: string, tableId: num
   const tableTicketsQuery = query(
     getTicketsCollectionRef(restaurantId),
     where('tableId', '==', tableId),
-    where('active', '==', true),
+    where('status', '!=', 'encaissee'), // Utiliser le statut au lieu d'active
     orderBy('timestamp', 'desc')
   );
 
   return onSnapshot(
     tableTicketsQuery,
     (snapshot) => {
-      console.log(`📡 Tickets de la table ${tableId} mis à jour: ${snapshot.docs.length} tickets actifs`);
+      console.log(`📡 Tickets de la table ${tableId} mis à jour: ${snapshot.docs.length} tickets non terminés`);
       
       // Prendre le ticket le plus récent (premier dans la liste triée par timestamp desc)
       const latestTicket = snapshot.docs.length > 0 ? {
@@ -131,11 +92,8 @@ export const startTicketsRealtimeSync = async (restaurantId: string): Promise<vo
     // Arrêter les listeners existants pour ce restaurant
     stopTicketsRealtimeSync(restaurantId);
     
-    // Configurer le listener pour tous les tickets actifs
-    const activeTicketsListener = setupActiveTicketsRealtimeSync(restaurantId);
-    activeTicketListeners.set(`${restaurantId}_active`, activeTicketsListener);
-    
-    console.log(`✅ Synchronisation temps réel des tickets démarrée pour ${restaurantId}`);
+    // ✅ NOUVELLE ARCHITECTURE : Utiliser la chaîne globale au lieu de listeners spécifiques
+    console.log(`✅ Synchronisation temps réel basée sur la chaîne globale pour ${restaurantId}`);
   } catch (error) {
     console.error('❌ Erreur lors du démarrage de la synchronisation temps réel des tickets:', error);
     throw error;

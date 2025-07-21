@@ -118,7 +118,7 @@ const AutoRedirect = ({
           }
         } catch (tokenError) {
           console.error('🚨 [Security] Erreur de validation du token:', tokenError);
-          router.replace('/connexion');
+          router.replace('/connexion' as any);
           return;
         }
 
@@ -133,7 +133,7 @@ const AutoRedirect = ({
           } catch (storageError) {
             console.error('❌ [AutoRedirect] Erreur AsyncStorage:', storageError);
             // SÉCURITÉ : En cas d'erreur AsyncStorage, rediriger vers sélection
-            router.replace('/restaurant/select');
+            router.replace('/restaurant/select' as any);
             return;
           }
         }

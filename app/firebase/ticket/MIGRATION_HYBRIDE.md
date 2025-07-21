@@ -13,7 +13,7 @@ Cette mise à jour **supprime complètement le système active: boolean** et le 
 ```
 restaurants/{restaurantId}/
 ├── tickets/                    # Collection existante (inchangée)
-├── global_chain/              # 🆕 Chaîne séquentielle globale
+├── global_chain/             # 🆕 Chaîne séquentielle globale
 │   └── Séq.001, Séq.002...   # Blocs ordonnés chronologiquement
 ├── ticket_map/               # 🆕 Index direct des tickets
 │   └── {ticketId}            # Mapping vers head actuel

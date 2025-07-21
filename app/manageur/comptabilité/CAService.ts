@@ -17,12 +17,13 @@ export interface RestaurantFinances {
 
 /**
  * Récupère les données du restaurant et des employés
+ * @param restaurantId ID du restaurant pour les nouvelles règles de sécurité
  * @returns Les finances du restaurant et la liste des employés
  */
-export const fetchFinancialData = async (): Promise<{ restaurantFinances: RestaurantFinances, employees: User[] }> => {
+export const fetchFinancialData = async (restaurantId: string): Promise<{ restaurantFinances: RestaurantFinances, employees: User[] }> => {
   try {
-    // Récupérer le CA total du restaurant
-    const restaurantRef = doc(db, 'restaurant', 'finances');
+    // 🔧 CORRECTION : Utiliser le chemin correct selon les règles de sécurité
+    const restaurantRef = doc(db, 'restaurants', restaurantId, 'accounting', 'finances');
     const restaurantDoc = await getDoc(restaurantRef);
     
     let restaurantFinances: RestaurantFinances;
@@ -62,19 +63,21 @@ export const fetchFinancialData = async (): Promise<{ restaurantFinances: Restau
 };
 
 /**
- * Met à jour le CA total du restaurant dans Firestore
- * @param caTotal Le nouveau chiffre d'affaires total
+ * Met à jour le CA du restaurant dans Firestore
+ * @param restaurantId ID du restaurant pour les nouvelles règles de sécurité
+ * @param newCA Nouveau chiffre d'affaires du restaurant
  */
-export const updateRestaurantCA = async (caTotal: number): Promise<void> => {
+export const updateRestaurantCA = async (restaurantId: string, newCA: number): Promise<void> => {
   try {
-    const restaurantRef = doc(db, 'restaurant', 'finances');
+    // 🔧 CORRECTION : Utiliser le chemin correct selon les règles de sécurité
+    const restaurantRef = doc(db, 'restaurants', restaurantId, 'accounting', 'finances');
     await updateDoc(restaurantRef, {
-      caTotal,
+      caTotal: newCA,
       lastUpdated: new Date().toISOString()
     });
   } catch (error) {
     console.error("Erreur lors de la mise à jour du CA du restaurant:", error);
-    throw new Error("Impossible de mettre à jour le CA du restaurant");
+    throw error;
   }
 };
 
@@ -95,13 +98,14 @@ export const updateUserCA = async (userId: string, chiffreAffaire: number): Prom
 
 /**
  * Sauvegarde les modifications du CA du restaurant et de tous les employés
+ * @param restaurantId ID du restaurant pour les nouvelles règles de sécurité
  * @param restaurantCA Le CA total du restaurant
  * @param employees La liste des employés avec leurs CA
  */
-export const saveAllChanges = async (restaurantCA: number, employees: User[]): Promise<void> => {
+export const saveAllChanges = async (restaurantId: string, restaurantCA: number, employees: User[]): Promise<void> => {
   try {
     // Mettre à jour le CA du restaurant
-    await updateRestaurantCA(restaurantCA);
+    await updateRestaurantCA(restaurantId, restaurantCA);
 
     // Mettre à jour le CA de chaque employé
     const updatePromises = employees.map(employee => 
@@ -151,11 +155,12 @@ export const filterAndSortEmployees = (
 };
 
 
-export const addToCA = async (target: string, amount: number): Promise<number> => {
+export const addToCA = async (target: string, amount: number, restaurantId: string): Promise<number> => {
   try {
     if (target === 'restaurant') {
-      // Ajouter au CA du restaurant
-      const restaurantRef = doc(db, 'restaurant', 'finances');
+      // 🔧 CORRECTION : Utiliser le chemin correct selon les règles de sécurité
+      // restaurants/{restaurantId}/accounting/finances
+      const restaurantRef = doc(db, 'restaurants', restaurantId, 'accounting', 'finances');
       const restaurantDoc = await getDoc(restaurantRef);
       
       if (restaurantDoc.exists()) {
@@ -198,7 +203,24 @@ export const addToCA = async (target: string, amount: number): Promise<number> =
         
         return finalCA;
       } else {
-        throw new Error("L'employé spécifié n'existe pas");
+        // 🔧 CORRECTION : Créer le document utilisateur s'il n'existe pas
+        console.warn(`⚠️ Document utilisateur ${target} inexistant, création automatique`);
+        
+        const initialCA = amount > 0 ? amount : 0;
+        
+        // Créer un document utilisateur basique avec le CA initial
+        await setDoc(employeeRef, {
+          chiffreAffaire: initialCA,
+          createdAt: new Date().toISOString(),
+          lastUpdated: new Date().toISOString(),
+          // Données par défaut pour éviter les erreurs futures
+          nom: 'Employé',
+          prenom: 'Nouveau',
+          poste: 'Service'
+        });
+        
+        console.log(`✅ Document utilisateur ${target} créé avec CA initial: ${initialCA}€`);
+        return initialCA;
       }
     }
   } catch (error) {
@@ -211,18 +233,19 @@ export const addToCA = async (target: string, amount: number): Promise<number> =
  * Distribue un montant entre le CA du restaurant et celui d'un employé
  * @param employeeId ID de l'employé à créditer
  * @param amount Montant total à ajouter
+ * @param restaurantId ID du restaurant (requis pour les nouvelles règles de sécurité)
  * @returns Un objet avec les nouveaux CA du restaurant et de l'employé
  */
-export const distributeAmount = async (employeeId: string, amount: number): Promise<{ 
+export const distributeAmount = async (employeeId: string, amount: number, restaurantId: string): Promise<{ 
   restaurantCA: number, 
   employeeCA: number 
 }> => {
   try {
     // Ajouter le montant au CA total du restaurant
-    const newRestaurantCA = await addToCA('restaurant', amount);
+    const newRestaurantCA = await addToCA('restaurant', amount, restaurantId);
     
     // Ajouter le même montant au CA de l'employé
-    const newEmployeeCA = await addToCA(employeeId, amount);
+    const newEmployeeCA = await addToCA(employeeId, amount, restaurantId);
     
     return {
       restaurantCA: newRestaurantCA,
